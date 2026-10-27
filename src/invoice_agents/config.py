@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     review_model: str = "grok-4.7"
 
     db_path: Path = Path("inventory.db")
+    # API: graph checkpoints, so a run paused for the VP survives a restart.
+    checkpoint_path: Path = Path("checkpoints.db")
+    samples_dir: Path = Path("data/invoices")
+    uploads_dir: Path = Path("uploads")
+    max_upload_bytes: int = 5 * 1024 * 1024
+    cors_origins: list[str] = ["http://localhost:5173"]
     approval_threshold: float = 10_000
     # Totals within this fraction below the threshold get a warning.
     near_threshold_ratio: float = 0.95

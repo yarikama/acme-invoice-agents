@@ -21,6 +21,7 @@ from invoice_agents.config import get_settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import build_agents
+from invoice_agents.summary import run_status, summarize
 
 console = Console(stderr=True)
 
@@ -91,25 +92,7 @@ async def _process(graph: Any, path: Path, vp_mode: str) -> dict[str, Any]:
         payload = Command(resume=_ask_vp(interrupted, vp_mode))
 
     state = (await graph.aget_state(config)).values
-    return _summary(path, state)
-
-
-def _summary(path: Path, state: dict[str, Any]) -> dict[str, Any]:
-    invoice = state.get("invoice")
-    report = state.get("report")
-    return {
-        "file": path.name,
-        "invoice_number": invoice.invoice_number if invoice else None,
-        "vendor": invoice.vendor if invoice else None,
-        "total": invoice.total if invoice else None,
-        "currency": invoice.currency if invoice else None,
-        "status": "paid" if state.get("payment") else "rejected",
-        "reason": state.get("rejection_reason"),
-        "findings": [f.model_dump(mode="json") for f in report.findings]
-        if report
-        else [],
-        "trace": state.get("trace", []),
-    }
+    return {"file": path.name, **summarize(state, run_status(state, False))}
 
 
 async def _run(args: argparse.Namespace) -> int:

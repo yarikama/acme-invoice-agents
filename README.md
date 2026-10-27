@@ -34,6 +34,23 @@ ingest ──▶ validate ──▶ review ──▶ critique ──▶ pay
 - **Approve.** An approver drafts approve, reject or escalate; a critic checks the draft against the findings and the policy, and the approver revises. Code has the last word: an invoice with an error is rejected and one over $10,000 goes to a human, whatever the agents say.
 - **Pay.** `mock_payment` for approved invoices; rejections are logged with the reasoning.
 
+## API
+
+```bash
+make api        # http://localhost:8000, docs at /docs
+```
+
+| Method | Path | |
+|---|---|---|
+| `POST` | `/api/runs` | Start a run on a sample: `{"sample": "invoice_1013.json"}` |
+| `POST` | `/api/runs/upload` | Start a run on an uploaded file |
+| `POST` | `/api/runs/batch` | Run every sample, in order |
+| `GET` | `/api/runs`, `/api/runs/{id}` | Run list; one run's state and events |
+| `GET` | `/api/runs/{id}/events` | Server-sent events |
+| `POST` | `/api/runs/{id}/decision` | The VP's answer: `{"approved": true, "note": "..."}` |
+
+The event stream replays the run's history, then stays open for live events, including while the run waits for the VP; the decision's events arrive on the same connection. Reconnecting with `Last-Event-ID` skips what the client already has. Checkpoints are stored in SQLite, so the graph state of a paused run survives a restart.
+
 ## Development
 
 ```bash
