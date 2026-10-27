@@ -49,7 +49,7 @@ make api        # http://localhost:8000, docs at /docs
 | `GET` | `/api/runs/{id}/events` | Server-sent events |
 | `POST` | `/api/runs/{id}/decision` | The VP's answer: `{"approved": true, "note": "..."}` |
 
-The event stream replays the run's history, then stays open for live events, including while the run waits for the VP; the decision's events arrive on the same connection. Reconnecting with `Last-Event-ID` skips what the client already has. Checkpoints are stored in SQLite, so the graph state of a paused run survives a restart.
+The event stream replays the run's history, then stays open for live events, including while the run waits for the VP; the decision's events arrive on the same connection. Reconnecting with `Last-Event-ID` skips what the client already has. Graph checkpoints are stored in SQLite. The list of runs is kept in memory for now, so a restart forgets them.
 
 ## Development
 
