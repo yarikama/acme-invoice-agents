@@ -51,6 +51,15 @@ make api        # http://localhost:8000, docs at /docs
 
 The event stream replays the run's history, then stays open for live events, including while the run waits for the VP; the decision's events arrive on the same connection. Reconnecting with `Last-Event-ID` skips what the client already has. Graph checkpoints are stored in SQLite. The list of runs is kept in memory for now, so a restart forgets them.
 
+## Web console
+
+```bash
+make api        # terminal 1: the API on :8000
+make web        # terminal 2: the console on http://localhost:5173
+```
+
+React, Vite and Tailwind. One server-sent event stream (`/api/events`) feeds the whole console: the inbox, the pipeline lights, the agent trace and the VP decision panel all update as events arrive.
+
 ## Development
 
 ```bash
