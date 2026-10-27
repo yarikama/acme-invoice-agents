@@ -29,13 +29,18 @@ class Agents:
     critic: Critic
 
 
-def chat_model(settings: Settings, model: str) -> BaseChatModel:
+def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
     if settings.llm_provider == "xai":
         from langchain_xai import ChatXAI
 
         if settings.xai_api_key is None:
             raise ValueError("LLM_PROVIDER=xai needs XAI_API_KEY")
-        return ChatXAI(model=model, api_key=settings.xai_api_key)
+        return ChatXAI(
+            model=model,
+            api_key=settings.xai_api_key,
+            max_tokens=settings.max_output_tokens,
+            reasoning_effort=reasoning,
+        )
 
     if settings.llm_provider == "openrouter":
         from langchain_openai import ChatOpenAI
@@ -46,6 +51,9 @@ def chat_model(settings: Settings, model: str) -> BaseChatModel:
             model=f"x-ai/{model}",
             base_url=OPENROUTER_BASE_URL,
             api_key=settings.openrouter_api_key,
+            max_completion_tokens=settings.max_output_tokens,
+            # OpenRouter's unified reasoning control.
+            extra_body={"reasoning": {"effort": reasoning}},
         )
 
     raise ValueError(f"No chat model for provider {settings.llm_provider!r}")
@@ -54,8 +62,10 @@ def chat_model(settings: Settings, model: str) -> BaseChatModel:
 def build_agents(settings: Settings) -> Agents:
     if settings.llm_provider == "offline":
         return Agents(NoExtractor(), RuleApprover(), RuleCritic())
-    extract_llm = chat_model(settings, settings.extract_model)
-    review_llm = chat_model(settings, settings.review_model)
+    extract_llm = chat_model(
+        settings, settings.extract_model, settings.extract_reasoning
+    )
+    review_llm = chat_model(settings, settings.review_model, settings.review_reasoning)
     return Agents(
         LLMExtractor(extract_llm), LLMApprover(review_llm), LLMCritic(review_llm)
     )

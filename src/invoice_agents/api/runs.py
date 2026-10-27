@@ -73,6 +73,9 @@ class RunManager:
     def __init__(self, graph: CompiledStateGraph) -> None:
         self.graph = graph
         self.runs: dict[str, Run] = {}
+        # Every event from every run, in order: one stream for the whole console.
+        self.log: list[dict[str, Any]] = []
+        self._log_changed = asyncio.Condition()
         self._tasks: set[asyncio.Task[None]] = set()
 
     def get(self, run_id: str) -> Run:
@@ -154,6 +157,17 @@ class RunManager:
             if run.status in TERMINAL and cursor >= len(run.events):
                 return
 
+    async def all_events(self, after: int = -1) -> AsyncIterator[dict[str, Any]]:
+        """Every run's events with seq > `after`, then live ones. Never ends."""
+        cursor = after + 1
+        while True:
+            async with self._log_changed:
+                await self._log_changed.wait_for(lambda c=cursor: c < len(self.log))
+                pending = self.log[cursor:]
+            for event in pending:
+                yield event
+            cursor += len(pending)
+
     async def close(self) -> None:
         for task in self._tasks:
             task.cancel()
@@ -169,9 +183,20 @@ class RunManager:
         task.add_done_callback(self._tasks.discard)
 
     async def _emit(self, run: Run, event: dict[str, Any]) -> None:
-        async with run._changed:
-            run.events.append({"id": len(run.events), "run_id": run.id, **event})
+        async with run._changed, self._log_changed:
+            full = {
+                "id": len(run.events),
+                "seq": len(self.log),
+                "run_id": run.id,
+                "source": run.source,
+                "created_at": run.created_at,
+                "status": run.status,
+                **event,
+            }
+            run.events.append(full)
+            self.log.append(full)
             run._changed.notify_all()
+            self._log_changed.notify_all()
 
     async def _drive(
         self, run: Run, payload: Any, first: dict[str, Any] | None = None
@@ -182,7 +207,7 @@ class RunManager:
         else:
             await self._emit(run, first)
 
-        interrupted = False
+        request: dict[str, Any] | None = None
         try:
             async for mode, chunk in self.graph.astream(
                 payload, run.config, stream_mode=["updates", "custom"]
@@ -190,22 +215,33 @@ class RunManager:
                 # With a list of stream modes, LangGraph yields (mode, chunk).
                 chunk = cast(dict[str, Any], chunk)
                 if mode == "custom":
-                    await self._emit(run, {"type": "progress", **chunk})
+                    # Renamed so it can't clobber the run's own `status`.
+                    await self._emit(
+                        run,
+                        {
+                            "type": "progress",
+                            "stage": chunk["stage"],
+                            "step": chunk["status"],
+                        },
+                    )
                     continue
                 for node, update in chunk.items():
                     if node == "__interrupt__":
-                        interrupted = True
-                        await self._emit(
-                            run, {"type": "awaiting_vp", "request": update[0].value}
-                        )
+                        request = update[0].value
                         continue
                     for item in (update or {}).get("trace", []):
                         await self._emit(run, {"type": "trace", "node": node, **item})
             snapshot = await self.graph.aget_state(run.config)
             state = cast(InvoiceState, snapshot.values)
-            run.status = run_status(state, interrupted)
+            run.status = run_status(state, request is not None)
             run.summary = summarize(state, run.status)
-            if run.status in TERMINAL:
+            # Sent after the status is final, so clients can trust `status`.
+            if request is not None:
+                await self._emit(
+                    run,
+                    {"type": "awaiting_vp", "request": request, "summary": run.summary},
+                )
+            elif run.status in TERMINAL:
                 await self._emit(run, {"type": "done", "summary": run.summary})
         except ExtractionUnavailableError as exc:
             await self._fail(run, str(exc))
@@ -219,4 +255,5 @@ class RunManager:
 
     async def _fail(self, run: Run, message: str) -> None:
         run.status = "failed"
-        await self._emit(run, {"type": "error", "message": message})
+        # Not "error": EventSource reserves that name for connection errors.
+        await self._emit(run, {"type": "run_error", "message": message})

@@ -131,6 +131,8 @@ async def test_free_text_offline_fails_with_a_reason(client):
     events = manager().get(run["id"]).events
     assert manager().get(run["id"]).status == "failed"
     assert "needs an LLM" in events[-1]["message"]
+    # "error" is EventSource's reserved name for connection errors.
+    assert events[-1]["type"] == "run_error"
 
 
 async def test_upload(client):
@@ -162,3 +164,26 @@ async def test_batch_runs_in_order(client):
     assert status["invoice_1001.txt"] == "failed"
     listed = (await client.get("/api/runs")).json()
     assert len(listed) == 20
+
+
+async def test_global_stream_carries_every_run_in_order(client):
+    a = (await client.post("/api/runs", json={"sample": "invoice_1015.csv"})).json()
+    b = (await client.post("/api/runs", json={"sample": "invoice_1014.xml"})).json()
+    await settle(a["id"])
+    await settle(b["id"])
+
+    seen = []
+    async for event in manager().all_events():
+        seen.append(event)
+        if len(seen) == len(manager().log):
+            break
+    assert [e["seq"] for e in seen] == list(range(len(seen)))
+    assert {e["run_id"] for e in seen} == {a["id"], b["id"]}
+    paused = next(e for e in seen if e["type"] == "awaiting_vp")
+    assert paused["status"] == "awaiting_vp"
+    assert paused["summary"]["invoice"]["invoice_number"] == "INV-1014"
+    done = next(e for e in seen if e["type"] == "done")
+    assert done["status"] == "paid"
+    # Progress steps must not overwrite the run's status.
+    assert all(e["status"] == "running" for e in seen if e["type"] == "progress")
+    assert {e["step"] for e in seen if e["type"] == "progress"} >= {"start"}
