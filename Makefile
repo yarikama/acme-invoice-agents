@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check db run run-all clean
+.PHONY: install lint format typecheck test check db run run-all api clean
 
 install:
 	uv sync
@@ -30,5 +30,8 @@ run:
 run-all:
 	uv run python main.py --dir data/invoices
 
+api:
+	uv run uvicorn invoice_agents.api.app:app --reload --port 8000
+
 clean:
-	rm -rf .pytest_cache .ruff_cache inventory.db
+	rm -rf .pytest_cache .ruff_cache inventory.db checkpoints.db uploads
