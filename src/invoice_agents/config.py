@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     openrouter_api_key: SecretStr | None = None
     extract_model: str = "grok-4.3"
     review_model: str = "grok-4.7"
+    # Cap output, reasoning included: without it the provider reserves the
+    # model's maximum (64K) and small credit limits reject the request.
+    max_output_tokens: int = 8000
+    extract_reasoning: Literal["low", "medium", "high"] = "low"
+    review_reasoning: Literal["low", "medium", "high"] = "medium"
 
     db_path: Path = Path("inventory.db")
     # API: graph checkpoints, so a run paused for the VP survives a restart.

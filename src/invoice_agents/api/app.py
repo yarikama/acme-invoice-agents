@@ -189,16 +189,40 @@ async def stream_events(
     arrive on the same connection.
     """
     _run_or_404(manager, run_id)
-    after = int(last_event_id) if last_event_id and last_event_id.isdigit() else -1
+    return _sse_response(manager.events(run_id, _after(last_event_id)), "id")
+
+
+@app.get("/api/events")
+async def stream_all_events(
+    manager: ManagerDep,
+    last_event_id: Annotated[str | None, Header()] = None,
+) -> StreamingResponse:
+    """Every run's events on one connection, for the console.
+
+    Browsers allow only six HTTP/1.1 connections per host, so one stream per
+    run would stall a batch. The SSE id here is the global `seq`.
+    """
+    return _sse_response(manager.all_events(_after(last_event_id)), "seq")
+
+
+def _after(last_event_id: str | None) -> int:
+    return int(last_event_id) if last_event_id and last_event_id.isdigit() else -1
+
+
+def _sse_response(
+    events: AsyncIterator[dict[str, Any]], id_key: str
+) -> StreamingResponse:
     return StreamingResponse(
-        _sse(manager, run_id, after),
+        _sse(events, id_key),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
-async def _sse(manager: RunManager, run_id: str, after: int) -> AsyncIterator[str]:
-    events = manager.events(run_id, after).__aiter__()
+async def _sse(
+    source: AsyncIterator[dict[str, Any]], id_key: str
+) -> AsyncIterator[str]:
+    events = source.__aiter__()
     next_event = asyncio.ensure_future(anext(events))
     try:
         while True:
@@ -211,7 +235,7 @@ async def _sse(manager: RunManager, run_id: str, after: int) -> AsyncIterator[st
             except StopAsyncIteration:
                 return
             yield (
-                f"id: {event['id']}\nevent: {event['type']}\n"
+                f"id: {event[id_key]}\nevent: {event['type']}\n"
                 f"data: {json.dumps(event)}\n\n"
             )
             next_event = asyncio.ensure_future(anext(events))

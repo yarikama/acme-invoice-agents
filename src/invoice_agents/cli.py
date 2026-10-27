@@ -112,6 +112,12 @@ async def _run(args: argparse.Namespace) -> int:
         except ExtractionUnavailableError as exc:
             console.print(f"  [yellow]skipped[/] {exc}")
             results.append({"file": path.name, "status": "skipped", "reason": str(exc)})
+        except Exception as exc:
+            # One bad invoice or API error must not stop the batch.
+            logging.getLogger(__name__).debug("Run failed", exc_info=True)
+            reason = f"{type(exc).__name__}: {exc}"
+            console.print(f"  [red]failed[/] {reason}")
+            results.append({"file": path.name, "status": "failed", "reason": reason})
 
     for r in results:
         color = {"paid": "green", "rejected": "red"}.get(r["status"], "yellow")
