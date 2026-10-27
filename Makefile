@@ -1,8 +1,9 @@
-.PHONY: install lint format typecheck test check db run run-all api clean
+.PHONY: install lint format typecheck test check db run run-all api web web-check clean
 
 install:
 	uv sync
 	uv run pre-commit install
+	cd web && npm ci
 
 lint:
 	uv run ruff check .
@@ -19,7 +20,7 @@ test:
 	uv run pytest
 
 # Everything CI runs.
-check: lint typecheck test
+check: lint typecheck test web-check
 
 db:
 	uv run python -c "from invoice_agents.inventory import Inventory; Inventory('inventory.db').seed()"
@@ -29,6 +30,12 @@ run:
 
 run-all:
 	uv run python main.py --dir data/invoices
+
+web:
+	cd web && npm run dev
+
+web-check:
+	cd web && npm run lint && npm run typecheck && npm test && npm run build
 
 api:
 	uv run uvicorn invoice_agents.api.app:app --reload --port 8000

@@ -1,0 +1,347 @@
+@import "tailwindcss";
+@import "@fontsource-variable/funnel-sans/index.css";
+@import "@fontsource-variable/martian-mono/wdth.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Instrument: grey panels joined by hairline seams, one signal orange.
+   Orange is only ever a fill under #111 text: as text on light it fails AA. */
+:root {
+  --canvas: #e6e6e3;
+  --panel: #f6f6f4;
+  --raised: #ffffff;
+  --ink: #111111;
+  --ink-2: #55554f;
+  --seam: #c6c6c0;
+  --pale: #e3e3df;
+  --key-shadow: #111111;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #161615;
+  --panel: #1f1f1e;
+  --raised: #292927;
+  --ink: #edede9;
+  --ink-2: #a6a69f;
+  --seam: #383835;
+  --pale: #2e2e2b;
+  --key-shadow: #000000;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-seam: var(--seam);
+  --color-pale: var(--pale);
+  --color-signal: #ff5a1f;
+  --font-sans: "Funnel Sans Variable", system-ui, sans-serif;
+  --font-mono: "Martian Mono Variable", ui-monospace, monospace;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .mono,
+  .cap,
+  .tag {
+    font-family: var(--font-mono);
+    font-stretch: 87.5%;
+    font-weight: 400;
+  }
+  .cap {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--ink-2);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 12px;
+    line-height: 16px;
+    padding: 4px 8px;
+    background: var(--pale);
+    color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* Keys: physical buttons that sink 2px when pressed. */
+  .key {
+    font: inherit;
+    color: var(--ink);
+    background: var(--raised);
+    border: 1px solid var(--ink);
+    border-radius: 0;
+    box-shadow: 0 2px 0 var(--key-shadow);
+    cursor: pointer;
+    transition:
+      transform 80ms ease-out,
+      box-shadow 80ms ease-out;
+  }
+  .key:active:not(:disabled) {
+    transform: translateY(2px);
+    box-shadow: inset 0 1px 0 rgb(0 0 0 / 0.4);
+  }
+  .key:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  .key-sm {
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .key-big {
+    min-height: 80px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 4px;
+    text-align: left;
+    width: 100%;
+  }
+  .key-go {
+    background: var(--color-signal);
+    color: #111111;
+    border-color: #111111;
+  }
+
+  /* Corner brackets mark the selected item, instead of a filled state. */
+  .bracketed {
+    position: relative;
+  }
+  .bracketed::before,
+  .bracketed::after,
+  .bracketed > .bk::before,
+  .bracketed > .bk::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border: 0 solid var(--ink);
+    pointer-events: none;
+  }
+  .bracketed::before {
+    left: 4px;
+    top: 4px;
+    border-left-width: 2px;
+    border-top-width: 2px;
+  }
+  .bracketed::after {
+    right: 4px;
+    bottom: 4px;
+    border-right-width: 2px;
+    border-bottom-width: 2px;
+  }
+  .bracketed > .bk::before {
+    right: 4px;
+    top: 4px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+  }
+  .bracketed > .bk::after {
+    left: 4px;
+    bottom: 4px;
+    border-left-width: 2px;
+    border-bottom-width: 2px;
+  }
+
+  /* Status lights: shape and fill tell them apart, not hue alone. */
+  .lt {
+    position: relative;
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    flex: none;
+  }
+  .lt-paid {
+    background: var(--ink);
+  }
+  .lt-awaiting_vp {
+    background: var(--color-signal);
+    box-shadow: 0 0 0 1px var(--ink);
+  }
+  .lt-rejected,
+  .lt-failed {
+    border: 1.5px solid var(--ink);
+  }
+  .lt-rejected::before,
+  .lt-rejected::after,
+  .lt-failed::before,
+  .lt-failed::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -1px;
+    width: 1.5px;
+    height: calc(100% + 2px);
+    margin-left: -0.75px;
+    background: var(--ink);
+    transform: rotate(45deg);
+  }
+  .lt-rejected::after,
+  .lt-failed::after {
+    transform: rotate(-45deg);
+  }
+  .lt-failed {
+    border-style: dashed;
+  }
+  .lt-queued {
+    border: 1px solid var(--ink-2);
+  }
+  .lt-running {
+    background: var(--color-signal);
+    box-shadow: 0 0 0 1px var(--ink);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  /* Pipeline LEDs. */
+  .led {
+    display: block;
+    height: 16px;
+    box-sizing: border-box;
+    position: relative;
+  }
+  .led-done {
+    background: var(--ink);
+  }
+  .led-flag {
+    border: 1px solid var(--ink);
+    background: repeating-linear-gradient(135deg, var(--ink) 0 2px, transparent 2px 6px);
+  }
+  .led-fail {
+    background: var(--ink);
+  }
+  .led-fail::before,
+  .led-fail::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 2px;
+    width: 2px;
+    height: 12px;
+    margin-left: -1px;
+    background: var(--panel);
+    transform: rotate(45deg);
+  }
+  .led-fail::after {
+    transform: rotate(-45deg);
+  }
+  .led-wait {
+    background: var(--color-signal);
+    box-shadow: inset 0 0 0 1px #111111;
+  }
+  .led-run {
+    background: var(--color-signal);
+    box-shadow: inset 0 0 0 1px #111111;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .led-skip {
+    border: 1px dashed var(--ink-2);
+  }
+  .led-off {
+    border: 1px solid var(--ink-2);
+  }
+
+  /* Finding severity chips. */
+  .chip {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-stretch: 87.5%;
+    font-size: 12px;
+    line-height: 16px;
+    padding: 2px 0;
+    width: 64px;
+    text-align: center;
+    flex: none;
+  }
+  .chip-error {
+    background: var(--ink);
+    color: var(--panel);
+  }
+  .chip-warning {
+    border: 1px solid var(--ink);
+  }
+  .chip-info {
+    background: var(--pale);
+    color: var(--ink-2);
+  }
+
+  /* The LCD: the agent trace, always dark. */
+  .lcd {
+    background: #0f0f0f;
+    color: #e2e2dc;
+    font-family: var(--font-mono);
+    font-stretch: 87.5%;
+    font-size: 12px;
+    line-height: 20px;
+    padding: 16px;
+    border: 1px solid #000000;
+  }
+  .dark .lcd {
+    border-color: var(--seam);
+  }
+  .n-model {
+    color: #5ab0ff;
+  }
+  .n-code {
+    color: #5fd38a;
+  }
+  .n-human {
+    color: #ff7a2f;
+  }
+  .cursor-blink {
+    animation: blink 1s steps(2, start) infinite;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-running,
+  .led-run,
+  .cursor-blink {
+    animation: none;
+  }
+  .key {
+    transition: none;
+  }
+}

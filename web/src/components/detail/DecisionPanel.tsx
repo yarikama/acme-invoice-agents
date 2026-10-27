@@ -1,0 +1,79 @@
+import { useState } from "react";
+
+import { api } from "../../api/client";
+import type { Summary } from "../../api/types";
+import { money } from "../../lib/format";
+
+/** Shown at the top of the detail pane while a run waits for the VP. */
+export function DecisionPanel({ runId, summary }: { runId: string; summary: Summary }) {
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState<"approve" | "reject" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const inv = summary.invoice;
+  const reasons = summary.findings.filter((f) => f.severity !== "info");
+
+  const decide = async (approved: boolean) => {
+    setSending(approved ? "approve" : "reject");
+    setError(null);
+    try {
+      await api.decide(runId, approved, note.trim());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setSending(null);
+    }
+  };
+
+  return (
+    <section aria-labelledby="decision-h" className="bg-panel">
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-signal px-6 py-3 text-[#111111]">
+        <h3 id="decision-h" className="m-0 text-base font-medium">
+          VP decision required
+        </h3>
+        <span className="mono text-xs">paused at human_review</span>
+      </div>
+      <div className="flex flex-col gap-4 p-6">
+        {summary.draft && (
+          <p className="m-0">
+            <span className="cap mr-2">agent recommends {summary.draft.decision}</span>
+            {summary.draft.rationale}
+          </p>
+        )}
+        {reasons.length > 0 && (
+          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+            {reasons.map((f) => (
+              <li key={f.code + f.detail}>
+                <span className="mono mr-2 text-xs text-ink-2">{f.code}</span>
+                {f.detail}
+              </li>
+            ))}
+          </ul>
+        )}
+        <label className="flex flex-col gap-1">
+          <span className="cap">note for the audit log (optional)</span>
+          <input
+            className="key min-h-10 px-3 text-sm shadow-none active:translate-y-0"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={500}
+          />
+        </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <button type="button" className="key key-big key-go" disabled={sending !== null} onClick={() => decide(true)}>
+            <span className="text-lg font-medium">{sending === "approve" ? "Approving…" : "Approve and pay"}</span>
+            <span className="mono text-xs">mock_payment · {inv ? money(inv.total, inv.currency) : ""}</span>
+          </button>
+          <button type="button" className="key key-big" disabled={sending !== null} onClick={() => decide(false)}>
+            <span className="text-lg font-medium">{sending === "reject" ? "Rejecting…" : "Reject"}</span>
+            <span className="mono text-xs">logs your reason, no payment</span>
+          </button>
+        </div>
+        {error && (
+          <p role="alert" className="m-0 text-sm">
+            <span className="tag mr-2">error</span>
+            {error}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
