@@ -1,8 +1,42 @@
-import { useState } from "react";
+import { CheckCircleIcon, HourglassMediumIcon, type Icon, ProhibitIcon } from "@phosphor-icons/react";
+import { type ReactNode, useState } from "react";
 
 import { api } from "../../api/client";
-import type { Summary } from "../../api/types";
+import type { Decision, Summary } from "../../api/types";
 import { money } from "../../lib/format";
+import { sentences } from "../../lib/text";
+import { PixelIcon } from "../Pixel";
+
+const VERDICT: Record<Decision, { label: string; icon: Icon }> = {
+  approve: { label: "Approve", icon: CheckCircleIcon },
+  reject: { label: "Reject", icon: ProhibitIcon },
+  escalate: { label: "Escalate", icon: HourglassMediumIcon },
+};
+
+/** The agent's recommendation as one solid pill. */
+function Verdict({ decision }: { decision: Decision }) {
+  const { label, icon: Glyph } = VERDICT[decision];
+  return (
+    <span className="verdict">
+      <Glyph size={18} weight="bold" aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+/** A labelled inner panel: separates one kind of content from the next without rules. */
+function Sheet({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="sheet">
+      <h4 className="sheet-label">{label}</h4>
+      {children}
+    </section>
+  );
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 /** The VP's approve/reject form for a run paused at human_review. */
 export function DecisionPanel({ runId, summary }: { runId: string; summary: Summary }) {
@@ -28,20 +62,39 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
     <div className="flex h-full min-h-0 flex-col gap-4">
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {summary.draft && (
-          <p className="m-0">
-            <span className="cap mr-2">agent recommends {summary.draft.decision}</span>
-            {summary.draft.rationale}
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="cap">agent recommends</span>
+            <Verdict decision={summary.draft.decision} />
+          </div>
+        )}
+        {summary.route_reason && (
+          <Sheet label="why it needs a VP">
+            <p className="m-0 font-medium">{capitalize(summary.route_reason)}.</p>
+          </Sheet>
+        )}
+        {summary.draft && (
+          <Sheet label="the agent's reasoning">
+            <ul className="facts">
+              {sentences(summary.draft.rationale).map((line, i) => (
+                <li key={i}>
+                  <PixelIcon node="dot" size={12} className="mt-1.5" />
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          </Sheet>
         )}
         {reasons.length > 0 && (
-          <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
-            {reasons.map((f) => (
-              <li key={f.code + f.detail}>
-                <span className="mono mr-2 text-xs text-ink-2">{f.code}</span>
-                {f.detail}
-              </li>
-            ))}
-          </ul>
+          <Sheet label="flags to weigh">
+            <ul className="facts">
+              {reasons.map((f) => (
+                <li key={f.code + f.detail}>
+                  <span className="code-chip">{f.code}</span>
+                  <span>{f.detail}</span>
+                </li>
+              ))}
+            </ul>
+          </Sheet>
         )}
       </div>
       <label className="flex flex-none flex-col gap-1">

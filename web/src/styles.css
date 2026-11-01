@@ -189,19 +189,19 @@
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     backdrop-filter: blur(12px) saturate(1.4);
   }
-  /* The page header: a muted yellow band, the same in both themes, with
-     dark text (about 12:1). Its tokens are reset like the signal card's. */
-  .bar-yellow {
-    --ink: #111111;
-    --ink-2: rgb(17 17 17 / 0.72);
-    --raised: rgb(255 255 255 / 0.55);
-    --pale: rgb(17 17 17 / 0.08);
-    --glass-hi: rgb(255 255 255 / 0.4);
-    background: var(--grain-soft) 0 0 / 200px 200px, rgb(242 207 74 / 0.94);
+  /* The page header: a frosted charcoal band, the same in both themes, with
+     light text. Orange stays reserved for what needs a person. */
+  .bar-ink {
+    --ink: #edede9;
+    --ink-2: rgb(237 237 233 / 0.7);
+    --raised: rgb(255 255 255 / 0.1);
+    --pale: rgb(255 255 255 / 0.1);
+    --glass-hi: rgb(255 255 255 / 0.08);
+    background: var(--grain-soft) 0 0 / 200px 200px, rgb(24 24 23 / 0.9);
     color: var(--ink);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     backdrop-filter: blur(12px) saturate(1.4);
-    box-shadow: 0 1px 12px rgb(0 0 0 / 0.12);
+    box-shadow: 0 1px 16px rgb(0 0 0 / 0.18);
   }
   /* The figures that matter: page title, counts, amounts. */
   .display {
@@ -237,6 +237,64 @@
     background: #111111;
     color: var(--color-signal);
   }
+  /* Decision parts: a solid verdict pill, inner sheets, fact lists, code chips. */
+  .card-signal {
+    --tile: rgb(255 255 255 / 0.26);
+  }
+  .verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 10px;
+    border-radius: 999px;
+    background: #111111;
+    color: #ffffff;
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: 18px;
+    letter-spacing: -0.01em;
+  }
+  .sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: var(--r);
+    background: var(--tile);
+  }
+  .sheet-label {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--ink-2);
+  }
+  .facts {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .facts li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .code-chip {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 18px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: #111111;
+    color: #ffffff;
+  }
+
   /* On the orange, controls are flat single fills: no highlight, no shadow. */
   .card-signal .key {
     background: rgb(255 255 255 / 0.92);
@@ -459,6 +517,93 @@
   }
 }
 
+@layer components {
+  /* Trace rows: number, pixel glyph and node, then the text. */
+  .trace-row {
+    display: grid;
+    grid-template-columns: 24px 118px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    padding: 2px 6px;
+    margin-inline: -6px;
+    border-radius: 6px;
+  }
+  .trace-new {
+    animation: row-in 900ms ease-out;
+  }
+  .trace-guard {
+    background: rgb(255 122 47 / 0.12);
+  }
+  .px-pop {
+    shape-rendering: crispEdges;
+  }
+  .trace-new .px-pop {
+    animation: px-pop 480ms steps(4, end);
+  }
+  .px-caret {
+    display: inline-block;
+    width: 0.55em;
+    height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    background: currentColor;
+    animation: blink 1s steps(2, start) infinite;
+  }
+  .px-sq {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: currentColor;
+  }
+  .px-bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+  }
+  .px-bars i {
+    width: 3px;
+    height: 3px;
+    background: #6b6b65;
+  }
+  .px-bars-live i {
+    background: #ff7a2f;
+    animation: px-bar 720ms steps(4, end) infinite alternate;
+  }
+}
+
+@keyframes row-in {
+  from {
+    background: rgb(95 211 138 / 0.16);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+@keyframes px-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes px-bar {
+  from {
+    height: 3px;
+  }
+  to {
+    height: 12px;
+  }
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -481,8 +626,8 @@
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  .bar-yellow {
-    background: rgb(242 207 74);
+  .bar-ink {
+    background: rgb(24 24 23);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -491,7 +636,11 @@
 @media (prefers-reduced-motion: reduce) {
   .lt-running,
   .led-run,
-  .cursor-blink {
+  .cursor-blink,
+  .px-caret,
+  .px-bars-live i,
+  .trace-new,
+  .trace-new .px-pop {
     animation: none;
   }
   .key {
