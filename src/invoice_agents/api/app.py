@@ -24,7 +24,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel
 
@@ -36,7 +36,6 @@ from invoice_agents.llm import build_agents
 from invoice_agents.models import HumanDecision, SourceFormat
 from invoice_agents.usage import Pricing, openrouter_pricing
 
-KEEPALIVE_SECONDS = 15
 SUFFIXES = {f".{f.value}" for f in SourceFormat}
 
 
@@ -192,70 +191,50 @@ async def decide(
         raise HTTPException(409, str(exc)) from exc
 
 
-@app.get("/api/runs/{run_id}/events")
+def _known_run(run_id: str, manager: ManagerDep) -> str:
+    """A dependency, so an unknown run is a 404 before the stream opens."""
+    _run_or_404(manager, run_id)
+    return run_id
+
+
+@app.get("/api/runs/{run_id}/events", response_class=EventSourceResponse)
 async def stream_events(
-    run_id: str,
+    run_id: Annotated[str, Depends(_known_run)],
     manager: ManagerDep,
     last_event_id: Annotated[str | None, Header()] = None,
-) -> StreamingResponse:
+) -> AsyncIterator[ServerSentEvent]:
     """Server-sent events. Replays history, then streams live until the run ends.
 
     The stream stays open while the run waits for the VP; the decision's events
-    arrive on the same connection.
+    arrive on the same connection. FastAPI frames the events and sends a
+    keep-alive comment while the stream is idle.
     """
-    _run_or_404(manager, run_id)
-    return _sse_response(manager.events(run_id, _after(last_event_id)), "id")
+    async for event in manager.events(run_id, _after(last_event_id)):
+        yield _sse(event, "id")
 
 
-@app.get("/api/events")
+@app.get("/api/events", response_class=EventSourceResponse)
 async def stream_all_events(
     manager: ManagerDep,
     last_event_id: Annotated[str | None, Header()] = None,
-) -> StreamingResponse:
+) -> AsyncIterator[ServerSentEvent]:
     """Every run's events on one connection, for the console.
 
     Browsers allow only six HTTP/1.1 connections per host, so one stream per
     run would stall a batch. The SSE id here is the global `seq`.
     """
-    return _sse_response(manager.all_events(_after(last_event_id)), "seq")
+    async for event in manager.all_events(_after(last_event_id)):
+        yield _sse(event, "seq")
 
 
 def _after(last_event_id: str | None) -> int:
     return int(last_event_id) if last_event_id and last_event_id.isdigit() else -1
 
 
-def _sse_response(
-    events: AsyncIterator[dict[str, Any]], id_key: str
-) -> StreamingResponse:
-    return StreamingResponse(
-        _sse(events, id_key),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+def _sse(event: dict[str, Any], id_key: str) -> ServerSentEvent:
+    return ServerSentEvent(
+        id=str(event[id_key]), event=event["type"], raw_data=json.dumps(event)
     )
-
-
-async def _sse(
-    source: AsyncIterator[dict[str, Any]], id_key: str
-) -> AsyncIterator[str]:
-    events = source.__aiter__()
-    next_event = asyncio.ensure_future(anext(events))
-    try:
-        while True:
-            done, _ = await asyncio.wait({next_event}, timeout=KEEPALIVE_SECONDS)
-            if not done:
-                yield ": keepalive\n\n"
-                continue
-            try:
-                event = next_event.result()
-            except StopAsyncIteration:
-                return
-            yield (
-                f"id: {event[id_key]}\nevent: {event['type']}\n"
-                f"data: {json.dumps(event)}\n\n"
-            )
-            next_event = asyncio.ensure_future(anext(events))
-    finally:
-        next_event.cancel()
 
 
 def _run_or_404(manager: RunManager, run_id: str):
