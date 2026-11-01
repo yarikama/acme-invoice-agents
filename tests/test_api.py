@@ -150,6 +150,26 @@ async def test_upload(client):
     assert bad.status_code == 415
 
 
+async def test_a_scan_without_ocr_fails_with_the_install_hint(
+    client, monkeypatch, caplog
+):
+    from invoice_agents import graph
+    from invoice_agents.ingestion.ocr import OcrUnavailableError
+
+    def no_ocr(path):
+        raise OcrUnavailableError("needs OCR: uv sync --extra ocr")
+
+    monkeypatch.setitem(graph.OCR_BACKENDS, "docling", no_ocr)
+    resp = await client.post("/api/runs/upload", files={"file": ("scan.png", b"png")})
+    await settle(resp.json()["id"])
+    run = manager().get(resp.json()["id"])
+    assert run.status == "failed"
+    [error] = [e for e in run.events if e["type"] == "run_error"]
+    assert error["message"] == "needs OCR: uv sync --extra ocr"
+    # An expected condition, not a crash: no stack trace in the log.
+    assert not [r for r in caplog.records if r.exc_info]
+
+
 async def test_batch_runs_in_order(client):
     runs = (await client.post("/api/runs/batch")).json()
     assert len(runs) == 20

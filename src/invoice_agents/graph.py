@@ -202,10 +202,10 @@ def build_graph(
     async def validate_node(state: InvoiceState) -> InvoiceState:
         _emit("validate", "start")
         invoice = _invoice(state)
-        # SQLite lookups block too; a busy batch shouldn't stall other runs.
-        report = await asyncio.to_thread(
-            validate, invoice, deps.inventory, deps.seen, deps.policy
-        )
+        # Checking and recording the invoice stay one step on the event loop,
+        # with no await between them, so runs that overlap see each other for
+        # duplicates and splits. The checks are fast SQLite lookups.
+        report = validate(invoice, deps.inventory, deps.seen, deps.policy)
         report.findings += [
             Finding(
                 code="EXTRACTION_CORRECTION",
