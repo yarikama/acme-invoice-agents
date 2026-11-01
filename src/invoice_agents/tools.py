@@ -87,12 +87,14 @@ class ReviewTools:
         ]
 
     def run(self, name: str, args: dict[str, Any]) -> ToolCall:
-        func = self._funcs.get(name)
-        if func is None:
+        """Run a tool the model called. LangChain validates and coerces the
+        arguments against the signature, so "100" arrives as 100.0."""
+        tool = next((t for t in self.as_langchain() if t.name == name), None)
+        if tool is None:
             result = f"Unknown tool {name!r}."
         else:
             try:
-                result = func(**args)
+                result = str(tool.invoke(args))
             except (TypeError, ValueError) as exc:
                 result = f"Bad arguments for {name}: {exc}"
         return ToolCall(name=name, args=args, result=result)
