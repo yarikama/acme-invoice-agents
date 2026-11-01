@@ -5,7 +5,9 @@ import type { RunView } from "../../state/runs";
 function closing(run: RunView): string {
   const s = run.summary;
   if (run.status === "paid" && s?.payment)
-    return `Paid ${money(s.payment.amount, s.payment.currency)} through mock_payment.`;
+    return s.payment.duplicate
+      ? `Already paid ${money(s.payment.amount, s.payment.currency)} earlier; no money moved this time.`
+      : `Paid ${money(s.payment.amount, s.payment.currency)} through mock_payment.`;
   if (run.status === "rejected") return s?.reason ?? "Rejected.";
   if (run.status === "failed")
     return `The run stopped before a decision, so nothing was paid.${run.error ? ` ${run.error}` : ""}`;

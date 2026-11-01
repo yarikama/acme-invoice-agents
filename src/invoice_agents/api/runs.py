@@ -24,6 +24,7 @@ from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.graph import InvoiceState
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.models import HumanDecision
+from invoice_agents.payment import MockBank
 from invoice_agents.summary import Status, run_status, summarize
 from invoice_agents.validation import SeenInvoices
 
@@ -89,11 +90,16 @@ def _node_of(item: Mapping[str, Any]) -> str:
 
 class RunManager:
     def __init__(
-        self, graph: CompiledStateGraph, ledger: SeenInvoices | None = None
+        self,
+        graph: CompiledStateGraph,
+        ledger: SeenInvoices | None = None,
+        bank: MockBank | None = None,
     ) -> None:
         self.graph = graph
         # The graph's record of received invoices, kept across restarts.
         self.ledger = ledger or SeenInvoices()
+        # The bank's payment keys: cleared with the ledger on a reset.
+        self.bank = bank
         self.runs: dict[str, Run] = {}
         # Every event from every run, in order: one stream for the whole console.
         self.log: list[dict[str, Any]] = []
@@ -238,6 +244,8 @@ class RunManager:
         if busy:
             raise RunStateError(f"{len(busy)} run(s) still working; try again shortly")
         self.ledger.clear()
+        if self.bank is not None:
+            self.bank.clear()
         self.runs.clear()
         async with self._log_changed:
             self.log.append(

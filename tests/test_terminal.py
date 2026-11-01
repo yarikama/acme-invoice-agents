@@ -506,3 +506,19 @@ def test_a_step_that_called_a_model_is_labelled_with_it() -> None:
     [parsed] = turns([code], 1.0)
     assert "Ingest  grok-4.3" in text(render_turn(read))
     assert "Ingest  code" in text(render_turn(parsed))
+
+
+def test_a_repeated_payment_says_no_money_moved() -> None:
+    paid = {"status": "success", "vendor": "W", "amount": 10.0, "currency": "USD"}
+    again = {**paid, "duplicate": True, "idempotency_key": "w:inv1:"}
+    events = [
+        {
+            **trace("pay", "Already paid under key w:inv1:.", 1.0),
+            "data": {"payment": again},
+        }
+    ]
+    out = text(Group(*(render_turn(t) for t in turns(events, 1.0))))
+    assert "Already paid $10.00 to W; key w:inv1: was used before" in out
+    assert "Already paid $10.00" in text(
+        result_card("f", {"status": "paid", "payment": again})
+    )

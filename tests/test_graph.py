@@ -87,6 +87,8 @@ async def test_each_step_reports_what_it_produced(inventory):
         "vendor": "Widgets Inc.",
         "amount": 5000.0,
         "currency": "USD",
+        "idempotency_key": "widgetsinc:inv1001:",
+        "duplicate": False,
     }
     # A document parsed in code reports its invoice too.
     state = await graph.ainvoke({"path": str(INVOICES / "invoice_1016.json")}, config())

@@ -345,10 +345,13 @@ async def test_reset_forgets_runs_and_received_invoices(client):
     # Every open console hears it on the event stream.
     assert manager().log[-1]["type"] == "reset"
 
-    # The same invoice again is not a duplicate any more.
+    # The same invoice again is not a duplicate any more, and the bank has
+    # forgotten its payment key too, so it really pays.
     again = (await client.post("/api/runs", json={"sample": "invoice_1015.csv"})).json()
     await settle(again["id"])
     assert manager().get(again["id"]).status == "paid"
+    summary = manager().get(again["id"]).summary
+    assert summary is not None and summary["payment"]["duplicate"] is False
 
 
 async def test_reset_waits_for_running_work(client):

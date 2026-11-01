@@ -41,6 +41,9 @@ export interface Payment {
   vendor: string;
   amount: number;
   currency: string;
+  // The bank's idempotency key, and whether it was already paid before.
+  idempotency_key?: string | null;
+  duplicate?: boolean;
 }
 
 /** What a step produced, on its trace line: the extraction, the checks, the payment. */
