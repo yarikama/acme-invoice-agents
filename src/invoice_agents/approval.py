@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 from invoice_agents.models import Decision, Invoice, ValidationReport
-from invoice_agents.validation import Policy
+from invoice_agents.validation import Policy, usd_total
 
 Route = Literal["reject", "human", "auto"]
 Outcome = Literal["pay", "reject", "human"]
@@ -23,12 +23,19 @@ def vp_reason(invoice: Invoice, report: ValidationReport, policy: Policy) -> str
 
     Reads as the end of "Paused for a VP: ...".
     """
-    if invoice.total is not None and invoice.total > policy.approval_threshold:
+    total = usd_total(invoice)
+    if total is not None and total > policy.approval_threshold:
         return f"the total is over ${policy.approval_threshold:,.0f}"
     flagged = [f.title for f in report.findings if f.code in policy.vp_required]
     if flagged:
         return "; ".join(dict.fromkeys(flagged))
     return None
+
+
+def unresolved(route: Route) -> Outcome:
+    """The outcome when the approver and the critic never agree: a person
+    decides, unless the rules already reject the invoice."""
+    return "reject" if route == "reject" else "human"
 
 
 def resolve(decision: Decision, route: Route) -> Outcome:

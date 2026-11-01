@@ -127,3 +127,10 @@ def test_agents_can_only_make_it_stricter() -> None:
     assert resolve("approve", "reject") == "reject"
     assert resolve("escalate", "auto") == "human"
     assert resolve("approve", "auto") == "pay"
+
+
+def test_a_vp_is_needed_over_the_threshold_in_dollars():
+    euro = invoice(currency="EUR", total=9_500)
+    assert vp_reason(euro, ValidationReport(), Policy()) == "the total is over $10,000"
+    yen = invoice(currency="JPY", total=20_000)
+    assert vp_reason(yen, ValidationReport(), Policy()) is None

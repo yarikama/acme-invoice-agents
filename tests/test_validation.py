@@ -313,3 +313,32 @@ def test_no_sample_vendor_looks_like_another(inventory):
             flagged.append(path.name)
         seen.add(doc.invoice)
     assert flagged == []
+
+
+def test_negative_prices_and_non_positive_totals_are_errors(inventory):
+    # Before: a -$250 invoice with a positive quantity was paid.
+    credit = validate(make([("WidgetA", 1, -250)], -250), inventory)
+    [finding] = [f for f in credit.findings if f.code == "NON_POSITIVE_AMOUNT"]
+    assert finding.severity is Severity.ERROR
+    assert finding.detail == "WidgetA is priced at -$250.00; the total is -$250.00."
+    free = validate(make([("WidgetA", 1, 0)], 0), inventory)
+    assert "NON_POSITIVE_AMOUNT" in codes(free, Severity.ERROR)
+    assert "NON_POSITIVE_AMOUNT" not in codes(
+        validate(make([("WidgetA", 1, 250)], 250), inventory)
+    )
+
+
+def test_part_of_a_unit_is_a_warning(inventory):
+    report = validate(make([("WidgetA", 1.5, 250)], 375), inventory)
+    assert "FRACTIONAL_QUANTITY" in codes(report, Severity.WARNING)
+    assert any("WidgetA x 1.5" in f.detail for f in report.findings)
+
+
+def test_the_threshold_is_in_dollars_whatever_the_currency(inventory):
+    # ¥20,000 is about $134: not over a $10,000 threshold.
+    yen = validate(make([("WidgetA", 1, 20_000)], 20_000, currency="JPY"), inventory)
+    assert "OVER_THRESHOLD" not in codes(yen)
+    # €9,500 is $10,260: over it, though the face value is under.
+    euro = validate(make([("WidgetA", 1, 9_500)], 9_500, currency="EUR"), inventory)
+    assert "OVER_THRESHOLD" in codes(euro)
+    assert "NEAR_THRESHOLD" not in codes(euro)

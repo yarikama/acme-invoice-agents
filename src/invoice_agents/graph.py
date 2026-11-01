@@ -21,7 +21,14 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
 from invoice_agents.agents import GUARDRAIL, Extraction
-from invoice_agents.approval import Outcome, Route, policy_route, resolve, vp_reason
+from invoice_agents.approval import (
+    Outcome,
+    Route,
+    policy_route,
+    resolve,
+    unresolved,
+    vp_reason,
+)
 from invoice_agents.config import Settings
 from invoice_agents.ingestion import load_document
 from invoice_agents.ingestion.ocr import BACKENDS as OCR_BACKENDS
@@ -371,9 +378,17 @@ def build_graph(
             message = "Critic agrees."
         else:
             message = f"Critic objects: {' '.join(critique.issues)}"
-        if critique.agrees or state["review_rounds"] >= settings.max_review_rounds:
+        if critique.agrees:
             update["outcome"] = resolve(draft.decision, state["route"])
             message += f" Outcome: {update['outcome']}."
+        elif state["review_rounds"] >= settings.max_review_rounds:
+            # Out of rounds and still disputed: neither agent gets the last
+            # word. A person decides, unless the rules already reject it.
+            update["outcome"] = unresolved(state["route"])
+            message += (
+                f" Still disputed after {state['review_rounds']} rounds."
+                f" Outcome: {update['outcome']}."
+            )
         update["trace"] = _event("approve", message, step_usage(tokens, deps.pricing))
         return update
 

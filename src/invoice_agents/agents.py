@@ -373,8 +373,19 @@ class NoExtractor:
         )
 
 
+# Paperwork warnings the rule-based approver lets through on a first draft.
+# Its critic doesn't, so offline runs show the review loop at work.
+PAPERWORK = frozenset(
+    {"TERMS_MISMATCH", "DUE_BEFORE_ISSUE", "UNPARSEABLE_DATE", "STOCK_DEPLETED"}
+)
+
+
 class RuleApprover:
-    """Decides from the findings alone; it has no use for tools."""
+    """Decides from the findings alone; it has no use for tools.
+
+    A first draft approves past paperwork warnings, the way a busy clerk
+    might. When the critic objects, the next draft escalates instead.
+    """
 
     async def draft(
         self,
@@ -384,6 +395,7 @@ class RuleApprover:
         tools: ReviewTools,
     ) -> Review:
         codes = list(dict.fromkeys(f.code for f in report.findings))
+        warnings = {f.code for f in report.warnings}
         if report.errors:
             titles = "; ".join(dict.fromkeys(f.title for f in report.errors))
             draft = ApprovalDraft(
@@ -391,11 +403,25 @@ class RuleApprover:
                 rationale=f"Hard failures: {titles}.",
                 addressed=codes,
             )
-        elif report.warnings:
+        elif critique:
+            draft = ApprovalDraft(
+                decision="escalate",
+                rationale=f"The critic objected: {' '.join(critique)}"
+                " A person should decide.",
+                addressed=codes,
+            )
+        elif warnings and not warnings <= PAPERWORK:
             titles = "; ".join(dict.fromkeys(f.title for f in report.warnings))
             draft = ApprovalDraft(
                 decision="escalate",
                 rationale=f"Needs a human look: {titles}.",
+                addressed=codes,
+            )
+        elif warnings:
+            draft = ApprovalDraft(
+                decision="approve",
+                rationale=f"Only paperwork warnings ({', '.join(sorted(warnings))});"
+                " the goods and amounts check out.",
                 addressed=codes,
             )
         else:
@@ -406,6 +432,8 @@ class RuleApprover:
 
 
 class RuleCritic:
+    """Objects to any draft that lets an error or a warning through."""
+
     async def review(
         self,
         invoice: Invoice,
@@ -416,5 +444,14 @@ class RuleCritic:
         if report.errors and draft.decision != "reject":
             return Critique(
                 agrees=False, issues=["The draft ignores an error finding."]
+            )
+        if report.warnings and draft.decision == "approve":
+            codes = ", ".join(sorted({f.code for f in report.warnings}))
+            return Critique(
+                agrees=False,
+                issues=[
+                    f"The draft approves with {codes} unresolved; nothing in the"
+                    " record clears them."
+                ],
             )
         return Critique(agrees=True)
