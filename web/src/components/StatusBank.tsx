@@ -45,7 +45,7 @@ export function StatusBank({
             type="button"
             aria-pressed={selected}
             onClick={() => onFilter(seg.key)}
-            className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--r)] border border-seam bg-panel px-4 py-3 text-left font-[inherit] text-ink hover:bg-raised ${
+            className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--r)] border border-[var(--glass-edge)] bg-[var(--tile)] px-4 py-3 text-left font-[inherit] text-ink hover:bg-raised ${
               selected ? "card-on" : ""
             }`}
           >
@@ -54,7 +54,7 @@ export function StatusBank({
               <Badge icon={STATUS_ICON[seg.key]} signal={seg.key === "awaiting_vp" && members.length > 0} />
               {seg.label}
             </span>
-            <span className="text-3xl font-light">{members.length}</span>
+            <span className="display text-3xl">{members.length}</span>
             <span className="text-xs text-ink-2">
               <Total runs={members} />
             </span>
