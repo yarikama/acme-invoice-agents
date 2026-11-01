@@ -74,6 +74,9 @@ class TraceEvent(TypedDict):
     tool: NotRequired[str]
     # Tokens and cost of the model calls this step made, on its last line.
     usage: NotRequired[StepUsage]
+    # Already sent live while the node ran (see `review`): clients reading
+    # the node's update skip it; the state keeps it for summaries.
+    streamed: NotRequired[bool]
 
 
 class InvoiceState(TypedDict, total=False):
@@ -114,6 +117,16 @@ class Deps:
             near_threshold_ratio=self.settings.near_threshold_ratio,
             vp_required=frozenset(self.settings.vp_required_findings),
         )
+
+
+def _tool_line(step: ToolCall) -> TraceEvent:
+    return {
+        "stage": "approve",
+        "message": f"Sent the decision back. {step.result}"
+        if step.name == GUARDRAIL
+        else step.describe(),
+        "tool": step.name,
+    }
 
 
 def _emit(stage: str, status: str, **data: Any) -> None:
@@ -296,7 +309,15 @@ def build_graph(
         critique = state.get("critique")
         issues = critique.issues if critique and not critique.agrees else []
         invoice = _invoice(state)
-        tools = ReviewTools(deps.inventory, deps.seen, invoice)
+        write = get_stream_writer()
+        streamed: set[int] = set()
+
+        def live(step: ToolCall) -> None:
+            # Each tool call as it finishes, not all of them with the draft.
+            write({"stage": "approve", "status": "tool", "trace": _tool_line(step)})
+            streamed.add(id(step))
+
+        tools = ReviewTools(deps.inventory, deps.seen, invoice, on_step=live)
         with collecting() as tokens:
             result = await deps.agents.approver.draft(
                 invoice, state["report"], issues, tools
@@ -304,13 +325,7 @@ def build_graph(
         draft = result.draft
         rounds = state.get("review_rounds", 0) + 1
         trace: list[TraceEvent] = [
-            {
-                "stage": "approve",
-                "message": f"Sent the decision back. {step.result}"
-                if step.name == GUARDRAIL
-                else step.describe(),
-                "tool": step.name,
-            }
+            {**_tool_line(step), "streamed": id(step) in streamed}
             for step in result.steps
         ]
         trace += _event(

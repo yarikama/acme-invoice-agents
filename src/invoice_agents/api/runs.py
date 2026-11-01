@@ -217,6 +217,12 @@ class RunManager:
             ):
                 # With a list of stream modes, LangGraph yields (mode, chunk).
                 chunk = cast(dict[str, Any], chunk)
+                if mode == "custom" and "trace" in chunk:
+                    # A tool call, sent the moment it finished.
+                    await self._emit(
+                        run, {"type": "trace", "node": "review", **chunk["trace"]}
+                    )
+                    continue
                 if mode == "custom":
                     # Renamed so it can't clobber the run's own `status`.
                     await self._emit(
@@ -233,7 +239,10 @@ class RunManager:
                         request = update[0].value
                         continue
                     for item in (update or {}).get("trace", []):
-                        await self._emit(run, {"type": "trace", "node": node, **item})
+                        if not item.get("streamed"):
+                            await self._emit(
+                                run, {"type": "trace", "node": node, **item}
+                            )
             snapshot = await self.graph.aget_state(run.config)
             state = cast(InvoiceState, snapshot.values)
             run.status = run_status(state, request is not None)

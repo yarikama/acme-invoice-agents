@@ -1,6 +1,7 @@
 """End-to-end runs of the graph with rule-based agents and a stub extractor."""
 
 import uuid
+from typing import Any, cast
 
 import pytest
 from langchain_core.runnables import RunnableConfig
@@ -148,7 +149,36 @@ async def test_tool_calls_reach_the_trace_and_the_critic(inventory):
         "tool": "check_inventory",
         "message": "check_inventory(WidgetA): WidgetA: 15 in stock,"
         " list price $250.00.",
+        "streamed": True,  # sent live, so clients skip it in the update
     }
     assert [c.name for c in state["tool_calls"]] == ["check_inventory"]
     assert critic.checked == [state["tool_calls"]]
     assert "payment" in state
+
+
+async def test_tool_calls_stream_as_they_finish_before_the_draft(inventory):
+    agents = Agents(StubExtractor(INV_1001), ToolUsingApprover(), RecordingCritic())
+    deps = Deps(
+        agents=agents, inventory=inventory, settings=Settings(llm_provider="offline")
+    )
+    graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
+
+    seen: list[str] = []
+    async for mode, raw in graph.astream(
+        {"path": str(INVOICES / "invoice_1001.txt")},
+        config(),
+        stream_mode=["updates", "custom"],
+    ):
+        chunk = cast(dict[str, Any], raw)
+        if mode == "custom" and "trace" in chunk:
+            seen.append("live: " + chunk["trace"]["message"].split(":")[0])
+        elif mode == "updates" and "review" in chunk:
+            seen.extend(
+                ("skip: " if item.get("streamed") else "") + item["message"][:7]
+                for item in chunk["review"]["trace"]
+            )
+    assert seen == [
+        "live: check_inventory(WidgetA)",
+        "skip: check_i",  # in the update too, marked as already sent
+        "Draft 1",
+    ]

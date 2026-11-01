@@ -138,3 +138,22 @@ def test_one_failure_does_not_stop_the_batch(
 
     assert result["status"] == "failed"
     assert result["reason"] == "RuntimeError: provider returned 402"
+
+
+def test_a_tool_call_is_shown_once_as_it_happens(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.test_graph import (
+        INV_1001,
+        RecordingCritic,
+        StubExtractor,
+        ToolUsingApprover,
+    )
+
+    agents = Agents(StubExtractor(INV_1001), ToolUsingApprover(), RecordingCritic())
+    monkeypatch.setattr(cli, "build_agents", lambda _settings: agents)
+    path = INVOICES / "invoice_1001.txt"
+    assert cli.main([f"--invoice_path={path}", "--json"]) == 0
+    out, err = capsys.readouterr()
+    assert json.loads(out)[0]["status"] == "paid"
+    assert err.count("check_inventory(WidgetA)") == 1

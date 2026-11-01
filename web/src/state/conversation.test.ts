@@ -105,6 +105,18 @@ describe("turns", () => {
     expect(odd).toMatchObject({ approved: true, by: "Dana Whitfield (Finance)", note: "FX ok (1.08)." });
   });
 
+  it("keeps one key for the approver's turn while its tool calls stream in", () => {
+    const head = [line(1, "validate", "0 errors, 0 warnings; policy route: auto.")];
+    const call = (seq: number) => line(seq, "tool", `check_inventory(W${seq}): fine.`);
+    const one = turns([...head, call(2)]).at(-1)!;
+    const two = turns([...head, call(2), call(3)]).at(-1)!;
+    const drafted = turns([...head, call(2), call(3), line(4, "review", "Draft 1: approve. Fine.")]).at(-1)!;
+    // Same key throughout, so React grows the turn instead of remounting it.
+    expect([one.key, two.key, drafted.key]).toEqual([2, 2, 2]);
+    expect(drafted).toMatchObject({ kind: "approver", decision: "approve" });
+    expect(turns([...head, line(5, "review", "Draft 1: approve. Fine.")]).at(-1)!.key).toBe(5);
+  });
+
   it("keeps tool calls that never reached a draft", () => {
     const got = turns([
       line(1, "tool", "check_inventory(X): X is not in the inventory database."),
