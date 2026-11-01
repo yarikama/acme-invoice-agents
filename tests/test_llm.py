@@ -71,3 +71,10 @@ def test_llm_provider_builds_llm_agents() -> None:
     assert isinstance(agents.approver, LLMApprover)
     assert isinstance(agents.critic, LLMCritic)
     assert agents.approver.llm is agents.critic.llm
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_a_blank_triage_model_means_no_triage(blank: str) -> None:
+    s = settings(llm_provider="offline", triage_model=blank)
+    assert s.triage_model is None
+    assert build_agents(s).triager is None

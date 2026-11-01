@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     # and (to approve) sees at most this much chance that something is off.
     triage_min_confidence: float = 0.9
     triage_max_suspicion: float = 0.2
+
+    @field_validator("triage_model", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, value: object) -> object:
+        """`TRIAGE_MODEL=` in a .env means no triage, not a model named ""."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
 
 @lru_cache
