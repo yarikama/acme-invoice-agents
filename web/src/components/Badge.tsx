@@ -4,7 +4,7 @@ import type { Icon } from "@phosphor-icons/react";
 export function Badge({ icon: Glyph, signal = false }: { icon: Icon; signal?: boolean }) {
   return (
     <span className={`badge ${signal ? "badge-signal" : ""}`} aria-hidden="true">
-      <Glyph size={16} weight="bold" />
+      <Glyph size={18} weight="bold" />
     </span>
   );
 }

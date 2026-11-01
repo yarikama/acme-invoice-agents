@@ -69,13 +69,17 @@
   --font-sans: "Schibsted Grotesk Variable", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
   --font-display: "Red Hat Display Variable", system-ui, sans-serif;
-  /* One step larger than Tailwind's defaults: the console is read all day. */
+  /* One type scale for the whole console, no near-duplicates:
+     13 labels and data, 15 secondary, 17 body, 20 widget titles,
+     26 names, 34 counts, 42 amounts, plus the page title. */
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.25rem;
   --text-sm: 0.9375rem;
   --text-sm--line-height: 1.4rem;
   --text-base: 1.0625rem;
   --text-base--line-height: 1.6rem;
+  --text-lg: 1.25rem;
+  --text-lg--line-height: 1.75rem;
   --text-2xl: 1.625rem;
   --text-3xl: 2.125rem;
   --text-4xl: 2.625rem;
@@ -87,7 +91,7 @@
     background: var(--canvas);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 16px;
+    font-size: 17px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
   }
@@ -171,7 +175,7 @@
   .key-sm {
     min-height: 40px;
     padding: 0 16px;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 500;
     display: inline-flex;
     align-items: center;
@@ -268,7 +272,7 @@
     color: #ffffff;
     font-family: var(--font-display);
     font-weight: 500;
-    font-size: 18px;
+    font-size: 20px;
     letter-spacing: -0.01em;
   }
   .sheet {
@@ -304,7 +308,7 @@
   .code-chip {
     flex: none;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 13px;
     line-height: 18px;
     padding: 2px 8px;
     border-radius: 6px;
@@ -478,8 +482,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     flex: none;
     border-radius: var(--r);
     background: var(--raised);

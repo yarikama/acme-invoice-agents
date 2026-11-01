@@ -32,7 +32,7 @@ export function Widget({
     <section aria-labelledby={`${id}-h`} className={`card flex h-full min-h-0 flex-col overflow-hidden ${signal ? "card-signal" : ""}`}>
       <header className={`flex items-center gap-3 px-5 pt-4 pb-3 ${draggable ? "widget-handle" : ""}`}>
         <Badge icon={icon} signal={signal} />
-        <h2 id={`${id}-h`} className="m-0 min-w-0 truncate text-base font-medium">
+        <h2 id={`${id}-h`} className="m-0 min-w-0 truncate text-lg font-medium">
           {title}
         </h2>
         <span className="ml-auto flex min-w-0 items-center gap-3">
