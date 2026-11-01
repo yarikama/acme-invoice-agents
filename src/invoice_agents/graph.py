@@ -250,7 +250,10 @@ def build_graph(
         update: InvoiceState = {"triage": answer}
         # The Decisions API reports its own cost; decision models bill input only.
         use = StepUsage(
-            input_tokens=answer.input_tokens, output_tokens=0, cost_usd=answer.cost_usd
+            model=answer.model,
+            input_tokens=answer.input_tokens,
+            output_tokens=0,
+            cost_usd=answer.cost_usd,
         )
         quick = fast_path(
             answer,

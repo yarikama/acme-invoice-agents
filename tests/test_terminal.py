@@ -284,3 +284,31 @@ def test_usage_shows_beside_each_turn_and_as_a_run_total() -> None:
         view.add(e)
     out = text(view)
     assert "2.1k tokens · $0.0042" in out and "this run so far: 2.1k tokens" in out
+
+
+def test_model_turns_name_their_model() -> None:
+    from invoice_agents.terminal import short_model
+
+    assert short_model("x-ai/grok-4.7") == "grok-4.7"
+    assert (
+        short_model("x-ai/grok-4.7, anthropic/claude-haiku-5.5")
+        == "grok-4.7, claude-haiku-5.5"
+    )
+    usage = {
+        "model": "anthropic/claude-haiku-5.5",
+        "input_tokens": 10,
+        "output_tokens": 1,
+        "cost_usd": None,
+    }
+    view = RunView("x")
+    view.started = 0.0
+    view.add({**trace("critique", "Critic agrees. Outcome: pay.", 1.0), "usage": usage})
+    view.add(
+        {
+            **trace("validate", "0 errors, 0 warnings; policy route: auto.", 2.0),
+            "usage": usage,
+        }
+    )
+    out = text(view)
+    assert "Critic  claude-haiku-5.5" in out
+    assert "Validation  code" in out  # code steps keep their role

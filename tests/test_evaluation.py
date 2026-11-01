@@ -182,3 +182,30 @@ def test_consistency_names_flaky_cases() -> None:
 def test_sets() -> None:
     assert evaluation.cases_in("samples") == evaluation.CASES
     assert evaluation.cases_in("all") == evaluation.CASES + evaluation.ADVERSARIAL
+
+
+def test_critic_flag_and_objection_count(
+    offline: Settings, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        evaluation.main(
+            [
+                "--only",
+                "1016",
+                "--critic",
+                "anthropic/claude-haiku-5.5",
+                "--out",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    [report] = tmp_path.glob("offline-critic-anthropic-claude-haiku-5.5-*.json")
+    data = json.loads(report.read_text())
+    assert data["critic_model"] == "anthropic/claude-haiku-5.5"
+    assert data["summary"]["critic_objections"] == 0
+
+    objected = evaluation.Result(
+        "a.json", "pay", "pay", True, 1.0, critic_objected=True
+    )
+    assert evaluation.summary([objected])["critic_objections"] == 1

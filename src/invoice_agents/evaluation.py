@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 import tempfile
 import time
@@ -164,6 +165,8 @@ class Result:
     fast_path: str | None = None
     # Which run of the case this was, with --repeat.
     attempt: int = 1
+    # The critic objected to a draft at least once.
+    critic_objected: bool = False
 
 
 def outcome_of(state: InvoiceState | dict[str, Any]) -> tuple[Outcome, str]:
@@ -219,6 +222,12 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
     fast = None
     if "triage" in state and "review_rounds" not in state and "draft" in state:
         fast = state["draft"].decision
+    # A second review round only happens when the critic objected; so does a
+    # final critique that still disagrees after the last round.
+    critique = state.get("critique")
+    objected = state.get("review_rounds", 0) > 1 or (
+        critique is not None and not critique.agrees
+    )
     correct = (
         None
         if outcome == "skipped"
@@ -236,6 +245,7 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
         detail=detail,
         findings=findings,
         fast_path=fast,
+        critic_objected=objected,
     )
 
 
@@ -284,6 +294,7 @@ def summary(results: list[Result]) -> dict[str, Any]:
         if scored
         else None,
         "fast_paths": sum(1 for r in scored if r.fast_path),
+        "critic_objections": sum(1 for r in scored if r.critic_objected),
         # The costly mistake in AP: paying an invoice that should not be paid.
         "wrongly_paid": sum(1 for r in scored if r.outcome == "pay" and not r.correct),
         **consistency(results),
@@ -353,6 +364,8 @@ def render(results: list[Result], totals: dict[str, Any], console: Console) -> N
         )
     if totals.get("fast_paths"):
         line += f", {totals['fast_paths']} settled by triage"
+    if totals.get("critic_objections"):
+        line += f", critic objected {totals['critic_objections']} times"
     line += f", {totals['wrongly_paid']} paid that should not have been"
     if totals["mean_seconds"] is not None:
         line += f", {totals['mean_seconds']:.1f}s mean"
@@ -383,6 +396,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Decision model for triage, e.g. typesafe/jev-1.14",
     )
     parser.add_argument(
+        "--critic",
+        metavar="MODEL",
+        help="Model for the critic, e.g. anthropic/claude-haiku-5.5",
+    )
+    parser.add_argument(
         "--out", type=Path, default=Path("eval-results"), help="Folder for JSON"
     )
     args = parser.parse_args(argv)
@@ -390,12 +408,15 @@ def main(argv: list[str] | None = None) -> int:
     settings = get_settings()
     if args.triage:
         settings = settings.model_copy(update={"triage_model": args.triage})
+    if args.critic:
+        settings = settings.model_copy(update={"critic_model": args.critic})
     cases = [c for c in cases_in(args.set) if not args.only or args.only in c.name]
     pricing = openrouter_pricing() if settings.llm_provider == "openrouter" else {}
     console = Console()
     console.print(
         f"Provider {settings.llm_provider}: extract {settings.extract_model},"
         f" review {settings.review_model}"
+        + (f", critic {settings.critic_model}" if settings.critic_model else "")
         + (f", triage {settings.triage_model}" if settings.triage_model else "")
         + f". {len(cases)} cases"
         + (f", {args.repeat} runs each." if args.repeat > 1 else ".")
@@ -412,6 +433,8 @@ def main(argv: list[str] | None = None) -> int:
     label = settings.llm_provider + ("-triage" if settings.triage_model else "")
     if args.set != "samples":
         label += f"-{args.set}"
+    if args.critic:
+        label += "-critic-" + re.sub(r"[^a-z0-9.]+", "-", args.critic.lower())
     report = args.out / f"{label}-{stamp}.json"
     report.write_text(
         json.dumps(
@@ -420,6 +443,7 @@ def main(argv: list[str] | None = None) -> int:
                 "extract_model": settings.extract_model,
                 "review_model": settings.review_model,
                 "triage_model": settings.triage_model,
+                "critic_model": settings.critic_model or settings.review_model,
                 "set": args.set,
                 "summary": totals,
                 "results": [asdict(r) for r in results],

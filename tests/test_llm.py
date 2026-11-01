@@ -1,6 +1,6 @@
 """Picking the chat model and agents for each provider. No network calls."""
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from langchain_openai import ChatOpenAI
@@ -70,7 +70,24 @@ def test_llm_provider_builds_llm_agents() -> None:
     assert isinstance(agents.extractor, LLMExtractor)
     assert isinstance(agents.approver, LLMApprover)
     assert isinstance(agents.critic, LLMCritic)
-    assert agents.approver.llm is agents.critic.llm
+    # Unset, the critic runs on the review model.
+    critic, approver = cast(Any, agents.critic).llm, cast(Any, agents.approver).llm
+    assert critic.model_name == approver.model_name == "x-ai/grok-4.7"
+
+
+def test_critic_can_run_on_another_vendor() -> None:
+    agents = build_agents(
+        settings(
+            llm_provider="openrouter",
+            openrouter_api_key="k",
+            critic_model="anthropic/claude-haiku-5.5",
+            critic_reasoning="low",
+        )
+    )
+    critic = cast(Any, agents.critic).llm
+    assert critic.model_name == "anthropic/claude-haiku-5.5"
+    assert critic.extra_body == {"reasoning": {"effort": "low"}}
+    assert cast(Any, agents.approver).llm.model_name == "x-ai/grok-4.7"
 
 
 @pytest.mark.parametrize("blank", ["", "  "])

@@ -19,6 +19,8 @@ Tokens = dict[str, dict[str, int]]  # model -> {"input_tokens", "output_tokens"}
 
 
 class StepUsage(TypedDict):
+    # The model (or models) that served the step, as the provider names it.
+    model: str
     input_tokens: int
     output_tokens: int
     # None when a model's price is unknown (e.g. direct xAI, or offline).
@@ -68,6 +70,7 @@ def step_usage(tokens: Tokens, pricing: Pricing) -> StepUsage | None:
     if not tokens:
         return None
     return StepUsage(
+        model=", ".join(tokens),
         input_tokens=sum(u["input_tokens"] for u in tokens.values()),
         output_tokens=sum(u["output_tokens"] for u in tokens.values()),
         cost_usd=cost(tokens, pricing),

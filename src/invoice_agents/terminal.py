@@ -238,6 +238,11 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
     return out
 
 
+def short_model(name: str) -> str:
+    """ "x-ai/grok-4.7" -> "grok-4.7"; several models are kept, joined."""
+    return ", ".join(n.strip().rsplit("/", 1)[-1] for n in name.split(","))
+
+
 def spent(usage: dict[str, Any] | None) -> str:
     """ "2.1k tokens · $0.0042", or "" for a step with no model calls."""
     if not usage:
@@ -309,6 +314,9 @@ def _header(
     left = Text()
     left.append(f" {GLYPH.get(node, '•')} ", style=f"bold #111111 on {VOICE[voice]}")
     left.append(f"  {name}", style="bold")
+    # A model's turn names the model that served it, when the trace says.
+    if usage and usage.get("model") and voice == "model":
+        role = short_model(str(usage["model"]))
     left.append(f"  {role}", style=VOICE[voice])
     right = "  ".join(x for x in (spent(usage), _took(took)) if x)
     row.add_row(left, Text(right, style="#7c7c75"))
