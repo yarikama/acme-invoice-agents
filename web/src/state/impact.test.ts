@@ -33,6 +33,24 @@ const cost = (usd: number | null) => ({
 });
 
 describe("impact", () => {
+  it("counts an invoice held back once, however many copies were rejected", () => {
+    const summary = (vendor: string, number: string) =>
+      ({ invoice: { total: 900, currency: "USD", vendor, invoice_number: number } }) as unknown as Summary;
+    const rejected = (id: string, vendor: string, number: string): RunView => ({
+      ...run(id, "rejected", [
+        { type: "started", at: at(0) },
+        { type: "done", at: at(1) },
+      ]),
+      summary: summary(vendor, number),
+    });
+    const got = impact([
+      rejected("pdf", "Atlas Supply", "INV-1013"),
+      rejected("json", "ATLAS SUPPLY", "inv 1013"),
+      rejected("other", "Gadgets Co.", "INV-1013"),
+    ]);
+    expect([got.stopped, got.stoppedUsd]).toEqual([2, 1800]);
+  });
+
   it("measures the runs against the manual process", () => {
     const got = impact([
       run("paid", "paid", [{ type: "started", at: at(0) }, cost(0.01), { type: "done", at: at(4) }]),

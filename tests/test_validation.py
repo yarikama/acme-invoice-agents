@@ -1,3 +1,5 @@
+import pytest
+
 from invoice_agents.ingestion import load_document
 from invoice_agents.models import Invoice, LineItem, Severity
 from invoice_agents.validation import Policy, SeenInvoices, ungrounded, validate
@@ -393,3 +395,33 @@ def test_extracted_values_the_document_does_not_show():
         )
         == []
     )
+
+
+def test_invoice_numbers_are_unique_per_vendor(inventory):
+    # Before: Gadgets Co.'s GC-1001 was rejected as a duplicate of Widgets
+    # Inc.'s INV-1001, because only the digits were compared.
+    seen = SeenInvoices()
+    seen.add(
+        make(
+            [("WidgetA", 1, 250)], 250, invoice_number="INV-1001", vendor="Widgets Inc."
+        ),
+        run_id="a",
+    )
+    seen.settle("a", "paid")
+    other = make(
+        [("WidgetA", 1, 250)], 250, invoice_number="GC-1001", vendor="Gadgets Co."
+    )
+    assert "DUPLICATE" not in codes(validate(other, inventory, seen))
+    same = make(
+        [("WidgetA", 1, 250)], 250, invoice_number="inv 1001", vendor="WIDGETS INC"
+    )
+    assert "DUPLICATE" in codes(validate(same, inventory, seen))
+
+
+def test_nan_and_infinity_are_not_numbers_an_invoice_can_hold():
+    import pydantic
+
+    with pytest.raises(pydantic.ValidationError):
+        LineItem(item="W", quantity=1, unit_price=float("nan"))
+    with pytest.raises(pydantic.ValidationError):
+        make([("WidgetA", 1, 250)], float("inf"))

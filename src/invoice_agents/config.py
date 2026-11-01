@@ -10,16 +10,23 @@ from typing import Annotated, Any, Literal
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+# The repository: defaults resolve against it, not the working directory, so
+# `python /path/to/main.py` from anywhere finds the data, the recording, the
+# database and .env. Outside a checkout (an installed package), the working
+# directory.
+_HERE = Path(__file__).resolve().parents[2]
+ROOT = _HERE if (_HERE / "pyproject.toml").is_file() else Path.cwd()
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ROOT / ".env", extra="ignore")
 
     # replay (the default): answer from a recording of a live run, with no
     # key or network, so a fresh checkout runs every sample as recorded.
     # "offline" runs rule-based agents with no network; text and PDF
     # invoices then need an LLM to extract and are skipped.
     llm_provider: Literal["xai", "openrouter", "offline", "replay"] = "replay"
-    replay_path: Path = Path("data/replay/recording.json")
+    replay_path: Path = ROOT / "data/replay/recording.json"
     # Set on a live provider to record the agents' answers for replay.
     record_to: Path | None = None
     xai_api_key: SecretStr | None = None
@@ -52,16 +59,16 @@ class Settings(BaseSettings):
     critic_model: str | None = None
     critic_reasoning: Literal["low", "medium", "high"] | None = None
 
-    db_path: Path = Path("inventory.db")
+    db_path: Path = ROOT / "inventory.db"
     # One JSON line per settled invoice: outcome, reason, amount. The same
     # records are in the ledger table of the database above.
-    decisions_log: Path | None = Path("logs/decisions.jsonl")
+    decisions_log: Path | None = ROOT / "logs" / "decisions.jsonl"
     # API: graph checkpoints, so a run paused for the VP survives a restart.
-    checkpoint_path: Path = Path("checkpoints.db")
-    samples_dir: Path = Path("data/invoices")
+    checkpoint_path: Path = ROOT / "checkpoints.db"
+    samples_dir: Path = ROOT / "data/invoices"
     # The folder --watch and /watch treat as the AP mailbox.
-    inbox_dir: Path = Path("data/inbox")
-    uploads_dir: Path = Path("uploads")
+    inbox_dir: Path = ROOT / "data/inbox"
+    uploads_dir: Path = ROOT / "uploads"
     max_upload_bytes: int = 5 * 1024 * 1024
     cors_origins: list[str] = ["http://localhost:5173"]
     approval_threshold: float = 10_000

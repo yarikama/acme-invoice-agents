@@ -860,17 +860,25 @@ def vp_card(summary: dict[str, Any]) -> Panel:
     )
 
 
+def _plain(text: str | None) -> str:
+    return re.sub(r"[^a-z0-9]", "", (text or "").lower())
+
+
 def impact_line(results: list[dict[str, Any]], replayed: bool = False) -> Text:
     """The batch against the manual process in the brief: time per invoice,
     money held back, and what the models cost."""
     times = sorted(r["seconds"] for r in results if r.get("seconds") is not None)
     rejected = [r for r in results if r.get("status") == "rejected"]
-    held = sum(
-        (r.get("invoice") or {}).get("total") or 0
-        for r in rejected
-        if (r.get("invoice") or {}).get("currency", "USD") == "USD"
-        and ((r.get("invoice") or {}).get("total") or 0) > 0
-    )
+    # Each invoice once: the same one sent as a PDF and a JSON, or again as a
+    # duplicate, is one amount held back, not two.
+    unique: dict[tuple[str, str], float] = {}
+    for r in rejected:
+        inv = r.get("invoice") or {}
+        total = inv.get("total") or 0
+        if inv.get("currency", "USD") == "USD" and total > 0:
+            key = (_plain(inv.get("vendor")), _plain(inv.get("invoice_number")))
+            unique[key if any(key) else ("", r.get("file", ""))] = total
+    held = sum(unique.values())
     used = [t["usage"] for r in results for t in r.get("trace", []) if t.get("usage")]
     costs = [u.get("cost_usd") for u in used]
     line = Text()

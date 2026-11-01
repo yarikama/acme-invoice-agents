@@ -44,6 +44,7 @@ from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
 from invoice_agents.inbox import Inbox, watch
+from invoice_agents.ingestion import UnsupportedFormatError
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
@@ -157,28 +158,36 @@ def _signals_end_the_cli() -> Iterator[None]:
             signal.signal(sig, handler)
 
 
-def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str] | None:
+# A run in this process ends with it, so it can't wait for a VP; one in
+# the API can (checkpoints), so it waits for the web console.
+CANT_WAIT = (
+    "Not decided: this run lives in this process, so it can't wait for a VP."
+    " Run it again with --vp approve or --vp reject, or with the API up"
+    " (--serve) to decide it in the web console."
+)
+WAITS = "Waiting for a VP: decide in the web console, or /approve or /reject."
+
+
+def _decide(
+    summary: dict[str, Any], mode: str, can_wait: bool = True
+) -> tuple[bool, str] | None:
     """Show the VP card and get an answer: from the flag, or by asking.
 
-    None leaves the invoice waiting for a VP: there is no one to ask when
-    input isn't a terminal (a script, CI), or the person closed the input.
+    None leaves the invoice for a VP: when told to wait, when input isn't a
+    terminal (a script, CI), or when the person closed the input.
     """
     console.line()
     console.print(vp_card(summary))
+    unanswered = f"  {WAITS if can_wait else CANT_WAIT}\n"
     if mode == "wait":
-        console.print(
-            "  Left waiting for a VP: decide in the web console, or with /approve"
-            " or /reject in the interactive console.\n"
-        )
+        console.print(unanswered)
         return None
     if mode != "ask":
         console.print(f"  Answered by --vp {mode}.\n")
         return mode == "approve", f"--vp {mode}"
     if not sys.stdin.isatty():
-        console.print(
-            "  No one to ask: input isn't a terminal, so it stays waiting for a"
-            " VP. Decide in the web console, or run with --vp approve or reject.\n"
-        )
+        console.print("  No one to ask: input isn't a terminal.")
+        console.print(unanswered)
         return None
     try:
         answer = console.input("  Approve and pay? [y/N] ").strip().lower()
@@ -188,7 +197,8 @@ def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str] | None:
             else ""
         )
     except EOFError:
-        console.print("\n  No answer, so it stays waiting for a VP.\n")
+        console.print("\n  No answer.")
+        console.print(unanswered)
         return None
     console.print()
     return answer in ("y", "yes"), note or "decided in the CLI"
@@ -234,8 +244,10 @@ class LocalRunner:
             raise
         if result["status"] == "awaiting_vp":
             # This process's checkpoints end with it, so nothing can resume
-            # the run: free the invoice number for a later run.
+            # the run: free the invoice number for a later run, and say so
+            # rather than claim it waits.
             self.ledger.settle(run_id, "dropped", "Left waiting for a VP in the CLI.")
+            result = {**result, "status": "skipped", "reason": CANT_WAIT}
         return result
 
     async def _process(self, run_id: str, path: Path, vp_mode: str) -> dict[str, Any]:
@@ -285,7 +297,7 @@ class LocalRunner:
                 _print_finished(view)
             if paused is None:
                 break
-            answer = _decide(summarize(state, "awaiting_vp"), vp_mode)
+            answer = _decide(summarize(state, "awaiting_vp"), vp_mode, can_wait=False)
             if answer is None:
                 return {"file": path.name, **summarize(state, "awaiting_vp")}
             approved, note = answer
@@ -345,7 +357,13 @@ async def _process_all(
         result: dict[str, Any]
         try:
             result = await runner.process(path, vp_mode)
-        except (ExtractionUnavailableError, OcrUnavailableError) as exc:
+        except (
+            ExtractionUnavailableError,
+            OcrUnavailableError,
+            UnsupportedFormatError,
+        ) as exc:
+            # Not an invoice this system reads, or not without a model: no
+            # outcome, but nothing broke either.
             result = {"file": path.name, "status": "skipped", "reason": str(exc)}
         except Exception as exc:
             # One bad invoice or API error must not stop the batch.
@@ -385,7 +403,7 @@ async def connect(
     local: LocalRunner | None = None,
 ) -> Connection:
     settings = get_settings()
-    api_up = not args.local and await remote.reachable(f"{args.api}/api/health", client)
+    api_up = not args.local and await remote.api_up(args.api, client)
     web_up = await remote.reachable(args.web, client)
     if api_up:
         mode = (
@@ -431,8 +449,12 @@ async def _watch(runner: Runner, folder: Path, vp_mode: str, conn: Connection) -
             " here. Start with --serve to decide them in the web console."
         )
 
-    async def handle(batch: list[Path]) -> None:
-        await process(runner, batch, vp_mode)
+    async def handle(batch: list[Path]) -> set[Path]:
+        results = await process(runner, batch, vp_mode)
+        # Not decided (no VP could wait): keep it out of processed/.
+        return {
+            p for p, r in zip(batch, results, strict=True) if r["status"] == "skipped"
+        }
 
     await watch(box, handle)
     return 0

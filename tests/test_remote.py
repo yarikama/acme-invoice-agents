@@ -45,7 +45,7 @@ class FakeApi:
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
         if path == "/api/health":
-            return httpx.Response(200, json={"status": "ok"})
+            return httpx.Response(200, json={"status": "ok", "llm_provider": "replay"})
         if path == "/api/runs/upload":
             self.uploads.append(request.content.decode(errors="ignore"))
             return httpx.Response(202, json={"id": "r1"})
@@ -136,6 +136,25 @@ async def test_events_parse_times_and_stop_at_the_end() -> None:
     assert all(e.get("node") != "ignored" for e in events)
 
 
+async def test_only_this_api_counts_as_the_api() -> None:
+    # Before: anything on :8000 (another app, a 404) was taken for the API,
+    # and every invoice then failed to upload.
+    def answers(status: int, body: object):
+        return httpx.MockTransport(lambda _r: httpx.Response(status, json=body))
+
+    ours = {"status": "ok", "llm_provider": "replay", "vp_auth": False}
+    for transport, up in [
+        (answers(200, ours), True),
+        (answers(404, {"detail": "Not Found"}), False),
+        (answers(200, {"status": "ok"}), False),  # some other app's health
+        (answers(200, ["not", "a", "dict"]), False),
+        (httpx.MockTransport(lambda _r: httpx.Response(200, text="<html>")), False),
+    ]:
+        async with httpx.AsyncClient(transport=transport) as c:
+            assert await remote.api_up("http://localhost:8000", c) is up
+    assert not await remote.api_up("http://127.0.0.1:9")
+
+
 async def test_reachable() -> None:
     async with client(FakeApi()) as c:
         assert await remote.reachable("http://api/api/health", c)
@@ -197,6 +216,7 @@ def test_serve_with_nothing_to_run_waits_then_stops(
 
     monkeypatch.setattr(cli.remote, "serve", fake_serve)
     monkeypatch.setattr(cli.remote, "reachable", down)
+    monkeypatch.setattr(cli.remote, "api_up", down)
     monkeypatch.setattr(cli.asyncio, "Event", Instant)
 
     assert cli.main(["--serve"]) == 130
@@ -224,6 +244,8 @@ async def test_serve_explains_a_missing_console(
         return Proc()
 
     monkeypatch.setattr(remote, "reachable", down)
+
+    monkeypatch.setattr(remote, "api_up", down)
     monkeypatch.setattr(remote, "_spawn", fake_spawn)
     monkeypatch.setattr(remote.shutil, "which", lambda _: None)
     with pytest.raises(RuntimeError, match="make install"):
@@ -246,6 +268,8 @@ async def test_serve_gives_up_when_a_server_dies(
         def wait(self, timeout: float) -> None: ...
 
     monkeypatch.setattr(remote, "reachable", down)
+
+    monkeypatch.setattr(remote, "api_up", down)
     monkeypatch.setattr(remote, "_spawn", lambda *a: Dead())
     monkeypatch.setattr(remote.shutil, "which", lambda _: "/usr/bin/npm")
     monkeypatch.setattr(remote, "REPO", tmp_path)

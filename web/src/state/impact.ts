@@ -21,6 +21,7 @@ export interface Impact {
 }
 
 const time = (iso?: string) => (iso ? Date.parse(iso) : NaN);
+const plain = (text?: string | null) => (text ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export function impact(runs: RunView[]): Impact {
   const seconds: number[] = [];
@@ -29,6 +30,7 @@ export function impact(runs: RunView[]): Impact {
   let stoppedUsd = 0;
   let cost: number | null = 0;
   let decided = 0;
+  const held = new Set<string>();
 
   for (const run of runs) {
     const start = time(run.events.find((e) => e.type === "started")?.at);
@@ -41,10 +43,18 @@ export function impact(runs: RunView[]): Impact {
     const vp = run.events.some((e) => e.type === "awaiting_vp");
     if (!vp && (run.status === "paid" || run.status === "rejected")) noPerson += 1;
     if (run.status === "rejected") {
-      stopped += 1;
       const inv = run.summary?.invoice;
-      if (inv?.total != null && inv.currency === "USD" && inv.total > 0) stoppedUsd += inv.total;
+      // Each invoice once: the same one as a PDF and a JSON, or sent again as
+      // a duplicate, is one amount held back.
+      const id = `${plain(inv?.vendor)}|${plain(inv?.invoice_number)}`;
+      const key = id === "|" ? run.source : id;
+      if (!held.has(key)) {
+        held.add(key);
+        stopped += 1;
+        if (inv?.total != null && inv.currency === "USD" && inv.total > 0) stoppedUsd += inv.total;
+      }
     }
+
     for (const e of run.events) {
       if (e.type !== "trace" || !e.usage) continue;
       cost = cost === null || e.usage.cost_usd === null ? null : cost + e.usage.cost_usd;

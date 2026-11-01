@@ -53,7 +53,13 @@ from invoice_agents.payment import MockBank
 from invoice_agents.tools import ReviewTools
 from invoice_agents.triage import TriageAnswer, TriageError, fast_path
 from invoice_agents.usage import Pricing, StepUsage, Tokens, collecting, step_usage
-from invoice_agents.validation import Policy, SeenInvoices, ungrounded, validate
+from invoice_agents.validation import (
+    Policy,
+    SeenInvoices,
+    renamed_from,
+    ungrounded,
+    validate,
+)
 
 STATE_TYPES = (
     Invoice,
@@ -104,6 +110,8 @@ class InvoiceState(TypedDict, total=False):
     corrections: list[str]
     # What the extraction model reported that the document doesn't say.
     ungrounded: list[str]
+    # A "formerly ..." line in the document: the old name, for validation.
+    renamed_from: str | None
     extract_feedback: list[str]
     extract_attempts: int
     report: ValidationReport
@@ -212,6 +220,7 @@ def build_graph(
             return {
                 "source_format": doc.format.value,
                 "invoice": doc.invoice,
+                "renamed_from": renamed_from(doc.text),
                 "extract_feedback": [],
                 "trace": _event(
                     "ingest",
@@ -272,6 +281,7 @@ def build_graph(
         return {
             "source_format": doc.format.value,
             "invoice": extraction.invoice,
+            "renamed_from": renamed_from(doc.text),
             "corrections": extraction.corrections,
             "ungrounded": ungrounded(
                 extraction.invoice, doc.text, extraction.corrections
@@ -304,7 +314,9 @@ def build_graph(
         # Checking and recording the invoice stay one step on the event loop,
         # with no await between them, so runs that overlap see each other for
         # duplicates and splits. The checks are fast SQLite lookups.
-        report = validate(invoice, deps.inventory, deps.seen, deps.policy)
+        old = state.get("renamed_from")
+        document = f"formerly {old}" if old else None
+        report = validate(invoice, deps.inventory, deps.seen, deps.policy, document)
         report.findings += [
             Finding(
                 code="EXTRACTION_CORRECTION",

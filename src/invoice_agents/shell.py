@@ -68,7 +68,7 @@ from invoice_agents.cli import (
     invoice_files,
     process,
 )
-from invoice_agents.config import get_settings
+from invoice_agents.config import ROOT, get_settings
 from invoice_agents.inbox import Inbox, watch
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
@@ -79,6 +79,18 @@ from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
 LOGS = Path(".acme-logs")
 VP_MODES = ("ask", "approve", "reject", "wait")
 HISTORY = LOGS / "history"
+
+
+def _path(arg: str) -> Path:
+    """A path as typed, or else the same path in the repository: the
+    assistant names files relative to it, wherever the console was started."""
+    typed = Path(arg).expanduser()
+    in_repo = ROOT / typed
+    return (
+        typed
+        if typed.exists() or typed.is_absolute() or not in_repo.exists()
+        else in_repo
+    )
 
 
 @dataclass(frozen=True)
@@ -451,7 +463,7 @@ class Shell:
         if not args:
             self._usage("run")
             return
-        targets = [Path(a).expanduser() for a in args]
+        targets = [_path(a) for a in args]
         missing = [t for t in targets if not t.exists()]
         if missing:
             names = ", ".join(escape(str(t)) for t in missing)
@@ -464,7 +476,7 @@ class Shell:
         if len(args) > 1:
             self._usage("dir")
             return
-        folder = Path(args[0]).expanduser() if args else get_settings().samples_dir
+        folder = _path(args[0]) if args else get_settings().samples_dir
         if not folder.is_dir():
             console.print(f"  [bold]Not a folder:[/] {escape(str(folder))}")
             return
@@ -763,7 +775,7 @@ class Shell:
         if len(args) > 1:
             self._usage("watch")
             return
-        folder = Path(args[0]).expanduser() if args else get_settings().inbox_dir
+        folder = _path(args[0]) if args else get_settings().inbox_dir
         self._connect()
         assert self.conn is not None
         box = Inbox(folder)
@@ -774,9 +786,12 @@ class Shell:
             f" {escape(str(box.done))}. Ctrl-C to stop."
         )
 
-        async def handle(batch: list[Path]) -> None:
+        async def handle(batch: list[Path]) -> set[Path]:
             assert self.conn is not None
-            self.history += await process(self.conn.runner, batch, mode)
+            results = await process(self.conn.runner, batch, mode)
+            self.history += results
+            held = zip(batch, results, strict=True)
+            return {path for path, r in held if r["status"] == "skipped"}
 
         self.loop.run(watch(box, handle))
 

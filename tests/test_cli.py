@@ -26,6 +26,8 @@ def no_servers(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(cli.remote, "reachable", down)
 
+    monkeypatch.setattr(cli.remote, "api_up", down)
+
 
 @pytest.fixture(autouse=True)
 def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
@@ -130,9 +132,10 @@ def test_with_no_one_to_ask_the_invoice_waits_for_a_vp(
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
     sample = f"--invoice_path={INVOICES / 'invoice_1014.xml'}"
     [result] = run(capsys, sample)
-    assert result["status"] == "awaiting_vp"
-    # Nothing can resume it once this process ends, so the ledger lets the
-    # invoice be sent again instead of calling the next one a duplicate.
+    # Nothing can resume it once this process ends, so it says so instead of
+    # claiming it waits, and the ledger lets the invoice be sent again.
+    assert result["status"] == "skipped"
+    assert "can't wait for a VP" in result["reason"]
     [entry] = Ledger(offline.db_path).entries
     assert entry.outcome == "dropped"
     [again] = run(capsys, sample)
@@ -148,7 +151,7 @@ def test_closing_the_input_at_the_prompt_leaves_it_waiting(
     monkeypatch.setattr(cli.console, "input", closed)
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
     [result] = run(capsys, f"--invoice_path={INVOICES / 'invoice_1014.xml'}")
-    assert result["status"] == "awaiting_vp"
+    assert result["status"] == "skipped"
 
 
 def test_one_failure_does_not_stop_the_batch(
@@ -204,3 +207,13 @@ def test_reset_forgets_what_was_received(
     assert cli.main(["--reset"]) == 0
     assert Ledger(offline.db_path).entries == []
     assert [r["status"] for r in run(capsys, sample, "--reset")] == ["paid"]
+
+
+def test_a_file_type_it_does_not_read_is_skipped_not_failed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    odd = tmp_path / "invoice.docx"
+    odd.write_bytes(b"PK")
+    [result] = run(capsys, f"--invoice_path={odd}")
+    assert result["status"] == "skipped"
+    assert "Unsupported file type: .docx" in result["reason"]

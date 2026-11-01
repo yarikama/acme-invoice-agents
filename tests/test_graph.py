@@ -268,3 +268,18 @@ async def test_an_invented_line_is_flagged_for_a_person(inventory):
     [finding] = [f for f in state["report"].findings if f.code == "NOT_IN_DOCUMENT"]
     assert "item 'GadgetX'" in finding.detail
     assert "payment" not in state
+
+
+async def test_a_rename_in_the_document_is_flagged_even_if_extraction_drops_it(
+    inventory, tmp_path
+):
+    # 1012 reads "(formerly FastShip Ltd.)", which extraction tends to drop.
+    text = tmp_path / "renamed.txt"
+    text.write_text(
+        "FROM: QuickShip Distributers\n(formerly FastShip Ltd.)\n"
+        "WidgetA 10 x 250\nTOTAL 5000"
+    )
+    graph = make_graph(inventory)  # the stub extracts no rename
+    state = await graph.ainvoke({"path": str(text)}, config())
+    [finding] = [f for f in state["report"].findings if f.code == "VENDOR_RENAMED"]
+    assert "was formerly FastShip Ltd" in finding.detail

@@ -130,7 +130,10 @@ def validate(
     inventory: Inventory,
     seen: SeenInvoices | None = None,
     policy: Policy | None = None,
+    document: str | None = None,
 ) -> ValidationReport:
+    """Every check on one invoice. `document` is the file's text, for what an
+    extraction may leave out (a vendor's "formerly ..." line)."""
     policy = policy or Policy()
     findings: list[Finding] = []
     for check in (
@@ -149,7 +152,7 @@ def validate(
     findings += _stock(invoice, inventory)
     findings += _prices(invoice, inventory)
     findings += _threshold(invoice, policy)
-    findings += _renamed(invoice)
+    findings += _renamed(invoice, document)
     master = inventory.vendors()
     seen = seen if seen is not None else SeenInvoices()
     findings += _duplicates(invoice, seen)
@@ -560,21 +563,27 @@ def _closest(key: str, vendors: list[str]) -> str | None:
 RENAMED = re.compile(r"\b(?:formerly|previously|f/k/a|fka)\b[\s:]*([^)\n;]+)", re.I)
 
 
-def _renamed(inv: Invoice) -> list[Finding]:
-    """A vendor announcing a new name: how an impostor explains away a name
-    that doesn't match the one on file."""
-    text = " ".join(t for t in (inv.vendor, inv.vendor_address, inv.notes) if t)
+def renamed_from(text: str) -> str | None:
+    """The old name in a "formerly ..." line, if the text has one."""
     match = RENAMED.search(text)
-    if not match:
+    return match.group(1).strip(" .") if match else None
+
+
+def _renamed(inv: Invoice, document: str | None = None) -> list[Finding]:
+    """A vendor announcing a new name: how an impostor explains away a name
+    that doesn't match the one on file. Read from the extracted fields, and
+    from the document itself, which an extraction may have trimmed."""
+    fields = " ".join(t for t in (inv.vendor, inv.vendor_address, inv.notes) if t)
+    old = renamed_from(fields) or (renamed_from(document) if document else None)
+    if not old:
         return []
     return [
         _f(
             "VENDOR_RENAMED",
             Severity.WARNING,
             "Vendor says it changed its name",
-            f"{inv.vendor or 'The vendor'} was formerly"
-            f" {match.group(1).strip(' .')}. Confirm the change, and the bank"
-            " account, with the vendor on a number already on file.",
+            f"{inv.vendor or 'The vendor'} was formerly {old}. Confirm the change,"
+            " and the bank account, with the vendor on a number already on file.",
         )
     ]
 
@@ -689,12 +698,20 @@ def _duplicates(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
     if not inv.invoice_number:
         return []
     key = _number_key(inv.invoice_number)
+    vendor = _vendor_key(inv.vendor or "")
+    # Numbers are unique per vendor: Gadgets Co.'s GC-1001 is not a second
+    # INV-1001 from Widgets Inc. A missing vendor matches any, to be safe.
     standing = [
         e
         for e in seen.entries
         if e.outcome in STANDING
         and e.invoice.invoice_number
         and _number_key(e.invoice.invoice_number) == key
+        and (
+            not vendor
+            or not e.invoice.vendor
+            or _vendor_key(e.invoice.vendor) == vendor
+        )
     ]
     if not standing:
         return []
