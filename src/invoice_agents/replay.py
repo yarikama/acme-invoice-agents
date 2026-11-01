@@ -7,8 +7,11 @@ reviewer without an API key sees the same agent conversation, tool calls and
 token counts the live run produced.
 
 What is recorded is each agent's answer, keyed by what it was given: the
-document text for extraction, the invoice and the critic's objections for the
-approver, the invoice and the draft for the critic. Prompts are not the key:
+document text for extraction; the invoice, the validation findings and the
+critic's objections for the approver; the invoice, the findings and the draft
+for the critic. The findings are in the key so that an invoice replayed in a
+different situation (a duplicate, say) never shows a draft written for a
+clean one. Prompts are not the key:
 the approver's tool results depend on which invoices ran earlier, and a
 reviewer may run the samples in any order. On replay the approver's tool
 calls run again in code, so their results match the current state.
@@ -64,6 +67,18 @@ def _key(kind: str, *parts: str) -> str:
 
 def _invoice(invoice: Invoice) -> str:
     return invoice.model_dump_json()
+
+
+def draft_key(invoice: Invoice, report: ValidationReport, critique: list[str]) -> str:
+    return _key("draft", _invoice(invoice), report.model_dump_json(), *critique)
+
+
+def critique_key(
+    invoice: Invoice, report: ValidationReport, draft: ApprovalDraft
+) -> str:
+    return _key(
+        "critique", _invoice(invoice), report.model_dump_json(), draft.model_dump_json()
+    )
 
 
 class Recording:
@@ -167,7 +182,7 @@ class RecordingApprover:
         with _spent() as tokens:
             out = await self.inner.draft(invoice, report, critique, tools)
         self.recording.put(
-            _key("draft", _invoice(invoice), *critique),
+            draft_key(invoice, report, critique),
             {
                 "draft": out.draft.model_dump(mode="json"),
                 "steps": [s.model_dump(mode="json") for s in out.steps],
@@ -191,7 +206,7 @@ class RecordingCritic:
         with _spent() as tokens:
             out = await self.inner.review(invoice, report, draft, checked)
         self.recording.put(
-            _key("critique", _invoice(invoice), draft.model_dump_json()),
+            critique_key(invoice, report, draft),
             {"critique": out.model_dump(mode="json"), "tokens": tokens},
         )
         return out
@@ -228,7 +243,7 @@ class ReplayApprover:
         critique: list[str],
         tools: ReviewTools,
     ) -> Review:
-        hit = self.recording.get(_key("draft", _invoice(invoice), *critique))
+        hit = self.recording.get(draft_key(invoice, report, critique))
         if hit is None:
             review = await self.fallback.draft(invoice, report, critique, tools)
             draft = review.draft.model_copy(
@@ -258,9 +273,7 @@ class ReplayCritic:
         draft: ApprovalDraft,
         checked: list[ToolCall],
     ) -> Critique:
-        hit = self.recording.get(
-            _key("critique", _invoice(invoice), draft.model_dump_json())
-        )
+        hit = self.recording.get(critique_key(invoice, report, draft))
         if hit is None:
             return await self.fallback.review(invoice, report, draft, checked)
         _replayed(hit["tokens"])

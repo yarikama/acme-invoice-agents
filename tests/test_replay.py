@@ -122,7 +122,7 @@ async def test_replayed_tool_calls_are_answered_by_code_again(
     recording = Recording(tmp_path / "r.json")
     stale = ToolCall(name="check_inventory", args={"item": "WidgetA"}, result="STALE")
     guard = ToolCall(name="guardrail", args={}, result="Address NEAR_THRESHOLD.")
-    recording.entries[replay._key("draft", INV_1001.model_dump_json())] = {
+    recording.entries[replay.draft_key(INV_1001, ValidationReport(findings=[]), [])] = {
         "draft": {"decision": "approve", "rationale": "ok", "addressed": []},
         "steps": [stale.model_dump(), guard.model_dump()],
         "tokens": {},
@@ -212,3 +212,36 @@ async def test_recorded_tokens_still_count_for_the_live_step(tmp_path: Path) -> 
     await approver.draft(INV_1001, ValidationReport(findings=[]), [], tools)
     await RuleApprover().draft(INV_1001, ValidationReport(findings=[]), [], tools)
     assert Critique(agrees=True).issues == []
+
+
+async def test_a_draft_is_only_replayed_for_the_findings_it_was_written_for(
+    inventory: Inventory, tmp_path: Path
+) -> None:
+    from invoice_agents.models import Finding, Severity
+
+    clean = ValidationReport(findings=[])
+    duplicate = ValidationReport(
+        findings=[
+            Finding(
+                code="DUPLICATE",
+                severity=Severity.ERROR,
+                title="Duplicate invoice",
+                detail="INV-1001 was already processed.",
+            )
+        ]
+    )
+    recording = Recording(tmp_path / "r.json")
+    recording.entries[replay.draft_key(INV_1001, clean, [])] = {
+        "draft": {"decision": "approve", "rationale": "Clean.", "addressed": []},
+        "steps": [],
+        "tokens": {},
+    }
+    tools = ReviewTools(inventory, SeenInvoices(), INV_1001)
+    approver = ReplayApprover(recording)
+    assert (
+        await approver.draft(INV_1001, clean, [], tools)
+    ).draft.rationale == "Clean."
+    # The same invoice seen again as a duplicate doesn't get the clean draft.
+    again = await approver.draft(INV_1001, duplicate, [], tools)
+    assert again.draft.rationale.startswith(FALLBACK)
+    assert again.draft.decision == "reject"
