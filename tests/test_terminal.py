@@ -1,6 +1,6 @@
 """What the CLI draws, rendered to plain text."""
 
-from rich.console import Console
+from rich.console import Console, Group
 
 from invoice_agents.terminal import (
     RunView,
@@ -18,6 +18,11 @@ def text(renderable: object) -> str:
     console = Console(width=120, record=True, color_system=None, force_terminal=False)
     console.print(renderable)
     return console.export_text()
+
+
+def shown(view: RunView) -> str:
+    """What the terminal shows: the turns printed so far, then the live status."""
+    return text(Group(*view.take(), view))
 
 
 def trace(node: str, message: str, at: float, tool: str | None = None) -> dict:
@@ -139,9 +144,10 @@ def test_run_view_draws_turns_and_resumes_after_the_pause() -> None:
     for e in EVENTS[:6]:
         view.add(e)
     view.add({"type": "progress", "stage": "approve", "step": "critique"})
-    assert "The critic is checking the draft" in text(view)
+    out = shown(view)
+    assert "The critic is checking the draft" in out
     view.add(EVENTS[6])
-    out = text(view)
+    out += shown(view)
     for words in (
         "Validation",
         "Triage",
@@ -159,9 +165,32 @@ def test_run_view_draws_turns_and_resumes_after_the_pause() -> None:
         {"type": "trace", "node": "human_review", "message": "VP approved. Note: ok"}
     )
     after.status = "paid"
-    drawn = text(after)
+    drawn = shown(after)
     assert "VP" in drawn and "Approved" in drawn
     assert "Triage" not in drawn  # already printed before the pause
+
+
+def test_only_the_status_is_redrawn() -> None:
+    """Finished turns are printed once; the live part stays a few lines tall,
+    so it never outgrows the screen and gets cropped or repainted whole."""
+    view = RunView("invoice_1014.xml")
+    view.started = 99.0
+    tool_calls = [e for e in EVENTS if e.get("tool") and e["tool"] != "guardrail"]
+    first_tool = EVENTS.index(tool_calls[0])
+    for e in EVENTS[: first_tool + 1]:
+        view.add(e)
+    printed = text(Group(*view.take()))
+    assert "convert_to_usd" not in printed  # the approver's turn isn't done
+    status = text(view)
+    assert "1 tool call so far" in status
+    assert len(status.strip().splitlines()) <= 3
+
+    for e in EVENTS[first_tool + 1 :]:
+        view.add(e)
+    printed = text(Group(*view.take()))
+    assert "convert_to_usd" in printed and "Triage" not in printed
+    assert view.take() == []  # each turn is printed once
+    assert "Triage" not in text(view) and len(text(view).strip().splitlines()) <= 3
 
 
 def test_banner_says_where_runs_show() -> None:
@@ -282,7 +311,7 @@ def test_usage_shows_beside_each_turn_and_as_a_run_total() -> None:
     view.started = 0.0
     for e in events[:2]:
         view.add(e)
-    out = text(view)
+    out = shown(view)
     assert "2.1k tokens · $0.0042" in out and "this run so far: 2.1k tokens" in out
 
 
@@ -309,7 +338,7 @@ def test_model_turns_name_their_model() -> None:
             "usage": usage,
         }
     )
-    out = text(view)
+    out = shown(view)
     assert "Critic  claude-haiku-5.5" in out
     assert "Validation  code" in out  # code steps keep their role
 
