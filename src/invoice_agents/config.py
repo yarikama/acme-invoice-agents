@@ -14,10 +14,11 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # "offline" runs rule-based agents with no network, for tests and demos
-    # without an API key. Text and PDF invoices need an LLM to extract.
-    # replay: answer from a recording of a live run, with no key or network.
-    llm_provider: Literal["xai", "openrouter", "offline", "replay"] = "offline"
+    # replay (the default): answer from a recording of a live run, with no
+    # key or network, so a fresh checkout runs every sample as recorded.
+    # "offline" runs rule-based agents with no network; text and PDF
+    # invoices then need an LLM to extract and are skipped.
+    llm_provider: Literal["xai", "openrouter", "offline", "replay"] = "replay"
     replay_path: Path = Path("data/replay/recording.json")
     # Set on a live provider to record the agents' answers for replay.
     record_to: Path | None = None

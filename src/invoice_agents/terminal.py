@@ -481,11 +481,14 @@ def render_turn(t: Turn) -> RenderableType:
             line.append(f"  {d['note']}")
         body.append(line)
     else:
+        # A step that called a model (ingest reading free text) is the
+        # model's turn, not code's.
+        voice = "model" if t.usage else "code"
         head = _header(
             t.node,
             NAME.get(t.node, t.node.capitalize()),
-            "code",
-            "code",
+            voice,
+            voice,
             t.took,
             t.usage,
         )

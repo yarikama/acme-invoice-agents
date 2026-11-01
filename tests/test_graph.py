@@ -8,7 +8,13 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from invoice_agents.agents import Extraction, Review, RuleApprover, RuleCritic
+from invoice_agents.agents import (
+    Extraction,
+    ExtractionUnavailableError,
+    Review,
+    RuleApprover,
+    RuleCritic,
+)
 from invoice_agents.config import Settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.llm import Agents
@@ -203,3 +209,40 @@ async def test_tool_calls_stream_as_they_finish_before_the_draft(inventory):
         "skip: check_i",  # in the update too, marked as already sent
         "Draft 1",
     ]
+
+
+class NoLLM:
+    async def extract(self, text: str, feedback: list[str]) -> Extraction:
+        raise ExtractionUnavailableError("no LLM is configured")
+
+
+async def test_unreadable_files_are_rejected_with_a_reason(inventory, tmp_path):
+    empty = tmp_path / "empty.txt"
+    empty.write_text("")
+    graph = make_graph(inventory)
+    state = await graph.ainvoke({"path": str(empty)}, config())
+    assert (
+        state["rejection_reason"] == "Could not extract the invoice: The file is empty."
+    )
+
+    # A CSV in an unknown layout, with no LLM to read it as text instead.
+    odd = tmp_path / "odd.csv"
+    odd.write_text("a,b\n1\n")
+    graph = make_graph(inventory, NoLLM())
+    state = await graph.ainvoke({"path": str(odd)}, config())
+    assert "payment" not in state
+    assert state["rejection_reason"].startswith(
+        "Could not extract the invoice: Could not read the CSV in code"
+    )
+    assert "needs an LLM" in state["rejection_reason"]
+
+
+async def test_the_agent_reads_a_structured_file_code_could_not(inventory, tmp_path):
+    odd = tmp_path / "odd.json"
+    odd.write_text('{"vendor": ')
+    graph = make_graph(inventory)
+    state = await graph.ainvoke({"path": str(odd)}, config())
+    [ingest] = [t["message"] for t in state["trace"] if t["stage"] == "ingest"]
+    assert ingest.startswith("Could not read the JSON in code: not valid JSON")
+    assert "The extraction agent read its text." in ingest
+    assert state["payment"].status == "success"

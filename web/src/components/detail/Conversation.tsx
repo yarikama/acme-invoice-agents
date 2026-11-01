@@ -318,7 +318,15 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
         { ingest: "Ingest", pay: "Payment", reject: "Not paid", error: "Run failed" }[turn.node] ?? turn.node;
       const paid = turn.output?.payment?.status === "success" ? turn.output.payment : null;
       return (
-        <TurnFrame node={turn.node} voice="code" name={name} role="code" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame
+          node={turn.node}
+          voice={turn.usage ? "model" : "code"}
+          name={name}
+          role={turn.usage ? "model" : "code"}
+          ms={turn.ms}
+          usage={turn.usage}
+          fresh={fresh}
+        >
           {paid ? (
             <p className="m-0">
               Paid <span className="font-medium">{money(paid.amount, paid.currency)}</span> to {paid.vendor} through
