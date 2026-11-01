@@ -77,6 +77,9 @@ class TraceEvent(TypedDict):
     # Already sent live while the node ran (see `review`): clients reading
     # the node's update skip it; the state keeps it for summaries.
     streamed: NotRequired[bool]
+    # What the step produced, for clients to show: the extracted invoice,
+    # the validation findings, the payment.
+    data: NotRequired[dict[str, Any]]
 
 
 class InvoiceState(TypedDict, total=False):
@@ -134,11 +137,16 @@ def _emit(stage: str, status: str, **data: Any) -> None:
 
 
 def _event(
-    stage: str, message: str, usage: StepUsage | None = None
+    stage: str,
+    message: str,
+    usage: StepUsage | None = None,
+    data: dict[str, Any] | None = None,
 ) -> list[TraceEvent]:
     event = TraceEvent(stage=stage, message=message)
     if usage:
         event["usage"] = usage
+    if data:
+        event["data"] = data
     return [event]
 
 
@@ -181,7 +189,9 @@ def build_graph(
                 "invoice": doc.invoice,
                 "extract_feedback": [],
                 "trace": _event(
-                    "ingest", f"Parsed {doc.format.value.upper()} in code."
+                    "ingest",
+                    f"Parsed {doc.format.value.upper()} in code.",
+                    data={"invoice": doc.invoice.model_dump(mode="json")},
                 ),
             }
 
@@ -216,7 +226,15 @@ def build_graph(
             "corrections": extraction.corrections,
             "extract_attempts": attempt,
             "extract_feedback": feedback,
-            "trace": _event("ingest", message + ".", step_usage(tokens, deps.pricing)),
+            "trace": _event(
+                "ingest",
+                message + ".",
+                step_usage(tokens, deps.pricing),
+                data={
+                    "invoice": extraction.invoice.model_dump(mode="json"),
+                    "corrections": extraction.corrections,
+                },
+            ),
         }
 
     def after_ingest(state: InvoiceState) -> Literal["ingest", "validate", "reject"]:
@@ -254,6 +272,7 @@ def build_graph(
                 f"{_count(len(report.errors), 'error')},"
                 f" {_count(len(report.warnings), 'warning')};"
                 f" policy route: {route}" + (f" ({reason})." if reason else "."),
+                data={"findings": [f.model_dump(mode="json") for f in report.findings]},
             ),
         }
 
@@ -397,7 +416,11 @@ def build_graph(
         result = mock_payment(invoice.vendor, invoice.total, invoice.currency)
         return {
             "payment": result,
-            "trace": _event("pay", f"mock_payment returned {result.status}."),
+            "trace": _event(
+                "pay",
+                f"mock_payment returned {result.status}.",
+                data={"payment": result.model_dump(mode="json")},
+            ),
         }
 
     async def reject(state: InvoiceState) -> InvoiceState:

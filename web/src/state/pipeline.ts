@@ -1,4 +1,4 @@
-import type { RunEvent, StepUsage } from "../api/types";
+import type { Finding, Invoice, RunEvent, StageOutput, StepUsage } from "../api/types";
 import type { RunView } from "./runs";
 
 export type LedState = "off" | "run" | "done" | "flag" | "block" | "fail" | "wait" | "skip";
@@ -119,6 +119,8 @@ export interface TraceLine {
   at?: number;
   // Tokens and cost of the step this line ends, if it called a model.
   usage?: StepUsage;
+  // What the step produced, when it says.
+  output?: StageOutput;
 }
 
 // The VP's decision shows up once, as the human_review node's trace line.
@@ -138,6 +140,7 @@ export function traceLines(run: RunView, llm: boolean): TraceLine[] {
         text: e.message,
         at: time(e.at),
         usage: e.usage,
+        output: e.data,
       });
     } else if (e.type === "run_error") {
       lines.push({ seq: e.seq, node: "error", voice: "code", text: e.message, at: time(e.at) });
@@ -165,4 +168,21 @@ function voiceOf(node: string, message: string, llm: boolean): TraceVoice {
   // The approver and critic are models only when an LLM is configured.
   if (node === "review" || node === "critique") return llm ? "model" : "code";
   return "code";
+}
+
+/**
+ * The invoice and its findings as far as the run has got: the final summary
+ * once there is one, otherwise what ingest and validation reported on their
+ * trace lines, so the panels fill in while the agents are still working.
+ */
+export function soFar(run: RunView): { invoice: Invoice | null; findings: Finding[] | null } {
+  if (run.summary) return { invoice: run.summary.invoice, findings: run.summary.findings };
+  let invoice: Invoice | null = null;
+  let findings: Finding[] | null = null;
+  for (const e of run.events) {
+    if (e.type !== "trace" || !e.data) continue;
+    if (e.data.invoice) invoice = e.data.invoice;
+    if (e.data.findings) findings = e.data.findings;
+  }
+  return { invoice, findings };
 }

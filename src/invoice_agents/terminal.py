@@ -247,6 +247,8 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
             out.append(Turn("step", node, timed(at), {"text": msg}))
         if len(out) > before:
             out[-1].usage = e.get("usage")
+            if e.get("data"):
+                out[-1].data["output"] = e["data"]
     if events:
         flush(None)
     return out
@@ -337,6 +339,70 @@ def _header(
     return row
 
 
+SEVERITY = {
+    "error": ("✕", "bold #e66767"),
+    "warning": ("▲", f"bold {SIGNAL}"),
+    "info": ("·", "#7c7c75"),
+}
+MUTED = "#a6a69f"
+
+
+def _number(x: float) -> str:
+    return f"{x:,.0f}" if float(x).is_integer() else f"{x:,}"
+
+
+def extracted(output: dict[str, Any]) -> list[RenderableType]:
+    """The fields ingest pulled out, and the invoice's lines as a table."""
+    inv = output.get("invoice") or {}
+    cur = inv.get("currency")
+    head = Text()
+    head.append(inv.get("invoice_number") or "No invoice number", style="bold")
+    head.append(f"  {inv.get('vendor') or 'no vendor'}")
+    head.append(f"  {money(inv.get('total'), cur)}", style="bold")
+    head.append(f"  due {inv.get('due_date') or 'not stated'}", style=MUTED)
+    parts: list[RenderableType] = [head]
+    items = inv.get("line_items") or []
+    if items:
+        table = Table(
+            box=None, padding=(0, 2, 0, 0), show_edge=False, header_style=MUTED
+        )
+        table.add_column("item")
+        table.add_column("qty", justify="right")
+        table.add_column("unit", justify="right")
+        table.add_column("amount", justify="right")
+        for li in items:
+            qty = float(li.get("quantity") or 0)
+            unit = float(li.get("unit_price") or 0)
+            amount = li.get("amount")
+            table.add_row(
+                Text(str(li.get("item")), style="bold"),
+                Text(_number(qty), style="#e66767" if qty <= 0 else ""),
+                money(unit, cur),
+                money(amount if amount is not None else qty * unit, cur),
+            )
+        parts.append(table)
+    parts += [Text(f"✎ {c}", style=MUTED) for c in output.get("corrections") or []]
+    return parts
+
+
+def checked(output: dict[str, Any]) -> list[RenderableType]:
+    """Each finding on its own line, worst first."""
+    order = {"error": 0, "warning": 1, "info": 2}
+    findings = sorted(
+        output.get("findings") or [], key=lambda f: order.get(f["severity"], 3)
+    )
+    lines: list[RenderableType] = []
+    if not any(f["severity"] != "info" for f in findings):
+        lines.append(Text("✓ Every check passed", style=f"bold {VOICE['code']}"))
+    for f in findings:
+        glyph, style = SEVERITY.get(f["severity"], ("·", MUTED))
+        line = Text(f"{glyph} ", style=style)
+        line.append(f["code"], style=style)
+        line.append(f"  {f['detail']}", style="" if f["severity"] != "info" else MUTED)
+        lines.append(line)
+    return lines
+
+
 def render_turn(t: Turn) -> RenderableType:
     d = t.data
     body: list[RenderableType] = []
@@ -358,6 +424,8 @@ def render_turn(t: Turn) -> RenderableType:
             body.append(line)
         else:
             body.append(Text(d["text"]))
+        if "output" in d:
+            body += checked(d["output"])
     elif t.kind == "triage":
         head = _header("triage", "Triage", "decision model", "model", t.took, t.usage)
         if "decision" in d:
@@ -421,7 +489,24 @@ def render_turn(t: Turn) -> RenderableType:
             t.took,
             t.usage,
         )
-        body.append(Text(d["text"]))
+        output = d.get("output") or {}
+        payment = output.get("payment")
+        if payment and payment.get("status") == "success":
+            line = Text("Paid ", style=MUTED)
+            line.append(
+                money(payment.get("amount"), payment.get("currency")), style="bold"
+            )
+            line.append(f" to {payment.get('vendor')}", style=MUTED)
+            line.append("  via mock_payment", style=MUTED)
+            body.append(line)
+        elif t.node == "reject" and len(sentences(d["text"])) > 2:
+            # The full reasoning is in the approver's turn and the result card.
+            first = sentences(d["text"])[:2]
+            body.append(Text(" ".join(first)))
+        else:
+            body.append(Text(d["text"], style=MUTED if "invoice" in output else ""))
+        if "invoice" in output:
+            body += extracted(output)
     return Group(head, Padding(Group(*body), (0, 0, 1, 6)))
 
 
@@ -593,24 +678,118 @@ def money(amount: float | None, currency: str | None) -> str:
     if amount is None:
         return "no amount"
     sym = {"USD": "$", "EUR": "€", "GBP": "£"}.get(currency or "USD")
-    return f"{sym}{amount:,.2f}" if sym else f"{currency} {amount:,.2f}"
+    sign = "-" if amount < 0 else ""
+    if sym:
+        return f"{sign}{sym}{abs(amount):,.2f}"
+    return f"{currency} {sign}{abs(amount):,.2f}"
 
 
-def result_line(file: str, result: dict[str, Any]) -> Text:
+def _verdicts(result: dict[str, Any]) -> Text | None:
+    """Who decided what: the approver's draft, the critic, then any VP."""
+    parts: list[Text] = []
+    draft = result.get("draft") or {}
+    if draft.get("decision"):
+        line = Text("Approver ", style="#a6a69f")
+        line.append_text(
+            _pill(draft["decision"].capitalize(), DECISION_STYLE[draft["decision"]])
+        )
+        parts.append(line)
+    for t in result.get("trace", []):
+        message = str(t.get("message", ""))
+        if message.startswith("Critic "):
+            agrees = message.startswith("Critic agrees")
+            line = Text("Critic ", style="#a6a69f")
+            line.append_text(
+                _pill(
+                    "Agrees" if agrees else "Objects",
+                    DECISION_STYLE["approve" if agrees else "reject"],
+                )
+            )
+            parts.append(line)
+        elif message.startswith(("VP approved", "VP rejected")):
+            approved = message.startswith("VP approved")
+            line = Text("VP ", style="#a6a69f")
+            line.append_text(
+                _pill(
+                    "Approved" if approved else "Rejected",
+                    DECISION_STYLE["approve" if approved else "reject"],
+                )
+            )
+            parts.append(line)
+    if not parts:
+        return None
+    return Text("   ").join(parts)
+
+
+def result_card(file: str, result: dict[str, Any]) -> Panel:
+    """What came of one invoice, boxed: the outcome, who decided it, why,
+    the flags behind it, and what the model calls cost."""
     status = str(result.get("status") or "failed")
-    line = _pill(OUTCOME_WORD.get(status, status), OUTCOME_STYLE.get(status, "reverse"))
+    style = OUTCOME_STYLE.get(status, "reverse")
     inv = result.get("invoice") or {}
-    line.append(f"  {inv.get('invoice_number') or file}", style="bold")
-    if inv.get("vendor"):
-        line.append(f"  {inv['vendor']}")
+    draft = result.get("draft") or {}
+    parts: list[RenderableType] = []
+
+    head = Text()
+    head.append(f"{inv.get('invoice_number') or file}", style="bold")
     if inv:
-        line.append(f"  {money(inv.get('total'), inv.get('currency'))}", style="bold")
-    reason = (
-        result.get("route_reason") if status == "awaiting_vp" else result.get("reason")
+        head.append(f"  {inv.get('vendor') or 'no vendor'}")
+        head.append(f"  {money(inv.get('total'), inv.get('currency'))}", style="bold")
+    parts.append(head)
+
+    verdicts = _verdicts(result)
+    if verdicts:
+        parts += [Text(), verdicts]
+
+    # Why: a VP-bound run says what policy needs; otherwise the model's
+    # reasoning, or the code's reason when no model weighed in.
+    why: list[str] = []
+    if status == "awaiting_vp" and result.get("route_reason"):
+        reason = str(result["route_reason"])
+        why.append(reason[:1].upper() + reason[1:] + ".")
+    why += sentences(draft.get("rationale") or "")
+    if not why and result.get("reason"):
+        why = sentences(str(result["reason"])) or [str(result["reason"])]
+    if why:
+        parts += [Text(), Text("Why", style="#a6a69f")]
+        parts += [Text(f"▪ {s}") for s in why]
+
+    flags = sorted(
+        (f for f in result.get("findings", []) if f.get("severity") != "info"),
+        key=lambda f: f.get("severity") != "error",
     )
-    if reason:
-        line.append(f"\n  {reason}", style="#a6a69f")
-    return line
+    if flags:
+        parts += [Text(), Text("Flags", style="#a6a69f")]
+        for f in flags:
+            line = Text(f" {f['code']} ", style="bold #f0efec on #2a2a28")
+            line.append(f"  {f.get('title') or f.get('detail', '')}")
+            parts.append(line)
+
+    payment = result.get("payment") or {}
+    if payment.get("status") == "success":
+        paid = Text("Paid ", style="#a6a69f")
+        paid.append(money(payment.get("amount"), payment.get("currency")), style="bold")
+        paid.append(f" to {payment.get('vendor')}", style="#a6a69f")
+        parts += [Text(), paid]
+
+    used = [t["usage"] for t in result.get("trace", []) if t.get("usage")]
+    if used:
+        costs = [u.get("cost_usd") for u in used]
+        total = {
+            "input_tokens": sum(int(u.get("input_tokens", 0)) for u in used),
+            "output_tokens": sum(int(u.get("output_tokens", 0)) for u in used),
+            "cost_usd": None if None in costs else sum(c or 0.0 for c in costs),
+        }
+        calls = f"{len(used)} model step{'s' if len(used) != 1 else ''}"
+        parts += [Text(), Text(f"{spent(total)} across {calls}", style="#7c7c75")]
+
+    return Panel(
+        Group(*parts),
+        title=Text(f" {OUTCOME_WORD.get(status, status)} ", style=style),
+        title_align="left",
+        border_style=style.split(" on ")[-1],
+        padding=(1, 2),
+    )
 
 
 def vp_card(summary: dict[str, Any]) -> Panel:

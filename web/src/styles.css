@@ -791,6 +791,21 @@
   .tool-use {
     background: color-mix(in srgb, var(--code) 10%, transparent);
   }
+  /* The fields ingest extracted, as a row of labelled values that wraps. */
+  .extracted {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px 16px;
+    margin: 0;
+  }
+  .extracted dt {
+    font-size: 0.75rem;
+    color: var(--ink-2);
+  }
+  .extracted dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
   .turn-new .tool-use {
     animation: turn-in 300ms ease-out both;
   }

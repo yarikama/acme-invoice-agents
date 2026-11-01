@@ -14,6 +14,7 @@ import {
   settledTimeline,
   VALIDATION_LABEL,
 } from "../state/routing";
+import { soFar } from "../state/pipeline";
 import type { RunView } from "../state/runs";
 import { RoutingFlow } from "./charts/RoutingFlow";
 import { Throughput } from "./charts/Throughput";
@@ -86,9 +87,10 @@ export function Dashboard({
   const settled = settledTimeline(runs);
 
   const s = selected?.summary;
-  const inv = s?.invoice;
+  // Ingest and validation report as they finish, before the run's summary.
+  const { invoice: inv, findings } = selected ? soFar(selected) : { invoice: null, findings: null };
   const waiting = selected?.status === "awaiting_vp";
-  const errors = s?.findings.filter((f) => f.severity === "error").length ?? 0;
+  const errors = findings?.filter((f) => f.severity === "error").length ?? 0;
 
   const widgets: Record<WidgetId, (draggable: boolean) => ReactNode> = {
     overview: (d) => (
@@ -224,20 +226,20 @@ export function Dashboard({
         icon={SECTION_ICON.findings}
         draggable={d}
         aside={
-          s && (
+          findings && (
             <span className="cap whitespace-nowrap">
-              {s.findings.length ? `${plural(errors, "hard failure")}, ${s.findings.length} total` : "all passed"}
+              {findings.length ? `${plural(errors, "hard failure")}, ${findings.length} total` : "all passed"}
             </span>
           )
         }
       >
-        {s ? <Findings findings={s.findings} /> : <Muted>Findings appear once validation runs.</Muted>}
+        {findings ? <Findings findings={findings} /> : <Muted>Findings appear once validation runs.</Muted>}
       </Widget>
     ),
     lines: (d) => (
       <Widget id="lines" title="Line items" icon={SECTION_ICON.lineItems} draggable={d}>
-        {inv && s && inv.line_items.length > 0 ? (
-          <LineItems invoice={inv} findings={s.findings} />
+        {inv && inv.line_items.length > 0 ? (
+          <LineItems invoice={inv} findings={findings ?? []} />
         ) : (
           <Muted>No line items to show.</Muted>
         )}

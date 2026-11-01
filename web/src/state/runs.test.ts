@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { RunEvent, Summary } from "../api/types";
-import { pipeline, traceLines } from "./pipeline";
+import { pipeline, soFar, traceLines } from "./pipeline";
 import { initialRuns, runsReducer, type RunsState } from "./runs";
 
 let seq = 0;
@@ -239,5 +239,47 @@ describe("traceLines", () => {
     ]);
     // Tool lines still light the draft segment of the pipeline.
     expect(pipeline(state.runs.r1!).find((s) => s.key === "draft")!.state).toBe("done");
+  });
+});
+
+describe("soFar", () => {
+  const invoice = {
+    invoice_number: "INV-1",
+    revision: null,
+    vendor: "Widgets Inc.",
+    vendor_address: null,
+    invoice_date: null,
+    due_date: null,
+    currency: "USD",
+    line_items: [{ item: "WidgetA", quantity: 2, unit_price: 5, amount: null, note: null }],
+    subtotal: null,
+    tax_amount: null,
+    shipping: null,
+    total: 10,
+    payment_terms: null,
+    notes: null,
+  };
+  const finding = { code: "OUT_OF_STOCK", severity: "error" as const, title: "Out of stock", detail: "FakeItem: 0" };
+
+  it("fills in from each step's trace line before the run is done", () => {
+    seq = 0;
+    const trace = (node: string, data: object) =>
+      ev({ type: "trace", node, stage: node, message: "x", data } as Partial<RunEvent> & { type: "trace" });
+    const afterIngest = play([ev({ type: "started" }), trace("ingest", { invoice })]).runs.r1!;
+    expect(soFar(afterIngest)).toEqual({ invoice, findings: null });
+    const afterValidate = play([trace("validate", { findings: [finding] })], {
+      ...initialRuns,
+      runs: { r1: afterIngest },
+      order: ["r1"],
+    }).runs.r1!;
+    expect(soFar(afterValidate)).toEqual({ invoice, findings: [finding] });
+    // The line also carries the step's output into its conversation turn.
+    expect(traceLines(afterValidate, true).map((l) => l.output)).toEqual([{ invoice }, { findings: [finding] }]);
+  });
+
+  it("prefers the run's summary once it has one", () => {
+    seq = 0;
+    const done = play([ev({ type: "done", status: "paid", summary: summary({ invoice, findings: [] }) })]).runs.r1!;
+    expect(soFar(done)).toEqual({ invoice, findings: [] });
   });
 });
