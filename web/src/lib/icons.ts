@@ -3,6 +3,7 @@ import {
   CircleNotchIcon,
   CreditCardIcon,
   FileArrowDownIcon,
+  FileTextIcon,
   FlagIcon,
   GavelIcon,
   HourglassMediumIcon,
@@ -43,6 +44,7 @@ export const STAGE_ICON: Record<Segment["key"], Icon> = {
 
 export const SECTION_ICON = {
   invoices: ReceiptIcon,
+  summary: FileTextIcon,
   decision: GavelIcon,
   stream: PulseIcon,
   findings: FlagIcon,

@@ -1,7 +1,5 @@
 import type { Finding, Invoice } from "../../api/types";
 import { money } from "../../lib/format";
-import { SECTION_ICON } from "../../lib/icons";
-import { Heading } from "../Badge";
 
 const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -14,50 +12,43 @@ export function LineItems({ invoice, findings }: { invoice: Invoice; findings: F
   );
   const cur = invoice.currency;
   return (
-    <section aria-labelledby="lines-h" className="bg-panel p-6">
-      <div className="mb-4">
-        <Heading id="lines-h" icon={SECTION_ICON.lineItems}>
-          Line items
-        </Heading>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[420px] border-collapse text-sm">
-          <thead>
-            <tr className="mono text-left text-xs text-ink-2">
-              <th scope="col" className="border-b border-seam py-2 font-normal">item</th>
-              <th scope="col" className="border-b border-seam py-2 text-right font-normal">qty</th>
-              <th scope="col" className="border-b border-seam py-2 text-right font-normal">unit</th>
-              <th scope="col" className="border-b border-seam py-2 text-right font-normal">amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.line_items.map((li, i) => {
-              const bad = flagged.has(key(li.item));
-              return (
-                <tr key={i}>
-                  <td className="border-b border-seam py-2">
-                    <span className="inline-flex items-center gap-2">
-                      {bad && <span className="lt lt-awaiting_vp" aria-label="flagged" />}
-                      <span className="mono text-xs">{li.item}</span>
-                      {li.note && <span className="text-ink-2">{li.note}</span>}
-                    </span>
-                  </td>
-                  <td className="border-b border-seam py-2 text-right">{li.quantity}</td>
-                  <td className="border-b border-seam py-2 text-right">{money(li.unit_price, cur)}</td>
-                  <td className="border-b border-seam py-2 text-right">{money(li.amount ?? li.quantity * li.unit_price, cur)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-          <tfoot className="text-right">
-            {invoice.subtotal != null && <Row label="subtotal" value={money(invoice.subtotal, cur)} />}
-            {invoice.tax_amount != null && <Row label="tax" value={money(invoice.tax_amount, cur)} />}
-            {invoice.shipping != null && <Row label="shipping" value={money(invoice.shipping, cur)} />}
-            <Row label="total as printed" value={money(invoice.total, cur)} strong />
-          </tfoot>
-        </table>
-      </div>
-    </section>
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[420px] border-collapse text-sm">
+        <thead>
+          <tr className="mono text-left text-xs text-ink-2">
+            <th scope="col" className="border-b border-seam py-2 font-normal">item</th>
+            <th scope="col" className="border-b border-seam py-2 text-right font-normal">qty</th>
+            <th scope="col" className="border-b border-seam py-2 text-right font-normal">unit</th>
+            <th scope="col" className="border-b border-seam py-2 text-right font-normal">amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.line_items.map((li, i) => {
+            const bad = flagged.has(key(li.item));
+            return (
+              <tr key={i}>
+                <td className="border-b border-seam py-2">
+                  <span className="inline-flex items-center gap-2">
+                    {bad && <span className="lt lt-awaiting_vp" aria-label="flagged" />}
+                    <span className="mono text-xs">{li.item}</span>
+                    {li.note && <span className="text-ink-2">{li.note}</span>}
+                  </span>
+                </td>
+                <td className="border-b border-seam py-2 text-right">{li.quantity}</td>
+                <td className="border-b border-seam py-2 text-right">{money(li.unit_price, cur)}</td>
+                <td className="border-b border-seam py-2 text-right">{money(li.amount ?? li.quantity * li.unit_price, cur)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot className="text-right">
+          {invoice.subtotal != null && <Row label="subtotal" value={money(invoice.subtotal, cur)} />}
+          {invoice.tax_amount != null && <Row label="tax" value={money(invoice.tax_amount, cur)} />}
+          {invoice.shipping != null && <Row label="shipping" value={money(invoice.shipping, cur)} />}
+          <Row label="total as printed" value={money(invoice.total, cur)} strong />
+        </tfoot>
+      </table>
+    </div>
   );
 }
 

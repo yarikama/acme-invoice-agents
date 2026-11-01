@@ -1,4 +1,4 @@
-import { MoonIcon, SunIcon } from "@phosphor-icons/react";
+import { ArrowCounterClockwiseIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import type { StreamState } from "../state/useConsole";
@@ -25,7 +25,15 @@ function useTheme() {
   return { dark, toggle };
 }
 
-export function Header({ stream, provider }: { stream: StreamState; provider: string | null }) {
+export function Header({
+  stream,
+  provider,
+  onResetLayout,
+}: {
+  stream: StreamState;
+  provider: string | null;
+  onResetLayout: () => void;
+}) {
   const { dark, toggle } = useTheme();
   return (
     <header className="border-b border-seam bg-panel">
@@ -44,6 +52,16 @@ export function Header({ stream, provider }: { stream: StreamState; provider: st
           <span className="tag" title="LLM provider configured on the server">
             {provider ?? "server offline"}
           </span>
+          {/* Only the wide grid can be rearranged, so only it can be reset. */}
+          <button
+            type="button"
+            className="key key-sm hidden min-[900px]:inline-flex"
+            onClick={onResetLayout}
+            title="Put every widget back where it started"
+          >
+            <ArrowCounterClockwiseIcon size={16} />
+            Reset layout
+          </button>
           <button
             type="button"
             className="key key-sm"

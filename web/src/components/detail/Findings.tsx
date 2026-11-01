@@ -1,36 +1,23 @@
 import type { Finding } from "../../api/types";
-import { plural } from "../../lib/format";
-import { SECTION_ICON } from "../../lib/icons";
-import { Heading } from "../Badge";
 
 const SEVERITY_WORD = { error: "fail", warning: "flag", info: "note" } as const;
 const ORDER = { error: 0, warning: 1, info: 2 } as const;
 
 export function Findings({ findings }: { findings: Finding[] }) {
   const sorted = [...findings].sort((a, b) => ORDER[a.severity] - ORDER[b.severity]);
-  const errors = findings.filter((f) => f.severity === "error").length;
+  if (findings.length === 0) return <p className="m-0 text-sm text-ink-2">Every check passed.</p>;
   return (
-    <section aria-labelledby="findings-h" className="bg-panel p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <Heading id="findings-h" icon={SECTION_ICON.findings}>
-          Findings
-        </Heading>
-        <span className="cap">
-          {findings.length ? `${plural(errors, "hard failure")}, ${findings.length} total` : "all checks passed"}
-        </span>
-      </div>
-      <ul className="m-0 flex list-none flex-col gap-3 p-0">
-        {sorted.map((f, i) => (
-          <li key={`${f.code}-${i}`} className="flex items-start gap-4">
-            <span className={`chip chip-${f.severity}`}>{SEVERITY_WORD[f.severity]}</span>
-            <span className="flex min-w-0 flex-col">
-              <span className="text-[15px] font-medium">{f.title}</span>
-              <span className="text-sm text-ink-2">{f.detail}</span>
-              <span className="mono text-xs text-ink-2">{f.code}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </section>
+    <ul className="m-0 flex list-none flex-col gap-3 p-0">
+      {sorted.map((f, i) => (
+        <li key={`${f.code}-${i}`} className="flex items-start gap-4">
+          <span className={`chip chip-${f.severity}`}>{SEVERITY_WORD[f.severity]}</span>
+          <span className="flex min-w-0 flex-col">
+            <span className="text-[15px] font-medium">{f.title}</span>
+            <span className="text-sm text-ink-2">{f.detail}</span>
+            <span className="mono text-xs text-ink-2">{f.code}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
