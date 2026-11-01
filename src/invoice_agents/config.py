@@ -15,7 +15,11 @@ class Settings(BaseSettings):
 
     # "offline" runs rule-based agents with no network, for tests and demos
     # without an API key. Text and PDF invoices need an LLM to extract.
-    llm_provider: Literal["xai", "openrouter", "offline"] = "offline"
+    # replay: answer from a recording of a live run, with no key or network.
+    llm_provider: Literal["xai", "openrouter", "offline", "replay"] = "offline"
+    replay_path: Path = Path("data/replay/recording.json")
+    # Set on a live provider to record the agents' answers for replay.
+    record_to: Path | None = None
     xai_api_key: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None
     extract_model: str = "grok-4.3"

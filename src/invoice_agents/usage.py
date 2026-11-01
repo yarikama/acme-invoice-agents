@@ -54,6 +54,14 @@ def record(message: Any) -> None:
     counts["output_tokens"] += int(meta.get("output_tokens") or 0)
 
 
+def add(into: Tokens, tokens: Tokens) -> None:
+    """Add one {model: usage} map to another."""
+    for model, u in tokens.items():
+        counts = into.setdefault(model, {"input_tokens": 0, "output_tokens": 0})
+        counts["input_tokens"] += int(u.get("input_tokens", 0))
+        counts["output_tokens"] += int(u.get("output_tokens", 0))
+
+
 def cost(tokens: dict[str, Any], pricing: Pricing) -> float | None:
     """Total USD for a {model: usage} map; None if a model has no price."""
     total = 0.0

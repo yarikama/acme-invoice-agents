@@ -39,6 +39,7 @@ from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_ser
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import build_agents
+from invoice_agents.replay import Recording
 from invoice_agents.usage import Pricing, cost, openrouter_pricing
 
 Outcome = Literal["pay", "reject", "human", "skipped", "error"]
@@ -479,6 +480,9 @@ def main(argv: list[str] | None = None) -> int:
         settings = settings.model_copy(update={"critic_model": args.critic})
     cases = [c for c in cases_in(args.set) if not args.only or args.only in c.name]
     pricing = openrouter_pricing() if settings.llm_provider == "openrouter" else {}
+    if settings.record_to is not None:
+        # Keep the prices with the recording, so replay can show costs.
+        Recording.shared(settings.record_to).pricing = pricing
     console = Console()
     console.print(
         f"Provider {settings.llm_provider}: extract {settings.extract_model},"
