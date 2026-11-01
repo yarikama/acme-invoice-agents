@@ -18,6 +18,15 @@ from invoice_agents.agents import (
     RuleCritic,
 )
 from invoice_agents.config import Settings
+from invoice_agents.replay import (
+    Recording,
+    RecordingApprover,
+    RecordingCritic,
+    RecordingExtractor,
+    ReplayApprover,
+    ReplayCritic,
+    ReplayExtractor,
+)
 from invoice_agents.triage import DecisionTriager, Triager
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -78,6 +87,14 @@ def build_agents(settings: Settings) -> Agents:
         return Agents(
             NoExtractor(), RuleApprover(), RuleCritic(), build_triager(settings)
         )
+    if settings.llm_provider == "replay":
+        # Triage isn't recorded: every invoice goes through the agents.
+        recording = Recording.shared(settings.replay_path)
+        return Agents(
+            ReplayExtractor(recording),
+            ReplayApprover(recording),
+            ReplayCritic(recording),
+        )
     extract_llm = chat_model(
         settings, settings.extract_model, settings.extract_reasoning
     )
@@ -87,9 +104,18 @@ def build_agents(settings: Settings) -> Agents:
         settings.critic_model or settings.review_model,
         settings.critic_reasoning or settings.review_reasoning,
     )
-    return Agents(
+    agents = Agents(
         LLMExtractor(extract_llm),
         LLMApprover(review_llm, max_steps=settings.max_tool_steps),
         LLMCritic(critic_llm),
         build_triager(settings),
+    )
+    if settings.record_to is None:
+        return agents
+    recording = Recording.shared(settings.record_to)
+    return Agents(
+        RecordingExtractor(agents.extractor, recording),
+        RecordingApprover(agents.approver, recording),
+        RecordingCritic(agents.critic, recording),
+        agents.triager,
     )
