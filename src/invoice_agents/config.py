@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     # API: graph checkpoints, so a run paused for the VP survives a restart.
     checkpoint_path: Path = Path("checkpoints.db")
     samples_dir: Path = Path("data/invoices")
+    # The folder --watch and /watch treat as the AP mailbox.
+    inbox_dir: Path = Path("data/inbox")
     uploads_dir: Path = Path("uploads")
     max_upload_bytes: int = 5 * 1024 * 1024
     cors_origins: list[str] = ["http://localhost:5173"]

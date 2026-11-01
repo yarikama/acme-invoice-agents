@@ -30,3 +30,7 @@ htmlcov/
 # Eval reports
 eval-results/
 .acme-logs/
+
+# The watched mailbox folder (--watch): keep the folder, not its mail
+data/inbox/*
+!data/inbox/.gitkeep

@@ -507,3 +507,26 @@ def test_reset_starts_over(
     assert sh.history == []
     sh.handle(sample)  # no longer a duplicate
     assert [r["status"] for r in sh.history] == ["paid"]
+
+
+def test_watch_runs_what_lands_and_waits_for_a_vp_instead_of_asking(
+    sh: shell.Shell,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    shutil.copy(INVOICES / "invoice_1014.xml", inbox / "invoice_1014.xml")
+
+    async def once(box, handle, interval: float = 2.0, stop=None) -> None:
+        await handle([inbox / "invoice_1014.xml"])
+
+    monkeypatch.setattr(shell, "watch", once)
+    sh.handle(f"/watch {inbox}")
+    assert "Watching" in said(capsys)
+    assert [r["status"] for r in sh.history] == ["awaiting_vp"]
+    sh.handle("/watch a b")
+    assert "Usage: /watch [folder]" in said(capsys)
+    sh.handle("/vp wait")
+    assert sh.vp_mode == "wait"
