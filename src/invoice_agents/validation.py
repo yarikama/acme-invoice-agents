@@ -14,6 +14,29 @@ TOLERANCE = 0.01
 PRESSURE_WORDS = re.compile(
     r"\b(urgent|immediately|wire transfer|avoid penalties|act now)\b", re.IGNORECASE
 )
+# Text in an invoice that addresses the system reviewing it, not the payer.
+INSTRUCTION_WORDS = re.compile(
+    r"\b(?:ignore|disregard)\b[^.]{0,60}\b(?:instructions?|warnings?|rules?|checks?"
+    r"|validation)\b"
+    r"|\bpre-?approved\b"
+    r"|\b(?:automated|automatic|ai)\s+(?:invoice\s+)?(?:reviewer|review|system"
+    r"|approver|agent)\b"
+    r"|\bsubmit\b[^.]{0,40}\bapprov",
+    re.IGNORECASE,
+)
+# A request to pay somewhere other than the account on file.
+BANK_CHANGE_WORDS = re.compile(
+    r"\bbank(?:ing)?\s+(?:details|information|account)\s+(?:have\s+|has\s+)?changed\b"
+    r"|\bnew\s+(?:bank\s+)?account\b"
+    r"|\bchange\s+of\s+bank\b"
+    r"|\bdo\s+not\s+use\s+the\s+account\b",
+    re.IGNORECASE,
+)
+# A unit price this far above the inventory's list price needs a person.
+PRICE_RATIO = 1.25
+# Invoices from one vendor this many days apart count as one purchase when
+# looking for a total split to stay under the approval threshold.
+SPLIT_WINDOW_DAYS = 3
 
 
 @dataclass
@@ -31,7 +54,17 @@ class SeenInvoices:
 
 
 # Warnings an agent may not clear on its own: each one goes to a VP.
-VP_REQUIRED_DEFAULT = frozenset({"NEAR_THRESHOLD", "FOREIGN_CURRENCY", "SUPERSEDES"})
+VP_REQUIRED_DEFAULT = frozenset(
+    {
+        "NEAR_THRESHOLD",
+        "FOREIGN_CURRENCY",
+        "SUPERSEDES",
+        "SPLIT_BELOW_THRESHOLD",
+        "PRICE_ABOVE_LIST",
+        "INSTRUCTIONS_IN_DOCUMENT",
+        "BANK_DETAILS_CHANGED",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -57,12 +90,16 @@ def validate(
         _currency,
         _dates,
         _pressure_language,
+        _instructions,
+        _bank_change,
     ):
         findings += check(invoice)
     findings += _stock(invoice, inventory)
+    findings += _prices(invoice, inventory)
     findings += _threshold(invoice, policy)
     if seen is not None:
         findings += _duplicates(invoice, seen)
+        findings += _split(invoice, seen, policy)
     return ValidationReport(findings=findings)
 
 
@@ -278,6 +315,102 @@ def _pressure_language(inv: Invoice) -> list[Finding]:
             Severity.WARNING,
             "Payment pressure language",
             f"Notes contain: {', '.join(hits)}.",
+        )
+    ]
+
+
+def _free_text(inv: Invoice) -> str:
+    return " ".join(t for t in (inv.notes, inv.payment_terms) if t)
+
+
+def _instructions(inv: Invoice) -> list[Finding]:
+    hits = [m.group(0) for m in INSTRUCTION_WORDS.finditer(_free_text(inv))]
+    if not hits:
+        return []
+    quoted = "; ".join(f'"{h}"' for h in dict.fromkeys(hits))
+    return [
+        _f(
+            "INSTRUCTIONS_IN_DOCUMENT",
+            Severity.WARNING,
+            "Instructions aimed at the reviewer",
+            f"The invoice tells its reviewer what to do: {quoted}.",
+        )
+    ]
+
+
+def _bank_change(inv: Invoice) -> list[Finding]:
+    if not BANK_CHANGE_WORDS.search(_free_text(inv)):
+        return []
+    return [
+        _f(
+            "BANK_DETAILS_CHANGED",
+            Severity.WARNING,
+            "Asks to pay a new bank account",
+            "Confirm the change with the vendor on a known number before paying.",
+        )
+    ]
+
+
+def _prices(inv: Invoice, inventory: Inventory) -> list[Finding]:
+    over = []
+    for line in inv.line_items:
+        record = inventory.lookup(line.item)
+        # Items without a list price (FakeItem) have nothing to compare to.
+        if record and 0 < record.unit_price * PRICE_RATIO < line.unit_price:
+            ratio = line.unit_price / record.unit_price
+            over.append(
+                f"{line.item} at {_usd(line.unit_price)}, {ratio:.1f}x the"
+                f" {_usd(record.unit_price)} list price"
+            )
+    if not over:
+        return []
+    return [
+        _f(
+            "PRICE_ABOVE_LIST",
+            Severity.WARNING,
+            "Priced far above list",
+            "; ".join(over) + ".",
+        )
+    ]
+
+
+def _split(inv: Invoice, seen: SeenInvoices, policy: Policy) -> list[Finding]:
+    """Invoices from one vendor, days apart, each under the threshold, that
+    together cross it: a purchase split to avoid VP review."""
+    limit = policy.approval_threshold
+    if inv.total is None or inv.total > limit or not inv.vendor:
+        return []
+    vendor = item_key(inv.vendor)
+    number = _number_key(inv.invoice_number or "")
+    issued = parse_date(inv.invoice_date)
+
+    def near(other: Invoice) -> bool:
+        when = parse_date(other.invoice_date)
+        if issued and when:
+            return abs((issued - when).days) <= SPLIT_WINDOW_DAYS
+        return bool(inv.invoice_date) and other.invoice_date == inv.invoice_date
+
+    others = [
+        o
+        for o in seen.invoices
+        if o.vendor
+        and item_key(o.vendor) == vendor
+        and o.total is not None
+        and o.total <= limit
+        and _number_key(o.invoice_number or "") != number
+        and near(o)
+    ]
+    combined = inv.total + sum(o.total or 0 for o in others)
+    if not others or combined <= limit:
+        return []
+    numbers = ", ".join(o.invoice_number or "unnumbered" for o in others)
+    return [
+        _f(
+            "SPLIT_BELOW_THRESHOLD",
+            Severity.WARNING,
+            "May be split to stay under the threshold",
+            f"With {numbers} from the same vendor within {SPLIT_WINDOW_DAYS} days,"
+            f" the total is {_usd(combined)}, over {_usd(limit)}.",
         )
     ]
 
