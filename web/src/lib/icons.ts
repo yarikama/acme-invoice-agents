@@ -1,10 +1,12 @@
 import {
+  ChartLineUpIcon,
   CheckCircleIcon,
   CircleNotchIcon,
   CreditCardIcon,
   FileArrowDownIcon,
   FileTextIcon,
   FlagIcon,
+  FlowArrowIcon,
   GavelIcon,
   HourglassMediumIcon,
   type Icon,
@@ -49,4 +51,6 @@ export const SECTION_ICON = {
   stream: PulseIcon,
   findings: FlagIcon,
   lineItems: ListBulletsIcon,
+  routing: FlowArrowIcon,
+  throughput: ChartLineUpIcon,
 } satisfies Record<string, Icon>;

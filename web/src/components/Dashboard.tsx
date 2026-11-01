@@ -5,7 +5,18 @@ import { plural } from "../lib/format";
 import { type Filter } from "../lib/filters";
 import { SECTION_ICON, STATUS_ICON } from "../lib/icons";
 import { COLS, GAP, ROW_HEIGHT, WIDGETS, type WidgetId } from "../state/layout";
+import {
+  DECIDER_LABEL,
+  flowPaths,
+  OUTCOME_LABEL,
+  routeOf,
+  type Route,
+  settledTimeline,
+  VALIDATION_LABEL,
+} from "../state/routing";
 import type { RunView } from "../state/runs";
+import { RoutingFlow } from "./charts/RoutingFlow";
+import { Throughput } from "./charts/Throughput";
 import { AgentStream } from "./detail/AgentStream";
 import { DecisionPanel } from "./detail/DecisionPanel";
 import { Findings } from "./detail/Findings";
@@ -22,6 +33,19 @@ const GRID_MIN_WIDTH = 852;
 
 function Muted({ children }: { children: string }) {
   return <p className="m-0 text-sm text-ink-2">{children}</p>;
+}
+
+function Legend() {
+  return (
+    <div className="chart-legend">
+      {(["paid", "vp", "rejected"] as const).map((o) => (
+        <span key={o}>
+          <i style={{ background: `var(--flow-${o})` }} />
+          {OUTCOME_LABEL[o]}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function Dashboard({
@@ -54,6 +78,10 @@ export function Dashboard({
   const stop = () => setMoving(false);
   const grid = mounted && width >= GRID_MIN_WIDTH;
 
+  const routes = runs.map(routeOf).filter((r): r is Route => r !== null);
+  const paths = flowPaths(routes);
+  const settled = settledTimeline(runs);
+
   const s = selected?.summary;
   const inv = s?.invoice;
   const waiting = selected?.status === "awaiting_vp";
@@ -63,6 +91,80 @@ export function Dashboard({
     overview: (d) => (
       <Widget id="overview" title="Overview" icon={STATUS_ICON.all} draggable={d}>
         <StatusBank runs={runs} filter={filter} onFilter={onFilter} />
+      </Widget>
+    ),
+    routing: (d) => (
+      <Widget
+        id="routing"
+        title="Routing"
+        icon={SECTION_ICON.routing}
+        draggable={d}
+        aside={<span className="cap whitespace-nowrap">{routes.length} settled</span>}
+      >
+        {routes.length === 0 ? (
+          <Muted>Run the samples to see where each invoice goes.</Muted>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Legend />
+            <RoutingFlow paths={paths} total={routes.length} />
+            <details>
+              <summary className="cursor-pointer text-sm text-ink-2">Show as a table</summary>
+              <table className="chart-table">
+                <thead>
+                  <tr>
+                    <th>Validation</th>
+                    <th>Decided by</th>
+                    <th>Outcome</th>
+                    <th>Invoices</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paths.map((p) => (
+                    <tr key={p.key}>
+                      <td>{VALIDATION_LABEL[p.steps[0]]}</td>
+                      <td>{DECIDER_LABEL[p.steps[1]]}</td>
+                      <td>{OUTCOME_LABEL[p.steps[2]]}</td>
+                      <td>{p.routes.map((r) => r.label).join(", ")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          </div>
+        )}
+      </Widget>
+    ),
+    throughput: (d) => (
+      <Widget id="throughput" title="Settled over time" icon={SECTION_ICON.throughput} draggable={d}>
+        {settled.length === 0 ? (
+          <Muted>The line grows as invoices settle.</Muted>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Legend />
+            <Throughput settled={settled} />
+            <details>
+              <summary className="cursor-pointer text-sm text-ink-2">Show as a table</summary>
+              <table className="chart-table">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Outcome</th>
+                    <th>Settled at</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {settled.map((x) => (
+                    <tr key={x.route.id}>
+                      <td>{x.route.label}</td>
+                      <td>{OUTCOME_LABEL[x.route.outcome]}</td>
+                      <td>{x.at < 60 ? `${x.at.toFixed(1)}s` : `${(x.at / 60).toFixed(1)} min`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          </div>
+        )}
       </Widget>
     ),
     inbox: (d) => (

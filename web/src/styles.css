@@ -36,6 +36,10 @@
   --model: #2563a8;
   --code: #1b7a43;
   --human: #c2410c;
+  /* Chart outcomes, validated as a set (all pairs, CVD) for this surface. */
+  --flow-paid: #1baf7a;
+  --flow-rejected: #2a78d6;
+  --flow-vp: #eb6834;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: light;
@@ -59,6 +63,9 @@
   --model: #6aa8ee;
   --code: #5fd38a;
   --human: #ff7a2f;
+  --flow-paid: #199e70;
+  --flow-rejected: #3987e5;
+  --flow-vp: #d95926;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
@@ -796,6 +803,125 @@
     background-clip: text;
     color: transparent;
     animation: shimmer 1.6s linear infinite;
+  }
+}
+
+@layer components {
+  /* Charts: thin marks, recessive grid, text in ink tokens, colour on marks only. */
+  .chart-stage {
+    font-size: 15px;
+    fill: var(--ink-2);
+  }
+  .chart-label {
+    font-size: 15px;
+    font-weight: 500;
+    fill: var(--ink);
+  }
+  .chart-count,
+  .chart-axis {
+    font-size: 15px;
+    fill: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-grid {
+    stroke: color-mix(in srgb, var(--ink) 10%, transparent);
+    stroke-width: 1;
+  }
+  .chart-cross {
+    stroke: var(--ink-2);
+    stroke-width: 1;
+    stroke-dasharray: 3 3;
+  }
+  .flow-node {
+    fill: var(--ink);
+  }
+  .flow-band {
+    opacity: 0.62;
+    cursor: pointer;
+    transition: opacity 120ms ease-out;
+  }
+  .flow-dim .flow-band {
+    opacity: 0.14;
+  }
+  .flow-dim .flow-band.flow-hot {
+    opacity: 0.85;
+  }
+  .flow-band.flow-paid,
+  .flow-dot.flow-paid {
+    fill: var(--flow-paid);
+  }
+  .flow-band.flow-rejected,
+  .flow-dot.flow-rejected {
+    fill: var(--flow-rejected);
+  }
+  .flow-band.flow-vp,
+  .flow-dot.flow-vp {
+    fill: var(--flow-vp);
+  }
+  .flow-line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+  }
+  .flow-line.flow-paid {
+    stroke: var(--flow-paid);
+  }
+  .flow-line.flow-rejected {
+    stroke: var(--flow-rejected);
+  }
+  .flow-line.flow-vp {
+    stroke: var(--flow-vp);
+  }
+  .flow-dot {
+    stroke: var(--panel);
+    stroke-width: 2;
+  }
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    font-size: 15px;
+    color: var(--ink-2);
+  }
+  .chart-legend i {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 7px;
+    border-radius: 3px;
+    vertical-align: -1px;
+  }
+  .chart-tip {
+    position: absolute;
+    z-index: 3;
+    max-width: 280px;
+    padding: 8px 12px;
+    border-radius: var(--r);
+    background: var(--ink);
+    color: var(--canvas);
+    font-size: 15px;
+    line-height: 1.45;
+    pointer-events: none;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  }
+  .chart-table {
+    width: 100%;
+    margin-top: 8px;
+    border-collapse: collapse;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+  }
+  .chart-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--ink-2);
+    padding: 4px 8px;
+  }
+  .chart-table td {
+    padding: 4px 8px;
+  }
+  .chart-table tbody tr:nth-child(odd) {
+    background: var(--tile);
   }
 }
 
