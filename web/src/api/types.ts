@@ -68,6 +68,8 @@ export interface RunOverview {
 
 /** Tokens and cost of the model calls one step made. */
 export interface StepUsage {
+  // The model that served the step, as the provider names it.
+  model?: string;
   input_tokens: number;
   output_tokens: number;
   // Null when the model's price is unknown.

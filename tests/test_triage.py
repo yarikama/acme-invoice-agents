@@ -263,7 +263,12 @@ async def test_triage_pays_a_clean_invoice_without_the_approver(inventory):
     line = next(e for e in state["trace"] if e["stage"] == "triage")
     assert "reasoning approver was skipped. Outcome: pay." in line["message"]
     # The decision model's own reported use rides on its line.
-    assert line["usage"] == {"input_tokens": 0, "output_tokens": 0, "cost_usd": None}
+    assert line["usage"] == {
+        "model": "m",
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cost_usd": None,
+    }
 
 
 async def test_triage_rejects_an_invoice_with_errors(inventory):

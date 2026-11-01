@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     llm_max_retries: int = 8
     extract_reasoning: Literal["low", "medium", "high"] = "low"
     review_reasoning: Literal["low", "medium", "high"] = "medium"
+    # The critic checks the approver's draft. Unset, it uses the review model;
+    # a model from another vendor gives a second opinion with different blind
+    # spots. On OpenRouter, a name with a "/" is used as given (e.g.
+    # anthropic/claude-haiku-5.5); a bare name is a Grok model.
+    critic_model: str | None = None
+    critic_reasoning: Literal["low", "medium", "high"] | None = None
 
     db_path: Path = Path("inventory.db")
     # API: graph checkpoints, so a run paused for the VP survives a restart.
