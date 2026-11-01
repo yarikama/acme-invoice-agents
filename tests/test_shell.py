@@ -571,3 +571,32 @@ def test_watch_runs_what_lands_and_waits_for_a_vp_instead_of_asking(
     assert "Usage: /watch [folder]" in said(capsys)
     sh.handle("/vp wait")
     assert sh.vp_mode == "wait"
+
+
+def test_the_assistant_stays_in_the_sample_folders_unless_the_path_was_typed() -> None:
+    from invoice_agents import assistant
+
+    def step(*args: str) -> assistant.Step:
+        return assistant.Step(command="run", args=list(args))
+
+    sample = "data/invoices/invoice_1001.txt"
+    assert assistant.within_reach(step(sample), "run 1001") == []
+    assert assistant.within_reach(step("/etc/passwd"), "run 1001") == ["/etc/passwd"]
+    assert assistant.within_reach(step("../secrets.txt"), "x") == ["../secrets.txt"]
+    # A path the person typed is theirs to run.
+    assert assistant.within_reach(step("/tmp/mine.pdf"), "run /tmp/mine.pdf") == []
+    other = assistant.Step(command="runs", args=["/etc/passwd"])
+    assert assistant.within_reach(other, "") == []
+
+
+def test_an_eval_on_a_live_model_needs_a_yes(
+    sh: shell.Shell, offline: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert sh._confirm_eval()  # offline: costs nothing
+    offline.llm_provider = "openrouter"
+    monkeypatch.setattr(shell.sys.stdin, "isatty", lambda: False)
+    assert not sh._confirm_eval()  # nobody to say yes
+    monkeypatch.setattr(shell.sys.stdin, "isatty", lambda: True)
+    for typed, ok in [("y", True), ("", False)]:
+        monkeypatch.setattr(shell.console, "input", lambda _p, t=typed: t)
+        assert sh._confirm_eval() is ok

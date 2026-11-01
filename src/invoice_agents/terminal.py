@@ -297,6 +297,10 @@ def _pill(word: str, style: str) -> Text:
     return pill
 
 
+# The start of a draft the rule-based approver wrote because replay had no
+# recorded answer (replay.FALLBACK).
+RULES_FALLBACK = "Not in the recording"
+
 GLYPH = {
     "ingest": "▤",
     "validate": "✓",
@@ -330,9 +334,12 @@ def _header(
     left = Text()
     left.append(f" {GLYPH.get(node, '•')} ", style=f"bold #111111 on {VOICE[voice]}")
     left.append(f"  {name}", style="bold")
-    # A model's turn names the model that served it, when the trace says.
+    # A model's turn names the model that served it, when the trace says,
+    # and says when its answer was replayed from a recording.
     if usage and usage.get("model") and voice == "model":
         role = short_model(str(usage["model"]))
+        if usage.get("replayed"):
+            role += " · replayed"
     left.append(f"  {role}", style=VOICE[voice])
     right = "  ".join(x for x in (spent(usage), _took(took)) if x)
     row.add_row(left, Text(right, style="#7c7c75"))
@@ -441,7 +448,23 @@ def render_turn(t: Turn) -> RenderableType:
         else:
             body.append(Text(d["text"]))
     elif t.kind == "approver":
-        head = _header("review", "Approver", "model", "model", t.took, t.usage)
+        # Replay without a recorded answer falls back to the rule-based
+        # approver: say so instead of naming a model.
+        fallback = str(d.get("rationale", "")).startswith(RULES_FALLBACK)
+        # A finished draft with no model usage came from the rules (offline).
+        rules = fallback or bool(d.get("decision") and not t.usage)
+        head = _header(
+            "review",
+            "Approver",
+            "rules, not in the recording"
+            if fallback
+            else "rules"
+            if rules
+            else "model",
+            "code" if rules else "model",
+            t.took,
+            t.usage,
+        )
         for call, result in d.get("tools", []):
             line = Text("⚒ ", style=VOICE["code"])
             line.append(call, style="bold")
@@ -460,7 +483,16 @@ def render_turn(t: Turn) -> RenderableType:
             body.append(line)
         body.extend(Text(f"▪ {s}") for s in sentences(d.get("rationale", "")))
     elif t.kind == "critic":
-        head = _header("critique", "Critic", "model", "model", t.took, t.usage)
+        # No model usage: the rule-based critic (offline, or not recorded).
+        voice = "model" if t.usage else "code"
+        head = _header(
+            "critique",
+            "Critic",
+            "model" if t.usage else "rules",
+            voice,
+            t.took,
+            t.usage,
+        )
         line = _pill(
             "Agrees" if d["agrees"] else "Objects",
             DECISION_STYLE["approve" if d["agrees"] else "reject"],

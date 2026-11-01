@@ -702,6 +702,15 @@ class Shell:
             )
             return
         steps, dropped = assistant.checked(answer)
+        # Code, not the prompt, keeps the assistant to the sample folders and
+        # to paths the person typed.
+        for step in list(steps):
+            if outside := assistant.within_reach(step, request):
+                steps.remove(step)
+                dropped.append(
+                    f"/{step.command} {' '.join(outside)} is outside the sample"
+                    " folders; type the path yourself to run it."
+                )
         used = sum(u["input_tokens"] + u["output_tokens"] for u in tokens.values())
         head = Text("  ◆ ", style=SIGNAL)
         head.append(s.extract_model, style="bold")
@@ -717,11 +726,29 @@ class Shell:
             console.print()
         before = len(self.history)
         for step in steps:
+            if step.command == "eval" and not self._confirm_eval():
+                console.print("  Not running the eval.")
+                continue
             self.handlers[step.command](step.args)
         if outcome := memory.outcomes(self.history[before:]):
             # What came of it, for "why was that one rejected?" next time,
             # here or in the web console.
             self.memory.add_message(memory.answered(outcome, "terminal"))
+
+    def _confirm_eval(self) -> bool:
+        """The eval calls the model on every case: a person says yes first."""
+        if get_settings().llm_provider not in ("openrouter", "xai"):
+            return True  # replay and offline cost nothing
+        if not sys.stdin.isatty():
+            return False
+        try:
+            answer = console.input(
+                "  The eval calls the model on every case, which costs money."
+                " Run it? [y/N] "
+            )
+        except EOFError:
+            return False
+        return answer.strip().lower() in ("y", "yes")
 
     def transcript(self, _args: list[str]) -> None:
         """The conversation so far, from the terminal and the web console."""

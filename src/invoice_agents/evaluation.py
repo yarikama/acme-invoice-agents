@@ -54,6 +54,9 @@ class Case:
     also_ok: tuple[Outcome, ...] = ()
     # Folder under data/: the brief's samples, or the attacks written here.
     folder: str = "invoices"
+    # Findings the right outcome must rest on: a case is correct only if
+    # validation raised each of these, so it can't pass for the wrong reason.
+    codes: tuple[str, ...] = ()
 
     @property
     def name(self) -> str:
@@ -63,8 +66,18 @@ class Case:
 
 CASES: list[Case] = [
     Case(("invoice_1001.txt",), "pay", "Clean, within stock."),
-    Case(("invoice_1002.txt",), "reject", "20 GadgetX against 5 in stock."),
-    Case(("invoice_1003.txt",), "reject", "FakeItem has no stock; pay-now pressure."),
+    Case(
+        ("invoice_1002.txt",),
+        "reject",
+        "20 GadgetX against 5 in stock.",
+        codes=("STOCK_EXCEEDED",),
+    ),
+    Case(
+        ("invoice_1003.txt",),
+        "reject",
+        "FakeItem has no stock; pay-now pressure.",
+        codes=("OUT_OF_STOCK",),
+    ),
     Case(
         ("invoice_1004.json",),
         "pay",
@@ -76,12 +89,28 @@ CASES: list[Case] = [
         ("invoice_1004.json", "invoice_1004_revised.json"),
         "reject",
         "A revision of an invoice already paid: paying it too would pay twice.",
+        codes=("ALREADY_PAID",),
     ),
     Case(("invoice_1005.json",), "reject", "8 GadgetX against 5 in stock."),
     Case(("invoice_1006.csv",), "pay", "Clean."),
-    Case(("invoice_1007.csv",), "reject", "Total does not add up; stock exceeded."),
-    Case(("invoice_1008.txt",), "reject", "Neither item is in the inventory."),
-    Case(("invoice_1009.json",), "reject", "Negative quantity; missing vendor."),
+    Case(
+        ("invoice_1007.csv",),
+        "reject",
+        "Total does not add up; stock exceeded.",
+        codes=("TOTAL_MISMATCH",),
+    ),
+    Case(
+        ("invoice_1008.txt",),
+        "reject",
+        "Neither item is in the inventory.",
+        codes=("UNKNOWN_ITEM",),
+    ),
+    Case(
+        ("invoice_1009.json",),
+        "reject",
+        "Negative quantity; missing vendor.",
+        codes=("INVALID_QUANTITY", "MISSING_FIELDS"),
+    ),
     Case(
         ("invoice_1010.txt",),
         "pay",
@@ -94,6 +123,7 @@ CASES: list[Case] = [
         ("invoice_1012.txt",),
         "human",
         "OCR typos, and $9,975 sits just under the $10,000 VP threshold.",
+        codes=("NEAR_THRESHOLD",),
     ),
     Case(("invoice_1012.pdf",), "human", "The same invoice as a PDF."),
     Case(("invoice_1013.json",), "reject", "Total does not add up; stock exceeded."),
@@ -104,7 +134,12 @@ CASES: list[Case] = [
         "Billed in EUR; policy sends foreign currency to a VP.",
     ),
     Case(("invoice_1015.csv",), "pay", "Clean."),
-    Case(("invoice_1016.json",), "reject", "WidgetC is not in the inventory."),
+    Case(
+        ("invoice_1016.json",),
+        "reject",
+        "WidgetC is not in the inventory.",
+        codes=("UNKNOWN_ITEM",),
+    ),
 ]
 
 # INV-1011 again, as a scanner would hand it over: an image with no text layer.
@@ -317,8 +352,12 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
     correct = (
         None
         if outcome == "skipped"
-        else outcome == case.expected or outcome in case.also_ok
+        else (outcome == case.expected or outcome in case.also_ok)
+        and set(case.codes) <= set(findings)
     )
+    if correct is False and not set(case.codes) <= set(findings):
+        missing = ", ".join(sorted(set(case.codes) - set(findings)))
+        detail = f"Missing the expected finding(s): {missing}. {detail}".strip()
     return Result(
         case=case.name,
         expected=case.expected,

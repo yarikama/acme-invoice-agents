@@ -569,3 +569,22 @@ def test_money_held_back_counts_each_invoice_once() -> None:
         },
     ]
     assert "$200.00 stopped before paying" in text(impact_line(results))
+
+
+def test_steps_say_when_they_were_replayed_or_decided_by_rules() -> None:
+    replayed = {"input_tokens": 9, "output_tokens": 1, "model": "x-ai/grok-4.7"}
+    replayed["replayed"] = True
+    events = [
+        {**trace("review", "Draft 1: approve. Fine.", 1.0), "usage": replayed},
+        trace("critique", "Critic agrees. Outcome: pay.", 1.1),
+        trace(
+            "review",
+            "Draft 1: reject. Not in the recording, so the rule-based approver"
+            " decided: Hard failures.",
+            1.2,
+        ),
+    ]
+    out = text(Group(*(render_turn(t) for t in turns(events, 1.0))))
+    assert "Approver  grok-4.7 · replayed" in out
+    assert "Critic  rules" in out
+    assert "Approver  rules, not in the recording" in out

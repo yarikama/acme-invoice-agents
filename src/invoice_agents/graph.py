@@ -18,7 +18,7 @@ from typing import Annotated, Any, Literal, NotRequired, TypedDict
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
-from langgraph.config import get_stream_writer
+from langgraph.config import get_config, get_stream_writer
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
@@ -149,6 +149,14 @@ class Deps:
         )
 
 
+def _current_run() -> str | None:
+    """The run (thread) this node is executing in, for the logs."""
+    try:
+        return _run_id(get_config()) or None
+    except RuntimeError:  # called outside a graph run
+        return None
+
+
 def _run_id(config: RunnableConfig) -> str:
     """The run's thread id: its key in the ledger and the checkpointer."""
     return str(config.get("configurable", {}).get("thread_id", ""))
@@ -175,7 +183,12 @@ def _event(
     data: dict[str, Any] | None = None,
 ) -> list[TraceEvent]:
     event = TraceEvent(stage=stage, message=message)
-    log.info("%s: %s", stage, message)
+    log.info(
+        "%s: %s",
+        stage,
+        message,
+        extra={"stage": stage, "run_id": _current_run(), "usage": usage},
+    )
     if usage:
         event["usage"] = usage
     if data:

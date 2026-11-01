@@ -92,6 +92,8 @@ export interface StepUsage {
   output_tokens: number;
   // Null when the model's price is unknown.
   cost_usd: number | null;
+  // Answered from a recording (replay): tokens and cost are the live run's.
+  replayed?: boolean;
 }
 
 interface EventBase {

@@ -217,3 +217,16 @@ def test_critic_flag_and_objection_count(
         "a.json", "pay", "pay", True, 1.0, critic_objected=True
     )
     assert evaluation.summary([objected])["critic_objections"] == 1
+
+
+async def test_the_right_outcome_for_the_wrong_reason_is_a_miss(
+    offline: Settings,
+) -> None:
+    # 1016 is rejected for WidgetC, an unknown item. A case that expects a
+    # different reason fails even though "reject" is the right outcome.
+    right = Case(("invoice_1016.json",), "reject", "x", codes=("UNKNOWN_ITEM",))
+    wrong = Case(("invoice_1016.json",), "reject", "x", codes=("STOCK_EXCEEDED",))
+    assert (await evaluation.run_case(right, offline, {})).correct
+    missed = await evaluation.run_case(wrong, offline, {})
+    assert missed.correct is False
+    assert missed.detail.startswith("Missing the expected finding(s): STOCK_EXCEEDED.")

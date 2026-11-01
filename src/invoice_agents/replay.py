@@ -146,9 +146,10 @@ def _spent() -> Iterator[usage.Tokens]:
 
 
 def _replayed(tokens: usage.Tokens) -> None:
+    """Count a recorded answer's tokens for the step, marked as replayed."""
     current = usage._current.get()  # pyright: ignore[reportPrivateUsage]
     if current is not None:
-        usage.add(current, tokens)
+        usage.add(current, {m: {**u, "replayed": 1} for m, u in tokens.items()})
 
 
 # --- Recording -----------------------------------------------------------
