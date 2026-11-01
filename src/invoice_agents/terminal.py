@@ -217,8 +217,11 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
                 )
             )
         elif node == "human_review":
+            # The verdict is read on its own, so an odd name can't flip it.
+            verdict = re.match(r"^VP (approved|rejected)\b", msg)
+            # "VP approved (Dana (Finance)). Note: ..." -> the name, the note.
             m = re.match(
-                r"^VP (approved|rejected)(?: \(([^)]*)\))?\.\s*(?:Note:\s*)?(.*)$",
+                r"^VP \w+(?: \((.+?)\)(?=\.(?:\s|$)))?\.\s*(?:Note:\s*)?(.*)$",
                 msg,
                 re.S,
             )
@@ -228,9 +231,9 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
                     node,
                     timed(at),
                     {
-                        "approved": bool(m and m[1] == "approved"),
-                        "by": m[2] if m else None,
-                        "note": (m[3].strip() if m else ""),
+                        "approved": bool(verdict and verdict[1] == "approved"),
+                        "by": m[1] if m else None,
+                        "note": (m[2].strip() if m else ""),
                     },
                 )
             )

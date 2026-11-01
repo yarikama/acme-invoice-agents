@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import SecretStr, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -21,7 +22,11 @@ class Settings(BaseSettings):
     # Who may approve or reject paused invoices: name -> bearer token, as JSON,
     # e.g. VP_TOKENS='{"Dana Whitfield": "..."}'. Unset, anyone who can reach
     # the API can decide, which is only fit for a local demo.
-    vp_tokens: dict[str, SecretStr] = {}
+    # Parsed below rather than by pydantic-settings, so a blank VP_TOKENS=
+    # means none instead of failing to start.
+    vp_tokens: Annotated[dict[str, SecretStr], NoDecode] = {}
+    # The CLI's own token, sent when it decides through the API.
+    vp_token: SecretStr | None = None
     extract_model: str = "grok-4.3"
     review_model: str = "grok-4.7"
     # Cap output, reasoning included: without it the provider reserves the
@@ -64,6 +69,13 @@ class Settings(BaseSettings):
     # and (to approve) sees at most this much chance that something is off.
     triage_min_confidence: float = 0.9
     triage_max_suspicion: float = 0.2
+
+    @field_validator("vp_tokens", mode="before")
+    @classmethod
+    def _tokens_from_json(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return json.loads(value) if value.strip() else {}
+        return value
 
 
 @lru_cache

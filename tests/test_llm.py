@@ -71,3 +71,16 @@ def test_llm_provider_builds_llm_agents() -> None:
     assert isinstance(agents.approver, LLMApprover)
     assert isinstance(agents.critic, LLMCritic)
     assert agents.approver.llm is agents.critic.llm
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_a_blank_vp_tokens_means_none_rather_than_a_startup_error(blank: str) -> None:
+    assert settings(vp_tokens=blank).vp_tokens == {}
+
+
+def test_vp_tokens_and_the_cli_token_come_from_a_dotenv(tmp_path: Any) -> None:
+    env = tmp_path / ".env"
+    env.write_text('VP_TOKENS={"Dana Whitfield": "s3cret"}\nVP_TOKEN=s3cret\n')
+    s = Settings(_env_file=env)  # pyright: ignore[reportCallIssue]
+    assert s.vp_tokens["Dana Whitfield"].get_secret_value() == "s3cret"
+    assert s.vp_token is not None and s.vp_token.get_secret_value() == "s3cret"

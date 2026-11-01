@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -18,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+
+from invoice_agents.config import get_settings
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -75,12 +76,14 @@ class Api:
                     return
 
     async def decide(self, run_id: str, approved: bool, note: str) -> None:
-        # A VP's token, when the API requires one (VP_TOKENS on the server).
-        token = os.environ.get("VP_TOKEN")
+        # A VP's token, when the API requires one (VP_TOKENS on the server),
+        # from the environment or .env like every other setting.
+        token = get_settings().vp_token
+        auth = f"Bearer {token.get_secret_value()}" if token else None
         r = await self.client.post(
             f"{self.base}/api/runs/{run_id}/decision",
             json={"approved": approved, "note": note},
-            headers={"Authorization": f"Bearer {token}"} if token else None,
+            headers={"Authorization": auth} if auth else None,
             timeout=30,
         )
         r.raise_for_status()

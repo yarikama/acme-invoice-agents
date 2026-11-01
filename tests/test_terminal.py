@@ -284,3 +284,21 @@ def test_usage_shows_beside_each_turn_and_as_a_run_total() -> None:
         view.add(e)
     out = text(view)
     assert "2.1k tokens · $0.0042" in out and "this run so far: 2.1k tokens" in out
+
+
+def test_a_vp_name_with_brackets_keeps_the_verdict() -> None:
+    [turn] = turns(
+        [
+            trace(
+                "human_review",
+                "VP approved (Dana Whitfield (Finance)). Note: ok (fx).",
+                1,
+            )
+        ],
+        started=0,
+    )
+    assert turn.data == {
+        "approved": True,
+        "by": "Dana Whitfield (Finance)",
+        "note": "ok (fx).",
+    }

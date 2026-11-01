@@ -129,13 +129,16 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
     else if (line.node === "triage") out.push({ ...timed(line), kind: "triage", text: line.text, ...parseTriage(line.text) });
     else if (line.node === "critique") out.push({ ...timed(line), kind: "critic", ...parseCritique(line.text) });
     else if (line.node === "human_review") {
-      const m = /^VP (approved|rejected)(?: \(([^)]*)\))?\.\s*(?:Note:\s*)?([\s\S]*)$/.exec(line.text);
+      // The verdict is read on its own, so an odd name can't flip it.
+      const verdict = /^VP (approved|rejected)\b/.exec(line.text);
+      // "VP approved (Dana (Finance)). Note: ..." -> the name, the note.
+      const m = /^VP \w+(?: \((.+?)\)(?=\.(?:\s|$)))?\.\s*(?:Note:\s*)?([\s\S]*)$/.exec(line.text);
       out.push({
         ...timed(line),
         kind: "human",
-        approved: m?.[1] === "approved",
-        by: m?.[2] ?? null,
-        note: m?.[3]?.trim() ?? "",
+        approved: verdict?.[1] === "approved",
+        by: m?.[1] ?? null,
+        note: m?.[2]?.trim() ?? "",
       });
     } else out.push({ ...timed(line), kind: "step", node: line.node, text: line.text });
   }
