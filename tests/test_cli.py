@@ -39,8 +39,10 @@ def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
     return settings
 
 
-def run(capsys: pytest.CaptureFixture[str], *argv: str) -> list[dict[str, Any]]:
-    assert cli.main([*argv, "--json"]) == 0
+def run(
+    capsys: pytest.CaptureFixture[str], *argv: str, code: int = 0
+) -> list[dict[str, Any]]:
+    assert cli.main([*argv, "--json"]) == code
     return json.loads(capsys.readouterr().out)
 
 
@@ -109,6 +111,7 @@ def test_vp_prompt_asks_on_the_terminal(
         return answer
 
     monkeypatch.setattr(cli.console, "input", fake_input)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
     [result] = run(capsys, f"--invoice_path={INVOICES / 'invoice_1014.xml'}")
 
     expected = ["  Approve and pay? [y/N] "]
@@ -116,6 +119,36 @@ def test_vp_prompt_asks_on_the_terminal(
         expected.append("  Note for the audit log (optional): ")
     assert prompts == expected
     assert result["status"] == status
+
+
+def test_with_no_one_to_ask_the_invoice_waits_for_a_vp(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    offline: Settings,
+) -> None:
+    # Before: a script or CI run crashed with EOFError at the VP prompt.
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    sample = f"--invoice_path={INVOICES / 'invoice_1014.xml'}"
+    [result] = run(capsys, sample)
+    assert result["status"] == "awaiting_vp"
+    # Nothing can resume it once this process ends, so the ledger lets the
+    # invoice be sent again instead of calling the next one a duplicate.
+    [entry] = Ledger(offline.db_path).entries
+    assert entry.outcome == "dropped"
+    [again] = run(capsys, sample)
+    assert "DUPLICATE" not in {f["code"] for f in again["findings"]}
+
+
+def test_closing_the_input_at_the_prompt_leaves_it_waiting(
+    capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def closed(prompt: str = "") -> str:
+        raise EOFError
+
+    monkeypatch.setattr(cli.console, "input", closed)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    [result] = run(capsys, f"--invoice_path={INVOICES / 'invoice_1014.xml'}")
+    assert result["status"] == "awaiting_vp"
 
 
 def test_one_failure_does_not_stop_the_batch(
@@ -136,7 +169,8 @@ def test_one_failure_does_not_stop_the_batch(
         "build_agents",
         lambda _settings: Agents(NoExtractor(), BrokenApprover(), RuleCritic()),
     )
-    [result] = run(capsys, f"--invoice_path={INVOICES / 'invoice_1015.csv'}")
+    # A run that broke exits non-zero, so a script notices.
+    [result] = run(capsys, f"--invoice_path={INVOICES / 'invoice_1015.csv'}", code=1)
 
     assert result["status"] == "failed"
     assert result["reason"] == "RuntimeError: provider returned 402"

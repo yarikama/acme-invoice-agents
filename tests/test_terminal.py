@@ -496,3 +496,13 @@ def test_a_duplicate_says_how_to_start_over() -> None:
     }
     assert "python main.py --reset" in text(result_card("f", dup))
     assert "--reset" not in text(result_card("f", {"status": "paid"}))
+
+
+def test_a_step_that_called_a_model_is_labelled_with_it() -> None:
+    usage = {"input_tokens": 1500, "output_tokens": 400, "model": "x-ai/grok-4.3"}
+    llm = {**trace("ingest", "Attempt 1: extracted with the LLM.", 1.0), "usage": usage}
+    code = trace("ingest", "Parsed JSON in code.", 1.0)
+    [read] = turns([llm], 1.0)
+    [parsed] = turns([code], 1.0)
+    assert "Ingest  grok-4.3" in text(render_turn(read))
+    assert "Ingest  code" in text(render_turn(parsed))

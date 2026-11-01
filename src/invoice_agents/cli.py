@@ -144,17 +144,33 @@ def _signals_end_the_cli() -> Iterator[None]:
             signal.signal(sig, handler)
 
 
-def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str]:
-    """Show the VP card and get an answer: from the flag, or by asking."""
+def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str] | None:
+    """Show the VP card and get an answer: from the flag, or by asking.
+
+    None leaves the invoice waiting for a VP: there is no one to ask when
+    input isn't a terminal (a script, CI), or the person closed the input.
+    """
     console.line()
     console.print(vp_card(summary))
     if mode != "ask":
         console.print(f"  Answered by --vp {mode}.\n")
         return mode == "approve", f"--vp {mode}"
-    answer = console.input("  Approve and pay? [y/N] ").strip().lower()
-    note = (
-        console.input("  Note for the audit log (optional): ").strip() if answer else ""
-    )
+    if not sys.stdin.isatty():
+        console.print(
+            "  No one to ask: input isn't a terminal, so it stays waiting for a"
+            " VP. Decide in the web console, or run with --vp approve or reject.\n"
+        )
+        return None
+    try:
+        answer = console.input("  Approve and pay? [y/N] ").strip().lower()
+        note = (
+            console.input("  Note for the audit log (optional): ").strip()
+            if answer
+            else ""
+        )
+    except EOFError:
+        console.print("\n  No answer, so it stays waiting for a VP.\n")
+        return None
     console.print()
     return answer in ("y", "yes"), note or "decided in the CLI"
 
@@ -247,7 +263,10 @@ class LocalRunner:
                 _print_finished(view)
             if paused is None:
                 break
-            approved, note = _decide(summarize(state, "awaiting_vp"), vp_mode)
+            answer = _decide(summarize(state, "awaiting_vp"), vp_mode)
+            if answer is None:
+                return {"file": path.name, **summarize(state, "awaiting_vp")}
+            approved, note = answer
             payload = Command(resume={"approved": approved, "note": note})
             view = view.resumed()
         return {"file": path.name, **summarize(state, run_status(state, False))}
@@ -275,7 +294,11 @@ class RemoteRunner:
                     view.status = "awaiting_vp"
                     _print_finished(view)
                     live.stop()
-                    approved, note = _decide(event["summary"], vp_mode)
+                    answer = _decide(event["summary"], vp_mode)
+                    if answer is None:
+                        # The run stays paused in the API, for the console.
+                        break
+                    approved, note = answer
                     view = view.resumed()
                     live = Live(
                         view, console=console, refresh_per_second=12, transient=False
@@ -392,7 +415,8 @@ async def _run(args: argparse.Namespace) -> int:
             results = await process(runner, paths, args.vp)
             if args.json:
                 print(json.dumps(results, indent=2, default=str))
-            return 0
+            # A rejected invoice is a result; a run that broke is not.
+            return 1 if any(r.get("status") == "failed" for r in results) else 0
     finally:
         remote.stop(started)
 
@@ -400,7 +424,7 @@ async def _run(args: argparse.Namespace) -> int:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.WARNING,
+        level=logging.WARNING,
         format="%(message)s",
         handlers=[RichHandler(console=console, show_path=False)],
     )
@@ -410,6 +434,10 @@ def main(argv: list[str] | None = None) -> int:
         console.print(f"  Started over: {settings.db_path} holds no received invoices.")
         if not (args.invoice_path or args.dir or args.serve or args.interactive):
             return 0
+    if args.verbose:
+        # This app's steps in detail; HTTP clients stay at warnings, or their
+        # connection chatter buries them.
+        logging.getLogger("invoice_agents").setLevel(logging.DEBUG)
     with _signals_end_the_cli():
         if _interactive(args):
             from invoice_agents.shell import run_shell
