@@ -27,7 +27,7 @@ export function Header({ stream, onResetLayout }: { stream: StreamState; onReset
       <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Logo size={40} />
-          <span className="display text-[28px] leading-none">Acme AP</span>
+          <span className="display text-2xl leading-none">Acme AP</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-4">
           {/* Silent while connected; speaks up only when updates have stopped arriving. */}
