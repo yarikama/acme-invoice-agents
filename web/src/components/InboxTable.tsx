@@ -41,7 +41,7 @@ export function InboxTable({
               onClick={() => onSelect(row.original.id)}
             >
               <span className="mono text-xs text-ink-2">{inv?.invoice_number ?? row.original.source}</span>
-              <span className="v text-[15px] font-medium underline-offset-[3px]">
+              <span className="v text-base font-medium underline-offset-[3px]">
                 {inv?.vendor ?? (inv ? "No vendor" : row.original.status === "failed" ? "Not extracted" : "Not extracted yet")}
               </span>
             </button>
@@ -94,7 +94,7 @@ export function InboxTable({
                 <th
                   key={header.id}
                   scope="col"
-                  className="mono border-b border-seam px-4 py-2 text-left text-xs font-normal text-ink-2 first:pl-6 last:pr-6"
+                  className="mono px-4 py-2 text-left text-xs font-normal text-ink-2 first:pl-6 last:pr-6"
                 >
                   {flexRender(header.column.columnDef.header, header.getContext())}
                 </th>
@@ -104,11 +104,11 @@ export function InboxTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className={`group ${row.id === selectedId ? "bg-raised" : "hover:bg-raised"}`}>
+            <tr key={row.id} className={`group ${row.id === selectedId ? "bg-raised" : "odd:bg-[var(--tile)] hover:bg-raised"}`}>
               {row.getVisibleCells().map((cell, i) => (
                 <td
                   key={cell.id}
-                  className={`relative border-b border-seam px-4 py-1 align-middle text-sm first:pl-6 last:pr-6 ${
+                  className={`relative px-4 py-1.5 align-middle text-sm first:pl-6 last:pr-6 ${
                     i === 0 && row.id === selectedId
                       ? "before:absolute before:top-2 before:bottom-2 before:left-2 before:w-1 before:rounded-full before:bg-ink"
                       : ""
@@ -125,7 +125,7 @@ export function InboxTable({
         // Placeholder rows the shape of real ones while the run list loads.
         <div aria-busy="true" aria-label="Loading invoices" className="flex flex-col">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center gap-6 border-b border-seam px-6 py-4">
+            <div key={i} className="flex items-center gap-6 px-6 py-4">
               <span className="flex flex-1 flex-col gap-2">
                 <span className="h-3 w-20 rounded bg-pale" />
                 <span className="h-3 w-40 rounded bg-pale" />

@@ -45,7 +45,7 @@ export function StatusBank({
             type="button"
             aria-pressed={selected}
             onClick={() => onFilter(seg.key)}
-            className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--r)] border border-[var(--glass-edge)] bg-[var(--tile)] px-4 py-3 text-left font-[inherit] text-ink hover:bg-raised ${
+            className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--r)] bg-[var(--tile)] px-4 py-3 text-left font-[inherit] text-ink hover:bg-raised ${
               selected ? "card-on" : ""
             }`}
           >
