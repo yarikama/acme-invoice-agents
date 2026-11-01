@@ -27,6 +27,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.sse import EventSourceResponse, ServerSentEvent
+from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field
 
@@ -342,3 +343,15 @@ def _run_or_404(manager: RunManager, run_id: str):
         return manager.get(run_id)
     except RunNotFoundError as exc:
         raise HTTPException(404, f"No run {run_id!r}") from exc
+
+
+def mount_console(target: FastAPI, dist: Path) -> bool:
+    """Serve the built console at /, when there is one. Mounted last, so every
+    /api route above still wins. One server then does it all, without Node."""
+    if not (dist / "index.html").is_file():
+        return False
+    target.mount("/", StaticFiles(directory=dist, html=True), name="console")
+    return True
+
+
+mount_console(app, get_settings().web_dist)
