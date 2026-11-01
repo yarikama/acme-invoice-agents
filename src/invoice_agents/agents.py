@@ -301,9 +301,22 @@ class LLMApprover:
         record(reply)
         for tc in reply.tool_calls:
             if tc["name"] == SUBMIT:
-                # Accepted as is: the policy route still overrides it in code.
-                return Review(ApprovalDraft.model_validate(tc["args"]), steps)
-        raise ValueError("The approver did not submit a decision.")
+                try:
+                    # Accepted as is: the policy route still overrides it in code.
+                    return Review(ApprovalDraft.model_validate(tc["args"]), steps)
+                except ValidationError:
+                    break
+        # Models occasionally ignore even a forced tool choice. No decision is
+        # not a reason to fail the run or to pay: hand it to a person.
+        return Review(
+            ApprovalDraft(
+                decision="escalate",
+                rationale=f"The approver did not reach a valid decision in"
+                f" {self.max_steps + 1} turns, so a person should decide.",
+                addressed=[f.code for f in report.findings],
+            ),
+            steps,
+        )
 
     @staticmethod
     def _check(
