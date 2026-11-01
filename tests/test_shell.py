@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import glob
 import io
 import json
 import shutil
@@ -62,7 +63,11 @@ def test_a_typo_names_the_command_it_meant() -> None:
 
 
 def test_tab_completes_commands_paths_and_choices(tmp_path: Path) -> None:
+    # Commands only, even on Linux where "/run/" is a folder at the root.
     assert shell.complete("/ru", "/ru") == ["/run ", "/runs "]
+    assert shell.complete("/Use", "/Use") == sorted(
+        p + "/" for p in glob.glob("/Use*")
+    )  # no command matches, so it's a path
     (tmp_path / "invoice_1.json").write_text("{}")
     (tmp_path / "folder").mkdir()
     prefix = str(tmp_path) + "/"

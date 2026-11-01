@@ -141,7 +141,8 @@ def complete(text: str, line: str) -> list[str]:
         if first and text.startswith("/")
         else []
     )
-    if first and not text:
+    # "/ru" is a command being typed; a path has a second "/" ("/Users/...").
+    if first and (not text or (commands and "/" not in text[1:])):
         return commands
     # "/Users/..." is a path too: a file dragged in starts with "/".
     found = sorted(glob.glob(str(Path(text).expanduser()) + "*"))
