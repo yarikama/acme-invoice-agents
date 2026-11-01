@@ -8,6 +8,14 @@ import { PixelIcon, PixelSpinner, Typewriter } from "../Pixel";
 
 const VERDICT_WORD: Record<Decision, string> = { approve: "Approve", reject: "Reject", escalate: "Escalate" };
 
+/** "x-ai/grok-4.7" -> "grok-4.7": the model a turn ran on, without its vendor. */
+function shortModel(name: string): string {
+  return name
+    .split(",")
+    .map((n) => n.trim().split("/").pop())
+    .join(", ");
+}
+
 function seconds(ms: number | undefined): string | null {
   if (ms === undefined) return null;
   return ms < 1000 ? `${Math.max(ms, 1).toFixed(0)}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -54,7 +62,9 @@ function TurnFrame({
       <div className="flex min-w-0 flex-col gap-2">
         <div className="flex items-baseline gap-2">
           <span className="font-medium">{name}</span>
-          <span className={`role role-${voice}`}>{role}</span>
+          <span className={`role role-${voice}`}>
+            {voice === "model" && usage?.model ? shortModel(usage.model) : role}
+          </span>
           <span className="mono ml-auto flex gap-3 text-xs text-ink-2">
             {spent && <span>{spent}</span>}
             {took && <span>{took}</span>}

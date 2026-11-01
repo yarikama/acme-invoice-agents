@@ -52,7 +52,8 @@ def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
         if settings.openrouter_api_key is None:
             raise ValueError("LLM_PROVIDER=openrouter needs OPENROUTER_API_KEY")
         return ChatOpenAI(
-            model=f"x-ai/{model}",
+            # A bare name is a Grok model; "vendor/model" is used as given.
+            model=model if "/" in model else f"x-ai/{model}",
             base_url=OPENROUTER_BASE_URL,
             api_key=settings.openrouter_api_key,
             max_completion_tokens=settings.max_output_tokens,
@@ -81,9 +82,14 @@ def build_agents(settings: Settings) -> Agents:
         settings, settings.extract_model, settings.extract_reasoning
     )
     review_llm = chat_model(settings, settings.review_model, settings.review_reasoning)
+    critic_llm = chat_model(
+        settings,
+        settings.critic_model or settings.review_model,
+        settings.critic_reasoning or settings.review_reasoning,
+    )
     return Agents(
         LLMExtractor(extract_llm),
         LLMApprover(review_llm, max_steps=settings.max_tool_steps),
-        LLMCritic(review_llm),
+        LLMCritic(critic_llm),
         build_triager(settings),
     )

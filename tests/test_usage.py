@@ -50,6 +50,7 @@ def test_step_usage_prices_known_models_only() -> None:
     pricing = {"x-ai/grok-4.7": (0.000002, 0.000006)}
     tokens = {"grok-4.7": {"input_tokens": 1000, "output_tokens": 100}}
     assert usage.step_usage(tokens, pricing) == {
+        "model": "grok-4.7",
         "input_tokens": 1000,
         "output_tokens": 100,
         "cost_usd": pytest.approx(0.0026),
@@ -97,6 +98,7 @@ async def test_each_step_carries_its_own_usage(inventory: Any) -> None:
     )
     draft = next(e for e in state["trace"] if e["message"].startswith("Draft 1"))
     assert draft["usage"] == {
+        "model": "grok-4.7",
         "input_tokens": 1000,
         "output_tokens": 10,
         "cost_usd": pytest.approx(0.00206),
