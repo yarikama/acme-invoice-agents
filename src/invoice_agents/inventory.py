@@ -17,8 +17,13 @@ SEED: list[tuple[str, int, float]] = [
 
 
 def item_key(name: str) -> str:
-    """Compare names loosely: "Widget A", "widget-a" and "WidgetA" match."""
-    return re.sub(r"[^a-z0-9]", "", name.lower())
+    """Compare names loosely: "Widget A", "widget-a" and "WidgetA" match.
+
+    Notes in parentheses are dropped, so "WidgetA (rush order)" is WidgetA
+    and its quantity counts against WidgetA's stock.
+    """
+    without_notes = re.sub(r"\([^)]*\)", "", name)
+    return re.sub(r"[^a-z0-9]", "", without_notes.lower())
 
 
 @dataclass(frozen=True)

@@ -39,6 +39,7 @@ def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
             model=model,
             api_key=settings.xai_api_key,
             max_tokens=settings.max_output_tokens,
+            max_retries=settings.llm_max_retries,
             reasoning_effort=reasoning,
         )
 
@@ -52,6 +53,7 @@ def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
             base_url=OPENROUTER_BASE_URL,
             api_key=settings.openrouter_api_key,
             max_completion_tokens=settings.max_output_tokens,
+            max_retries=settings.llm_max_retries,
             # OpenRouter's unified reasoning control.
             extra_body={"reasoning": {"effort": reasoning}},
         )
