@@ -45,7 +45,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh">
-      <Header stream={stream} provider={provider} onResetLayout={onResetLayout} />
+      <Header stream={stream} onResetLayout={onResetLayout} />
       <main className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
