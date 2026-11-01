@@ -6,7 +6,10 @@ no network, so tests are deterministic and the CLI works without a key.
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
@@ -161,6 +164,55 @@ Draft decision: {decision}
 Draft rationale: {rationale}"""
 
 
+# --- Provider hiccups -----------------------------------------------------
+
+LLM_ATTEMPTS = 3
+# Status codes OpenRouter and xAI use for overload and upstream failures.
+TRANSIENT_CODES = {408, 429, 500, 502, 503, 504, 524, 529}
+# Packages that turn a provider's response into messages. An exception raised
+# inside one of them on a malformed body is the provider's hiccup, not ours.
+CLIENT_PACKAGES = ("langchain_openai", "langchain_xai", "openai")
+
+
+def raised_at(exc: BaseException) -> tuple[Path, int] | None:
+    """File and line of the innermost frame that raised exc."""
+    tb = exc.__traceback__
+    if tb is None:
+        return None
+    while tb.tb_next is not None:
+        tb = tb.tb_next
+    return Path(tb.tb_frame.f_code.co_filename), tb.tb_lineno
+
+
+def is_transient(exc: BaseException) -> bool:
+    """A provider failure worth retrying, as opposed to a bug or a bad answer.
+
+    The HTTP client already retries 429s and 5xx responses. These are the
+    failures it can't see: OpenRouter reports an upstream error inside a 200
+    body, which langchain-openai raises as ValueError(error_dict), and a body
+    with missing fields fails inside the client library.
+    """
+    if isinstance(exc, ValueError) and exc.args and isinstance(exc.args[0], dict):
+        return exc.args[0].get("code") in TRANSIENT_CODES
+    if isinstance(exc, (TypeError, KeyError)):
+        where = raised_at(exc)
+        return where is not None and any(p in where[0].parts for p in CLIENT_PACKAGES)
+    return False
+
+
+async def with_retries[T](
+    call: Callable[[], Awaitable[T]], attempts: int = LLM_ATTEMPTS
+) -> T:
+    for attempt in range(1, attempts + 1):
+        try:
+            return await call()
+        except Exception as exc:
+            if attempt == attempts or not is_transient(exc):
+                raise
+            await asyncio.sleep(min(2**attempt, 10))
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
 async def _structured[T: BaseModel](
     llm: BaseChatModel, schema: type[T], prompt: str
 ) -> T:
@@ -168,7 +220,7 @@ async def _structured[T: BaseModel](
         schema, method="json_schema", include_raw=True
     )
     # include_raw=True always returns {raw, parsed, parsing_error}.
-    out = cast(dict[str, Any], await runnable.ainvoke(prompt))
+    out = cast(dict[str, Any], await with_retries(lambda: runnable.ainvoke(prompt)))
     if out.get("parsing_error") or out.get("parsed") is None:
         raise ValueError(
             f"Model output did not match {schema.__name__}: {out.get('parsing_error')}"
@@ -222,7 +274,7 @@ class LLMApprover:
             [*tools.as_langchain(), SubmitDecision], tool_choice="any"
         )
         for _ in range(self.max_steps):
-            reply = cast(AIMessage, await agent.ainvoke(messages))
+            reply = cast(AIMessage, await with_retries(lambda: agent.ainvoke(messages)))
             messages.append(reply)
             if not reply.tool_calls:
                 messages.append(HumanMessage("Call a tool, or call SubmitDecision."))
@@ -242,7 +294,7 @@ class LLMApprover:
 
         # Out of steps: decide with what has been gathered so far.
         final = self.llm.bind_tools([SubmitDecision], tool_choice=SUBMIT)
-        reply = cast(AIMessage, await final.ainvoke(messages))
+        reply = cast(AIMessage, await with_retries(lambda: final.ainvoke(messages)))
         for tc in reply.tool_calls:
             if tc["name"] == SUBMIT:
                 # Accepted as is: the policy route still overrides it in code.

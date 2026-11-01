@@ -44,7 +44,7 @@ INVOICE = Invoice(
 class FakeChatModel:
     """Records each prompt and returns the next canned structured output."""
 
-    def __init__(self, *outputs: dict[str, Any]) -> None:
+    def __init__(self, *outputs: dict[str, Any] | Exception) -> None:
         self.outputs = list(outputs)
         self.prompts: list[str] = []
         self.schemas: list[type[BaseModel]] = []
@@ -56,7 +56,10 @@ class FakeChatModel:
 
     async def ainvoke(self, prompt: str) -> dict[str, Any]:
         self.prompts.append(prompt)
-        return self.outputs.pop(0)
+        out = self.outputs.pop(0)
+        if isinstance(out, Exception):
+            raise out
+        return out
 
     def as_llm(self) -> BaseChatModel:
         return cast(BaseChatModel, self)
@@ -118,7 +121,7 @@ async def test_unparseable_output_raises(output: dict[str, Any]) -> None:
 class FakeToolModel:
     """Plays back scripted AI turns and records what the agent sent."""
 
-    def __init__(self, *turns: AIMessage) -> None:
+    def __init__(self, *turns: AIMessage | Exception) -> None:
         self.turns = list(turns)
         self.requests: list[list[BaseMessage]] = []
         self.bindings: list[tuple[list[str], Any]] = []
@@ -130,7 +133,10 @@ class FakeToolModel:
 
     async def ainvoke(self, messages: list[BaseMessage]) -> AIMessage:
         self.requests.append(list(messages))
-        return self.turns.pop(0)
+        turn = self.turns.pop(0)
+        if isinstance(turn, Exception):
+            raise turn
+        return turn
 
     def as_llm(self) -> BaseChatModel:
         return cast(BaseChatModel, self)
