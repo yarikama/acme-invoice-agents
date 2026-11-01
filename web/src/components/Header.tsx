@@ -4,11 +4,6 @@ import { useState } from "react";
 import type { StreamState } from "../state/useConsole";
 import { Logo } from "./Logo";
 
-const STREAM_WORD: Record<StreamState, string> = {
-  connecting: "connecting",
-  live: "live",
-  retrying: "reconnecting",
-};
 
 function useTheme() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
@@ -25,15 +20,7 @@ function useTheme() {
   return { dark, toggle };
 }
 
-export function Header({
-  stream,
-  provider,
-  onResetLayout,
-}: {
-  stream: StreamState;
-  provider: string | null;
-  onResetLayout: () => void;
-}) {
+export function Header({ stream, onResetLayout }: { stream: StreamState; onResetLayout: () => void }) {
   const { dark, toggle } = useTheme();
   return (
     <header className="bar-ink sticky top-0 z-10">
@@ -41,16 +28,16 @@ export function Header({
         <div className="flex items-center gap-3">
           <Logo size={40} />
           <span className="display text-[28px] leading-none">Acme AP</span>
-          <span className="cap self-end pb-0.5 text-sm">console</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-4">
-          <span className="inline-flex items-center gap-2" aria-live="polite">
-            <span className={`lt ${stream === "live" ? "lt-paid" : "lt-running"}`} aria-hidden="true" />
-            <span className="cap">stream</span>
-            <span className="text-sm">{STREAM_WORD[stream]}</span>
-          </span>
-          <span className="tag" title="LLM provider configured on the server">
-            {provider ?? "server offline"}
+          {/* Silent while connected; speaks up only when updates have stopped arriving. */}
+          <span aria-live="polite">
+            {stream === "retrying" && (
+              <span className="inline-flex items-center gap-2 text-sm">
+                <span className="lt lt-running" aria-hidden="true" />
+                Reconnecting…
+              </span>
+            )}
           </span>
           {/* Only the wide grid can be rearranged, so only it can be reset. */}
           <button
