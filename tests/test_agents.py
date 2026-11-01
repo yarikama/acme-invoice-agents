@@ -140,8 +140,16 @@ def call(name: str, call_id: str, **args: Any) -> AIMessage:
     return AIMessage("", tool_calls=[{"name": name, "args": args, "id": call_id}])
 
 
-def submit(decision: str, rationale: str, call_id: str = "s") -> AIMessage:
-    return call(SUBMIT, call_id, decision=decision, rationale=rationale)
+def submit(
+    decision: str, rationale: str, call_id: str = "s", addressed: tuple[str, ...] = ()
+) -> AIMessage:
+    return call(
+        SUBMIT,
+        call_id,
+        decision=decision,
+        rationale=rationale,
+        addressed=list(addressed),
+    )
 
 
 @pytest.fixture
@@ -152,13 +160,15 @@ def tools(inventory: Inventory) -> ReviewTools:
 async def test_approver_looks_things_up_before_deciding(tools: ReviewTools) -> None:
     fake = FakeToolModel(
         call("check_inventory", "c1", item="GadgetX"),
-        submit("reject", "Only 5 GadgetX in stock."),
+        submit("reject", "Only 5 GadgetX in stock.", addressed=("OUT_OF_STOCK",)),
     )
 
     out = await LLMApprover(fake.as_llm()).draft(INVOICE, report(ERROR), [], tools)
 
     assert out.draft == ApprovalDraft(
-        decision="reject", rationale="Only 5 GadgetX in stock."
+        decision="reject",
+        rationale="Only 5 GadgetX in stock.",
+        addressed=["OUT_OF_STOCK"],
     )
     assert [c.describe() for c in out.tool_calls] == [
         "check_inventory(GadgetX): GadgetX: 5 in stock, list price $750.00."
@@ -174,7 +184,10 @@ async def test_approver_looks_things_up_before_deciding(tools: ReviewTools) -> N
 
 
 async def test_approver_prompt_has_findings_and_critique(tools: ReviewTools) -> None:
-    fake = FakeToolModel(submit("reject", "Out of stock."))
+    fake = FakeToolModel(
+        call("check_inventory", "c1", item="FakeItem"),
+        submit("reject", "Out of stock.", addressed=("OUT_OF_STOCK",)),
+    )
 
     await LLMApprover(fake.as_llm()).draft(
         INVOICE, report(ERROR), ["You ignored the stock error"], tools
@@ -218,6 +231,29 @@ async def test_approver_retries_an_invalid_decision(tools: ReviewTools) -> None:
     feedback = fake.requests[1][-1]
     assert isinstance(feedback, ToolMessage)
     assert "Invalid decision" in str(feedback.content)
+
+
+async def test_guardrail_sends_back_a_decision_that_skips_a_finding(
+    tools: ReviewTools,
+) -> None:
+    fake = FakeToolModel(
+        submit("approve", "Looks fine.", "s1"),
+        call("check_inventory", "c1", item="FakeItem"),
+        submit("reject", "No stock.", "s2", addressed=("OUT_OF_STOCK",)),
+    )
+
+    out = await LLMApprover(fake.as_llm()).draft(INVOICE, report(ERROR), [], tools)
+
+    assert out.draft.decision == "reject"
+    [guard, lookup] = out.steps
+    assert guard.name == "guardrail"
+    assert "Approve is not allowed with error findings (OUT_OF_STOCK)." in guard.result
+    assert "Missing: OUT_OF_STOCK." in guard.result
+    assert "call check_inventory" in guard.result
+    assert out.tool_calls == [lookup]
+    reply = fake.requests[1][-1]
+    assert isinstance(reply, ToolMessage)
+    assert str(reply.content).startswith("Decision not accepted.")
 
 
 async def test_approver_must_decide_when_out_of_steps(tools: ReviewTools) -> None:

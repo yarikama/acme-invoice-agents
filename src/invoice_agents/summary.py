@@ -32,6 +32,7 @@ def summarize(state: InvoiceState, status: Status) -> dict[str, Any]:
         if report
         else [],
         "route": state.get("route"),
+        "route_reason": state.get("route_reason"),
         "draft": draft.model_dump(mode="json") if draft else None,
         "payment": payment.model_dump(mode="json") if payment else None,
         "reason": state.get("rejection_reason"),

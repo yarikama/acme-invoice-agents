@@ -30,10 +30,15 @@ class SeenInvoices:
             self.revisions.setdefault(key, set()).add(invoice.revision)
 
 
+# Warnings an agent may not clear on its own: each one goes to a VP.
+VP_REQUIRED_DEFAULT = frozenset({"NEAR_THRESHOLD", "FOREIGN_CURRENCY", "SUPERSEDES"})
+
+
 @dataclass(frozen=True)
 class Policy:
     approval_threshold: float = 10_000
     near_threshold_ratio: float = 0.95
+    vp_required: frozenset[str] = VP_REQUIRED_DEFAULT
 
 
 def validate(

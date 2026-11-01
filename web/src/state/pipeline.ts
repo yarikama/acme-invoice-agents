@@ -119,7 +119,9 @@ export function traceLines(run: RunView, llm: boolean): TraceLine[] {
   for (const e of run.events) {
     if (e.type === "trace" && e.tool) {
       // The model asked; code answered. The result is a fact, so it reads as code.
-      lines.push({ seq: e.seq, node: "tool", voice: "code", text: e.message });
+      // A guardrail line is code sending the approver's decision back.
+      const node = e.tool === "guardrail" ? "guardrail" : "tool";
+      lines.push({ seq: e.seq, node, voice: "code", text: e.message });
     } else if (e.type === "trace") {
       lines.push({ seq: e.seq, node: e.node, voice: voiceOf(e.node, e.message, llm), text: e.message });
     } else if (e.type === "run_error") {

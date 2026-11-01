@@ -47,6 +47,8 @@ export interface Summary {
   invoice: Invoice | null;
   findings: Finding[];
   route: "reject" | "human" | "auto" | null;
+  // Why the rules send this invoice to a VP, when they do.
+  route_reason?: string | null;
   draft: { decision: Decision; rationale: string } | null;
   payment: { status: string; vendor: string; amount: number; currency: string } | null;
   reason: string | null;
