@@ -105,3 +105,5 @@ make format
 ## Credits
 
 The case brief (`docs/case-brief.md`) and the sample invoices in `data/` come from [galatiq-ai/galatiq-case-invoices](https://github.com/galatiq-ai/galatiq-case-invoices).
+
+The console's backdrop is "City Streets" from [StockSnap](https://stocksnap.io/), released under CC0; it is shown in greyscale and blurred.
