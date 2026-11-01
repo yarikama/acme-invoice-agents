@@ -278,13 +278,26 @@ async def test_approver_must_decide_when_out_of_steps(tools: ReviewTools) -> Non
     assert fake.bindings[-1] == ([SUBMIT], SUBMIT)
 
 
-async def test_approver_that_never_decides_is_an_error(tools: ReviewTools) -> None:
+async def test_approver_that_never_decides_escalates(tools: ReviewTools) -> None:
+    # It looks something up, then ignores even the forced final decision.
     fake = FakeToolModel(call("vendor_history", "c1", vendor="X"), AIMessage("no"))
+    review = await LLMApprover(fake.as_llm(), max_steps=1).draft(
+        INVOICE, report(), [], tools
+    )
+    assert review.draft.decision == "escalate"
+    assert "did not reach a valid decision in 2 turns" in review.draft.rationale
+    assert [s.name for s in review.steps] == ["vendor_history"]
 
-    with pytest.raises(ValueError, match="did not submit"):
-        await LLMApprover(fake.as_llm(), max_steps=1).draft(
-            INVOICE, report(), [], tools
-        )
+
+async def test_an_invalid_forced_decision_escalates_too(tools: ReviewTools) -> None:
+    fake = FakeToolModel(
+        call("vendor_history", "c1", vendor="X"),
+        call(SUBMIT, "c2", decision="maybe", rationale="?"),
+    )
+    review = await LLMApprover(fake.as_llm(), max_steps=1).draft(
+        INVOICE, report(), [], tools
+    )
+    assert review.draft.decision == "escalate"
 
 
 async def test_critic_sees_the_draft_and_the_lookups() -> None:
