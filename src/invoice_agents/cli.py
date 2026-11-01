@@ -5,8 +5,9 @@
     python main.py --dir data/invoices
     python main.py --serve            # start the API and the web console
 
-With a file or folder the CLI runs it and exits, so scripts and the brief's
-command behave the same; `-i` stays in the interactive console afterwards.
+A file or folder runs first, then the interactive console stays open, as
+if it had been typed as /run. Where input isn't a terminal (a script, CI),
+with --json, or with --once, the CLI runs the file and exits.
 
 If the API is running, invoices go through it, so each run also appears in
 the web console; otherwise the graph runs here. Either way the terminal shows
@@ -18,11 +19,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
+import signal
 import sys
 import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
@@ -79,11 +83,17 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--web", default=DEFAULT_WEB, help=f"Console address (default {DEFAULT_WEB})"
     )
-    parser.add_argument(
+    stay = parser.add_mutually_exclusive_group()
+    stay.add_argument(
         "-i",
         "--interactive",
         action="store_true",
-        help="Stay in the interactive console after the file or folder",
+        help="Stay in the interactive console even when input isn't a terminal",
+    )
+    stay.add_argument(
+        "--once",
+        action="store_true",
+        help="Run the file or folder and exit (the default for scripts and --json)",
     )
     parser.add_argument(
         "--no-serve",
@@ -95,13 +105,37 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 
 
 def _interactive(args: argparse.Namespace) -> bool:
-    """No file or folder opens the console; so does -i. `--serve` alone keeps
-    serving without a prompt when stdin isn't a terminal (a container, say)."""
+    """Whether to open the console, before or after running a file.
+
+    A person at a terminal gets it. A script, CI or anything reading --json
+    gets one run and an exit, so nothing waits on a prompt nobody sees.
+    `--serve` alone keeps serving without a prompt off a terminal."""
     if args.interactive:
         return True
-    if args.invoice_path or args.dir:
+    if args.once or args.json:
         return False
+    at_terminal = sys.stdin.isatty() and sys.stdout.isatty()
+    if args.invoice_path or args.dir:
+        return at_terminal
     return not args.serve or sys.stdin.isatty()
+
+
+@contextlib.contextmanager
+def _signals_end_the_cli() -> Iterator[None]:
+    """Closing the terminal (SIGHUP) or `kill` (SIGTERM) ends the CLI the way
+    Ctrl-C does, so the cleanup runs and stops the servers it started: they
+    run in their own session (see remote._spawn) and don't get the signal."""
+
+    def stop(signum: int, _frame: object) -> None:
+        raise SystemExit(128 + signum)
+
+    wanted = [signal.SIGTERM, getattr(signal, "SIGHUP", None)]
+    previous = {sig: signal.signal(sig, stop) for sig in wanted if sig is not None}
+    try:
+        yield
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
 
 
 def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str]:
@@ -340,15 +374,16 @@ def main(argv: list[str] | None = None) -> int:
         format="%(message)s",
         handlers=[RichHandler(console=console, show_path=False)],
     )
-    if _interactive(args):
-        from invoice_agents.shell import run_shell
+    with _signals_end_the_cli():
+        if _interactive(args):
+            from invoice_agents.shell import run_shell
 
-        return run_shell(args)
-    try:
-        return asyncio.run(_run(args))
-    except KeyboardInterrupt:
-        console.print("\n  Stopped.")
-        return 130
+            return run_shell(args)
+        try:
+            return asyncio.run(_run(args))
+        except KeyboardInterrupt:
+            console.print("\n  Stopped.")
+            return 130
 
 
 if __name__ == "__main__":
