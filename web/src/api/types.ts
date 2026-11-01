@@ -72,6 +72,8 @@ interface EventBase {
   run_id: string;
   source: string;
   created_at: string;
+  // When the event happened (ISO 8601); older servers may leave it out.
+  at?: string;
   status: Status;
 }
 

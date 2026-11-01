@@ -179,6 +179,8 @@ async def test_global_stream_carries_every_run_in_order(client):
             break
     assert [e["seq"] for e in seen] == list(range(len(seen)))
     assert {e["run_id"] for e in seen} == {a["id"], b["id"]}
+    # Each event carries its own time, so the console can time each step.
+    assert all(e["at"] >= e["created_at"] for e in seen)
     paused = next(e for e in seen if e["type"] == "awaiting_vp")
     assert paused["status"] == "awaiting_vp"
     assert paused["summary"]["invoice"]["invoice_number"] == "INV-1014"

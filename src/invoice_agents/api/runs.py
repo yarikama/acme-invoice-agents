@@ -190,6 +190,8 @@ class RunManager:
                 "run_id": run.id,
                 "source": run.source,
                 "created_at": run.created_at,
+                # When this event happened, so the console can time each step.
+                "at": datetime.now(UTC).isoformat(),
                 "status": run.status,
                 **event,
             }

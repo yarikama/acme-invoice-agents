@@ -25,15 +25,15 @@ export const DEFAULT_LAYOUT: LayoutItem[] = (
     { i: "overview", x: 0, y: 0, w: 12, h: 4 },
     { i: "inbox", x: 0, y: 4, w: 7, h: 7 },
     { i: "summary", x: 7, y: 4, w: 5, h: 5 },
-    { i: "decision", x: 7, y: 9, w: 5, h: 11 },
-    { i: "stream", x: 0, y: 11, w: 7, h: 18 },
-    { i: "findings", x: 7, y: 20, w: 5, h: 4 },
-    { i: "lines", x: 7, y: 24, w: 5, h: 5 },
+    { i: "decision", x: 7, y: 9, w: 5, h: 13 },
+    { i: "stream", x: 0, y: 11, w: 7, h: 24 },
+    { i: "findings", x: 7, y: 22, w: 5, h: 6 },
+    { i: "lines", x: 7, y: 28, w: 5, h: 7 },
   ] as const
 ).map((item) => ({ ...item, ...MIN[item.i] }));
 
 // Bump when the default changes, so browsers holding the old default get the new one.
-const KEY = "acme-console-layout-v3";
+const KEY = "acme-console-layout-v4";
 
 function isItem(v: unknown): v is LayoutItem {
   if (typeof v !== "object" || v === null) return false;

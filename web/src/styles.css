@@ -32,6 +32,10 @@
   --glass-edge: rgb(17 17 17 / 0.13);
   --glass-hi: rgb(255 255 255 / 0.9);
   --tile: rgb(255 255 255 / 0.55);
+  /* The three voices in the agent run: model, code, human. */
+  --model: #2563a8;
+  --code: #1b7a43;
+  --human: #c2410c;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: light;
@@ -52,6 +56,9 @@
   --glass-edge: rgb(255 255 255 / 0.09);
   --glass-hi: rgb(255 255 255 / 0.06);
   --tile: rgb(255 255 255 / 0.04);
+  --model: #6aa8ee;
+  --code: #5fd38a;
+  --human: #ff7a2f;
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
@@ -70,10 +77,10 @@
   --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
   --font-display: "Red Hat Display Variable", system-ui, sans-serif;
   /* One type scale for the whole console, no near-duplicates:
-     13 labels and data, 15 secondary, 17 body, 20 widget titles,
+     15 labels, data and secondary text, 17 body, 20 widget titles,
      26 names, 34 counts, 42 amounts, plus the page title. */
-  --text-xs: 0.8125rem;
-  --text-xs--line-height: 1.25rem;
+  --text-xs: 0.9375rem;
+  --text-xs--line-height: 1.4rem;
   --text-sm: 0.9375rem;
   --text-sm--line-height: 1.4rem;
   --text-base: 1.0625rem;
@@ -130,16 +137,16 @@
     font-weight: 400;
   }
   .cap {
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 15px;
+    line-height: 22px;
     color: var(--ink-2);
   }
   /* Identifiers (invoice number, file name): solid and inverted, so they
      stand off any panel in either theme. */
   .tag {
     display: inline-block;
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 15px;
+    line-height: 22px;
     padding: 3px 9px;
     border-radius: var(--r-sm);
     background: var(--ink);
@@ -294,7 +301,7 @@
   .sheet-label {
     margin: 0;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 400;
     color: var(--ink-2);
   }
@@ -316,8 +323,8 @@
   .code-chip {
     flex: none;
     font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 15px;
+    line-height: 22px;
     padding: 2px 8px;
     border-radius: 6px;
     background: #111111;
@@ -606,8 +613,8 @@
   .chip {
     display: inline-block;
     font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 15px;
+    line-height: 22px;
     padding: 2px 0;
     width: 64px;
     text-align: center;
@@ -631,7 +638,7 @@
     background: #0f0f0f;
     color: #e2e2dc;
     font-family: var(--font-mono);
-    font-size: 13px;
+    font-size: 15px;
     line-height: 21px;
     padding: 16px;
     border-radius: var(--r-lg);
@@ -651,28 +658,6 @@
 }
 
 @layer components {
-  /* Trace rows: number, pixel glyph and node, then the text. */
-  .trace-row {
-    display: grid;
-    grid-template-columns: 24px 118px minmax(0, 1fr);
-    align-items: start;
-    gap: 10px;
-    padding: 2px 6px;
-    margin-inline: -6px;
-    border-radius: 6px;
-  }
-  .trace-new {
-    animation: row-in 900ms ease-out;
-  }
-  .trace-guard {
-    background: rgb(255 122 47 / 0.12);
-  }
-  .px-pop {
-    shape-rendering: crispEdges;
-  }
-  .trace-new .px-pop {
-    animation: px-pop 480ms steps(4, end);
-  }
   .px-caret {
     display: inline-block;
     width: 0.55em;
@@ -682,58 +667,145 @@
     background: currentColor;
     animation: blink 1s steps(2, start) infinite;
   }
-  .px-sq {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    background: currentColor;
+}
+
+@layer components {
+  /* The agent run as a conversation: an avatar per actor, then the turn. */
+  .turn {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
   }
-  .px-bars {
+  .turn-new {
+    animation: turn-in 260ms ease-out;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    color: var(--voice);
+    background: color-mix(in srgb, var(--voice) 16%, transparent);
+  }
+  .avatar-model,
+  .role-model {
+    --voice: var(--model);
+  }
+  .avatar-code,
+  .role-code {
+    --voice: var(--code);
+  }
+  .avatar-human,
+  .role-human {
+    --voice: var(--human);
+  }
+  .avatar-active {
+    animation: ring 1.4s ease-out infinite;
+  }
+  .role {
+    font-size: 15px;
+    color: var(--voice);
+  }
+  .pill {
     display: inline-flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 12px;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
   }
-  .px-bars i {
-    width: 3px;
-    height: 3px;
-    background: #6b6b65;
+  .pill-approve {
+    background: #1b7a43;
+    color: #ffffff;
   }
-  .px-bars-live i {
-    background: #ff7a2f;
-    animation: px-bar 720ms steps(4, end) infinite alternate;
+  .pill-reject {
+    background: var(--ink);
+    color: var(--canvas);
+  }
+  .pill-escalate {
+    background: var(--color-signal);
+    color: #111111;
+  }
+  .stat {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    padding: 2px 8px;
+    border-radius: var(--r-sm);
+    background: var(--tile);
+  }
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 4px var(--r-lg) var(--r-lg) var(--r-lg);
+    background: var(--tile);
+  }
+  .tool-use,
+  .sendback {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--r);
+  }
+  .tool-use {
+    background: color-mix(in srgb, var(--code) 10%, transparent);
+  }
+  .turn-new .tool-use {
+    animation: turn-in 300ms ease-out both;
+  }
+  .sendback {
+    background: color-mix(in srgb, var(--color-signal) 16%, transparent);
+    color: var(--ink);
+  }
+  .linkish {
+    margin-top: 6px;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 15px;
+    color: var(--ink-2);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+  /* "Thinking": the words shimmer while the run works. */
+  .shimmer {
+    background: linear-gradient(90deg, var(--ink-2) 0%, var(--ink) 50%, var(--ink-2) 100%) 0 0 / 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 1.6s linear infinite;
   }
 }
 
-@keyframes row-in {
+@keyframes turn-in {
   from {
-    background: rgb(95 211 138 / 0.16);
+    opacity: 0;
+    transform: translateY(6px);
   }
   to {
-    background: transparent;
+    opacity: 1;
+    transform: none;
   }
 }
 
-@keyframes px-pop {
+@keyframes ring {
   0% {
-    opacity: 0;
-    transform: scale(0.4);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.35);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--voice) 45%, transparent);
   }
   100% {
-    transform: scale(1);
+    box-shadow: 0 0 0 10px transparent;
   }
 }
 
-@keyframes px-bar {
+@keyframes shimmer {
   from {
-    height: 3px;
+    background-position: 100% 0;
   }
   to {
-    height: 12px;
+    background-position: -100% 0;
   }
 }
 
@@ -771,9 +843,10 @@
   .led-run,
   .cursor-blink,
   .px-caret,
-  .px-bars-live i,
-  .trace-new,
-  .trace-new .px-pop {
+  .turn-new,
+  .turn-new .tool-use,
+  .avatar-active,
+  .shimmer {
     animation: none;
   }
   .key {

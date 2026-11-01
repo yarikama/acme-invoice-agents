@@ -21,17 +21,6 @@ export function PixelIcon({ node, size = 14, className = "" }: { node: string; s
   );
 }
 
-/** Five pixel columns that bounce while agents work, and lie flat at rest. */
-export function PixelBars({ live }: { live: boolean }) {
-  return (
-    <span className={`px-bars ${live ? "px-bars-live" : ""}`} aria-hidden="true">
-      {[0, 1, 2, 3, 4].map((i) => (
-        <i key={i} style={{ animationDelay: `${i * 110}ms` }} />
-      ))}
-    </span>
-  );
-}
-
 const SPIN = ["▖", "▘", "▝", "▗"];
 
 /** A four-frame block spinner for the step that is running. */
