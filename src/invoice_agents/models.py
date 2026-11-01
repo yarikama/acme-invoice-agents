@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SourceFormat(StrEnum):
@@ -20,7 +20,15 @@ class SourceFormat(StrEnum):
     JPEG = "jpeg"
 
 
+# Money and quantities are finite numbers: "NaN" or "Infinity" in a file
+# would slip through every comparison (NaN > 10_000 is False) and could not
+# be stored as JSON.
+FINITE = ConfigDict(allow_inf_nan=False)
+
+
 class LineItem(BaseModel):
+    model_config = FINITE
+
     item: str = Field(description="Product name exactly as written on the invoice")
     quantity: float = Field(description="Units billed; keep negative values as-is")
     unit_price: float = Field(description="Price per unit, without currency symbols")
@@ -36,6 +44,8 @@ class Invoice(BaseModel):
     Fields stay as close to the document as possible: a wrong total or a
     missing vendor is kept, so the validator can report it.
     """
+
+    model_config = FINITE
 
     invoice_number: str | None = Field(description="Invoice number, e.g. INV-1001")
     revision: str | None = Field(default=None, description="Revision label, e.g. R1")

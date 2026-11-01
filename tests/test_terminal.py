@@ -546,3 +546,26 @@ def test_the_batch_is_measured_against_the_manual_process() -> None:
     assert "$5,000.00 stopped before paying (2 rejected)" in out
     assert "$0.013 model cost per invoice" in out
     assert "replayed answers return at once" in text(impact_line(results, True))
+
+
+def test_money_held_back_counts_each_invoice_once() -> None:
+    copy = {
+        "vendor": "Atlas",
+        "invoice_number": "INV-1013",
+        "total": 100.0,
+        "currency": "USD",
+    }
+    results = [
+        {"status": "rejected", "invoice": copy, "file": "a.pdf"},
+        {
+            "status": "rejected",
+            "invoice": {**copy, "vendor": "ATLAS"},
+            "file": "a.json",
+        },
+        {
+            "status": "rejected",
+            "invoice": {**copy, "vendor": "Gadgets"},
+            "file": "b.json",
+        },
+    ]
+    assert "$200.00 stopped before paying" in text(impact_line(results))

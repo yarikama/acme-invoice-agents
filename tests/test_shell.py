@@ -38,6 +38,8 @@ def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
         return False
 
     monkeypatch.setattr(cli.remote, "reachable", down)
+
+    monkeypatch.setattr(cli.remote, "api_up", down)
     return settings
 
 
@@ -211,6 +213,7 @@ def test_through_the_api_runs_lists_and_answers_waiting_runs(
 
     opened: list[str] = []
     monkeypatch.setattr(cli.remote, "reachable", up)
+    monkeypatch.setattr(cli.remote, "api_up", up)
     monkeypatch.setattr(shell.webbrowser, "open", opened.append)
     real = httpx.AsyncClient
     monkeypatch.setattr(
@@ -553,13 +556,17 @@ def test_watch_runs_what_lands_and_waits_for_a_vp_instead_of_asking(
     inbox.mkdir()
     shutil.copy(INVOICES / "invoice_1014.xml", inbox / "invoice_1014.xml")
 
+    held: list[set[Path]] = []
+
     async def once(box, handle, interval: float = 2.0, stop=None) -> None:
-        await handle([inbox / "invoice_1014.xml"])
+        held.append(await handle([inbox / "invoice_1014.xml"]))
 
     monkeypatch.setattr(shell, "watch", once)
     sh.handle(f"/watch {inbox}")
     assert "Watching" in said(capsys)
-    assert [r["status"] for r in sh.history] == ["awaiting_vp"]
+    # Local, so no VP can decide it later: no outcome, and held apart.
+    assert [r["status"] for r in sh.history] == ["skipped"]
+    assert held == [{inbox / "invoice_1014.xml"}]
     sh.handle("/watch a b")
     assert "Usage: /watch [folder]" in said(capsys)
     sh.handle("/vp wait")

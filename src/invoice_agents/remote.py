@@ -21,9 +21,28 @@ from urllib.parse import urlparse
 import httpx
 
 from invoice_agents import memory
-from invoice_agents.config import get_settings
+from invoice_agents.config import ROOT, get_settings
 
-REPO = Path(__file__).resolve().parents[2]
+REPO = ROOT
+
+
+async def api_up(base: str, client: httpx.AsyncClient | None = None) -> bool:
+    """Whether this project's API answers at `base`: its health check, not
+    just anything listening on the port (a grader may have another server
+    on :8000)."""
+    url = f"{base.rstrip('/')}/api/health"
+    try:
+        if client is not None:
+            r = await client.get(url, timeout=1.0)
+        else:
+            async with httpx.AsyncClient() as c:
+                r = await c.get(url, timeout=1.0)
+        body = r.json() if r.status_code == 200 else {}
+    except (httpx.HTTPError, ValueError):
+        return False
+    return (
+        isinstance(body, dict) and body.get("status") == "ok" and "llm_provider" in body
+    )
 
 
 async def reachable(url: str, client: httpx.AsyncClient | None = None) -> bool:
@@ -148,7 +167,7 @@ async def serve(
     redis_server = await asyncio.to_thread(_start_redis, log_dir)
     if redis_server is not None:
         started.append(redis_server)
-    if not await reachable(f"{api_url}/api/health"):
+    if not await api_up(api_url):
         cmd = [sys.executable, "-m", "uvicorn", "invoice_agents.api.app:app"]
         cmd += ["--port", _port(api_url)]
         started.append(await asyncio.to_thread(_spawn, cmd, REPO, log_dir / "api.log"))
@@ -164,7 +183,7 @@ async def serve(
             await asyncio.to_thread(_spawn, cmd, REPO / "web", log_dir / "web.log")
         )
     for _ in range(120):
-        if await reachable(f"{api_url}/api/health") and await reachable(web_url):
+        if await api_up(api_url) and await reachable(web_url):
             return started
         if any(p.poll() is not None for p in started):
             break

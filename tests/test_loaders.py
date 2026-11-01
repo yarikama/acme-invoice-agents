@@ -135,3 +135,14 @@ def test_files_with_nothing_to_read_say_why(tmp_path: Path) -> None:
     assert doc.text == ""
     assert doc.problem is not None
     assert doc.problem.startswith("The PDF could not be opened")
+
+
+def test_nan_in_a_json_invoice_goes_to_the_agent_as_text(tmp_path: Path) -> None:
+    path = tmp_path / "nan.json"
+    path.write_text(
+        '{"line_items": [{"item": "W", "quantity": 1, "unit_price": "NaN"}],'
+        ' "total": "Infinity"}'
+    )
+    doc = load_document(path)
+    assert doc.invoice is None and doc.problem is not None
+    assert doc.problem.startswith("Could not read the JSON in code")

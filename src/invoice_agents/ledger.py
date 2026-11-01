@@ -13,14 +13,19 @@ API and a CLI run on the same machine see each other's invoices.
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
 from invoice_agents.models import Invoice
 from invoice_agents.validation import Outcome, Received, SeenInvoices
+
+log = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ledger (
@@ -57,7 +62,16 @@ class Ledger(SeenInvoices):
                 "SELECT invoice, run_id, source, outcome, reason, received_at"
                 " FROM ledger ORDER BY received_at, rowid"
             ).fetchall()
-        return [Received(Invoice.model_validate_json(row[0]), *row[1:]) for row in rows]
+        entries = []
+        for row in rows:
+            try:
+                invoice = Invoice.model_validate_json(row[0])
+            except ValidationError:
+                # One bad row must not stop every later run.
+                log.warning("Skipping unreadable ledger row %s", row[1])
+                continue
+            entries.append(Received(invoice, *row[1:]))
+        return entries
 
     def add(
         self, invoice: Invoice, run_id: str | None = None, source: str = ""

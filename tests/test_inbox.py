@@ -41,6 +41,13 @@ def test_filing_never_overwrites(tmp_path: Path) -> None:
     assert first.exists() and second.exists()
 
 
+def test_files_without_an_outcome_are_kept_apart(tmp_path: Path) -> None:
+    box = Inbox(tmp_path)
+    kept = box.file_away(landed(tmp_path, "needs_vp.xml"), held=True)
+    assert kept == box.held / "needs_vp.xml"
+    assert box.arrived() == []
+
+
 async def test_watch_hands_over_what_arrives_then_files_it(tmp_path: Path) -> None:
     box = Inbox(tmp_path)
     landed(tmp_path, "one.json")
@@ -75,6 +82,8 @@ def test_cli_watch_processes_the_folder(
         return False
 
     monkeypatch.setattr(cli.remote, "reachable", down)
+
+    monkeypatch.setattr(cli.remote, "api_up", down)
     inbox = tmp_path / "inbox"
     inbox.mkdir()
     for name in ("invoice_1015.csv", "invoice_1014.xml"):
@@ -94,20 +103,20 @@ def test_cli_watch_processes_the_folder(
             return results
 
         monkeypatch.setattr(cli, "process", recording)
-        await handle(batch)
+        held = await handle(batch)
         for path in batch:
-            box.file_away(path)
+            box.file_away(path, held=path in held)
 
     monkeypatch.setattr(cli, "watch", once)
     assert not cli._interactive(cli._parse_args(["--watch", str(inbox)]))
     assert cli.main(["--watch", str(inbox)]) == 0
     [results] = handled
     status = {r["file"]: r["status"] for r in results}
-    # Nobody to ask while watching: the EUR invoice is left for a VP.
-    assert status == {"invoice_1015.csv": "paid", "invoice_1014.xml": "awaiting_vp"}
+    # Nobody to ask while watching, and no API to wait in: the EUR invoice
+    # gets no outcome, says so, and is kept apart instead of filed as done.
+    # Before: it was "waiting for a VP" that nothing could answer, in processed/.
+    assert status == {"invoice_1015.csv": "paid", "invoice_1014.xml": "skipped"}
     out = capsys.readouterr().err
-    assert "Watching" in out and "Left waiting for a VP" in out
-    assert sorted(p.name for p in (inbox / "processed").iterdir()) == [
-        "invoice_1014.xml",
-        "invoice_1015.csv",
-    ]
+    assert "Watching" in out and "can't wait for a VP" in out
+    assert [p.name for p in (inbox / "processed").iterdir()] == ["invoice_1015.csv"]
+    assert [p.name for p in (inbox / "unprocessed").iterdir()] == ["invoice_1014.xml"]

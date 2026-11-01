@@ -1,6 +1,7 @@
 """The ledger keeps received invoices and their outcomes across restarts."""
 
 import json
+import sqlite3
 import uuid
 from pathlib import Path
 
@@ -81,3 +82,16 @@ async def test_a_restart_does_not_forget_a_paid_invoice(tmp_path: Path, inventor
     [paid, rejected] = Ledger(tmp_path / "inventory.db").entries
     assert (paid.outcome, rejected.outcome) == ("paid", "rejected")
     assert paid.source == "invoice_1001.txt"
+
+
+def test_a_bad_row_is_skipped_not_fatal(tmp_path: Path):
+    # Before: one row the model could not read broke every later run.
+    ledger = Ledger(tmp_path / "inventory.db")
+    ledger.add(INV_1001, run_id="good")
+    with sqlite3.connect(tmp_path / "inventory.db") as conn:
+        conn.execute(
+            "INSERT INTO ledger (run_id, source, invoice, received_at)"
+            " VALUES ('bad', 'x', ?, 'z')",
+            ('{"line_items": [{"unit_price": null}]}',),
+        )
+    assert [e.run_id for e in ledger.entries] == ["good"]
