@@ -23,6 +23,12 @@ dependencies = [
     "httpx>=0.28.1",
 ]
 
+[project.optional-dependencies]
+ocr = [
+    "docling==2.140.0",
+    "langchain-docling==3.0.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.3",

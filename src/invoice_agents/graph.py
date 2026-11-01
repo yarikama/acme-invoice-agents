@@ -8,6 +8,7 @@ human pause in `human_review` until a decision is sent with Command(resume=...).
 
 from __future__ import annotations
 
+import asyncio
 import operator
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, NotRequired, TypedDict
@@ -23,6 +24,7 @@ from invoice_agents.agents import GUARDRAIL, Extraction
 from invoice_agents.approval import Outcome, Route, policy_route, resolve, vp_reason
 from invoice_agents.config import Settings
 from invoice_agents.ingestion import load_document
+from invoice_agents.ingestion.ocr import BACKENDS as OCR_BACKENDS
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import Agents
 from invoice_agents.models import (
@@ -156,7 +158,10 @@ def build_graph(
 
     async def ingest(state: InvoiceState) -> InvoiceState:
         _emit("ingest", "start")
-        doc = load_document(state["path"])
+        # Disk, PDF parsing and OCR all block: keep them off the event loop.
+        doc = await asyncio.to_thread(
+            load_document, state["path"], OCR_BACKENDS[settings.ocr_backend]
+        )
         if doc.invoice is not None:
             return {
                 "source_format": doc.format.value,
@@ -188,6 +193,8 @@ def build_graph(
             }
         feedback = _extraction_feedback(extraction)
         message = f"Attempt {attempt}: extracted with the LLM"
+        if doc.ocr:
+            message = f"Read the scan with OCR ({settings.ocr_backend}). " + message
         if feedback:
             message += f", retrying: {' '.join(feedback)}"
         return {
@@ -209,7 +216,10 @@ def build_graph(
     async def validate_node(state: InvoiceState) -> InvoiceState:
         _emit("validate", "start")
         invoice = _invoice(state)
-        report = validate(invoice, deps.inventory, deps.seen, deps.policy)
+        # SQLite lookups block too; a busy batch shouldn't stall other runs.
+        report = await asyncio.to_thread(
+            validate, invoice, deps.inventory, deps.seen, deps.policy
+        )
         report.findings += [
             Finding(
                 code="EXTRACTION_CORRECTION",

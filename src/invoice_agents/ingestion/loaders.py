@@ -18,6 +18,7 @@ import pdfplumber
 from defusedxml import ElementTree
 
 from invoice_agents.ingestion.dates import normalize_date
+from invoice_agents.ingestion.ocr import Ocr, docling_text
 from invoice_agents.models import Invoice, LineItem, SourceFormat
 
 
@@ -32,9 +33,18 @@ class Document:
     text: str
     # Set for structured formats; None means an LLM has to extract it.
     invoice: Invoice | None = None
+    # The text came from OCR: a scan or a photo rather than a text layer.
+    ocr: bool = False
 
 
-def load_document(path: str | Path) -> Document:
+IMAGES = {SourceFormat.PNG, SourceFormat.JPG, SourceFormat.JPEG}
+# A PDF with less text than this has no real text layer: it is a scan.
+MIN_PDF_TEXT = 20
+
+
+def load_document(path: str | Path, ocr: Ocr = docling_text) -> Document:
+    """Read an invoice file. Blocking (disk, PDF parsing, OCR): callers in
+    async code run it in a thread."""
     path = Path(path)
     suffix = path.suffix.lower().lstrip(".")
     try:
@@ -42,8 +52,13 @@ def load_document(path: str | Path) -> Document:
     except ValueError as exc:
         raise UnsupportedFormatError(f"Unsupported file type: .{suffix}") from exc
 
+    if fmt in IMAGES:
+        return Document(path, fmt, ocr(path), ocr=True)
     if fmt is SourceFormat.PDF:
-        return Document(path, fmt, _pdf_text(path))
+        text = _pdf_text(path)
+        if len(text) < MIN_PDF_TEXT:
+            return Document(path, fmt, ocr(path), ocr=True)
+        return Document(path, fmt, text)
 
     text = path.read_text(encoding="utf-8")
     parsers = {
