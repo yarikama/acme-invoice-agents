@@ -95,3 +95,16 @@ def test_a_blank_triage_model_means_no_triage(blank: str) -> None:
     s = settings(llm_provider="offline", triage_model=blank)
     assert s.triage_model is None
     assert build_agents(s).triager is None
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_a_blank_vp_tokens_means_none_rather_than_a_startup_error(blank: str) -> None:
+    assert settings(vp_tokens=blank).vp_tokens == {}
+
+
+def test_vp_tokens_and_the_cli_token_come_from_a_dotenv(tmp_path: Any) -> None:
+    env = tmp_path / ".env"
+    env.write_text('VP_TOKENS={"Dana Whitfield": "s3cret"}\nVP_TOKEN=s3cret\n')
+    s = Settings(_env_file=env)  # pyright: ignore[reportCallIssue]
+    assert s.vp_tokens["Dana Whitfield"].get_secret_value() == "s3cret"
+    assert s.vp_token is not None and s.vp_token.get_secret_value() == "s3cret"
