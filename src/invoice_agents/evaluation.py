@@ -20,7 +20,6 @@ import json
 import sys
 import tempfile
 import time
-import urllib.request
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -38,6 +37,7 @@ from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import build_agents
+from invoice_agents.usage import Pricing, cost, openrouter_pricing
 
 Outcome = Literal["pay", "reject", "human", "skipped", "error"]
 
@@ -164,30 +164,6 @@ class Result:
     fast_path: str | None = None
     # Which run of the case this was, with --repeat.
     attempt: int = 1
-
-
-Pricing = dict[str, tuple[float, float]]  # model -> (USD per input, per output token)
-
-
-def openrouter_pricing() -> Pricing:
-    with urllib.request.urlopen("https://openrouter.ai/api/v1/models", timeout=30) as r:
-        models = json.load(r)["data"]
-    return {
-        m["id"]: (float(m["pricing"]["prompt"]), float(m["pricing"]["completion"]))
-        for m in models
-        if "pricing" in m
-    }
-
-
-def cost(usage: dict[str, Any], pricing: Pricing) -> float | None:
-    """Total USD for a {model: usage_metadata} map; None if a model has no price."""
-    total = 0.0
-    for model, u in usage.items():
-        price = pricing.get(model) or pricing.get(f"x-ai/{model}")
-        if price is None:
-            return None
-        total += u["input_tokens"] * price[0] + u["output_tokens"] * price[1]
-    return total
 
 
 def outcome_of(state: InvoiceState | dict[str, Any]) -> tuple[Outcome, str]:

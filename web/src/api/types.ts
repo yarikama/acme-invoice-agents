@@ -66,6 +66,14 @@ export interface RunOverview {
   currency: string | null;
 }
 
+/** Tokens and cost of the model calls one step made. */
+export interface StepUsage {
+  input_tokens: number;
+  output_tokens: number;
+  // Null when the model's price is unknown.
+  cost_usd: number | null;
+}
+
 interface EventBase {
   id: number;
   seq: number;
@@ -82,7 +90,7 @@ export type RunEvent = EventBase &
     | { type: "started" }
     | { type: "progress"; stage: string; step: string }
     // `tool` is set when the line records a tool call the approver made.
-  | { type: "trace"; node: string; stage: string; message: string; tool?: string }
+  | { type: "trace"; node: string; stage: string; message: string; tool?: string; usage?: StepUsage }
     | { type: "awaiting_vp"; request: unknown; summary: Summary }
     | { type: "decision"; approved: boolean; note: string }
     | { type: "done"; summary: Summary }

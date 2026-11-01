@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { activity, parseCritique, parseDraft, parseTriage, parseValidate, turns } from "./conversation";
+import { activity, dollars, parseCritique, parseDraft, parseTriage, parseValidate, tokenWord, totals, turns } from "./conversation";
 import type { TraceLine } from "./pipeline";
 
 const line = (seq: number, node: string, text: string, at?: number): TraceLine => ({
@@ -80,5 +80,30 @@ describe("turns", () => {
   it("names what the run is doing", () => {
     expect(activity("draft")).toBe("The approver is reviewing");
     expect(activity(null)).toBe("Working");
+  });
+});
+
+describe("usage", () => {
+  it("rides on the turn it belongs to and adds up for the run", () => {
+    const priced = { input_tokens: 1200, output_tokens: 300, cost_usd: 0.0042 };
+    const got = turns([
+      { ...line(1, "ingest", "Parsed JSON in code.", 1_000) },
+      { ...line(2, "review", "Draft 1: approve. Fine.", 9_000), usage: priced },
+      { ...line(3, "critique", "Critic agrees. Outcome: pay.", 12_000), usage: { input_tokens: 500, output_tokens: 0, cost_usd: 0.001 } },
+    ], 0);
+    expect(got[1]!.usage).toEqual(priced);
+    expect(totals(got)).toEqual({ tokens: 2000, cost: 0.0052, ms: 12_000 });
+  });
+
+  it("leaves the cost unknown when any step was unpriced", () => {
+    const got = turns([{ ...line(1, "review", "Draft 1: approve.", 1), usage: { input_tokens: 10, output_tokens: 0, cost_usd: null } }]);
+    expect(totals(got).cost).toBeNull();
+  });
+
+  it("formats tokens and dollars", () => {
+    expect(tokenWord(840)).toBe("840 tokens");
+    expect(tokenWord(2140)).toBe("2.1k tokens");
+    expect(dollars(0.0042)).toBe("$0.0042");
+    expect(dollars(0.123)).toBe("$0.12");
   });
 });

@@ -40,6 +40,7 @@ from invoice_agents.models import (
 from invoice_agents.payment import mock_payment
 from invoice_agents.tools import ReviewTools
 from invoice_agents.triage import TriageAnswer, TriageError, fast_path
+from invoice_agents.usage import Pricing, StepUsage, Tokens, collecting, step_usage
 from invoice_agents.validation import Policy, SeenInvoices, validate
 
 STATE_TYPES = (
@@ -69,6 +70,8 @@ class TraceEvent(TypedDict):
     message: str
     # Set on lines that record a tool call, to the tool's name.
     tool: NotRequired[str]
+    # Tokens and cost of the model calls this step made, on its last line.
+    usage: NotRequired[StepUsage]
 
 
 class InvoiceState(TypedDict, total=False):
@@ -99,6 +102,8 @@ class Deps:
     inventory: Inventory
     settings: Settings
     seen: SeenInvoices = field(default_factory=SeenInvoices)
+    # Model prices, for the cost of each step; empty means tokens only.
+    pricing: Pricing = field(default_factory=dict)
 
     @property
     def policy(self) -> Policy:
@@ -113,8 +118,13 @@ def _emit(stage: str, status: str, **data: Any) -> None:
     get_stream_writer()({"stage": stage, "status": status, **data})
 
 
-def _event(stage: str, message: str) -> list[TraceEvent]:
-    return [TraceEvent(stage=stage, message=message)]
+def _event(
+    stage: str, message: str, usage: StepUsage | None = None
+) -> list[TraceEvent]:
+    event = TraceEvent(stage=stage, message=message)
+    if usage:
+        event["usage"] = usage
+    return [event]
 
 
 def _count(n: int, word: str) -> str:
@@ -158,10 +168,12 @@ def build_graph(
             }
 
         attempt = state.get("extract_attempts", 0) + 1
+        tokens: Tokens = {}
         try:
-            extraction = await deps.agents.extractor.extract(
-                doc.text, state.get("extract_feedback", [])
-            )
+            with collecting() as tokens:
+                extraction = await deps.agents.extractor.extract(
+                    doc.text, state.get("extract_feedback", [])
+                )
         except ValueError as exc:
             return {
                 "source_format": doc.format.value,
@@ -169,7 +181,9 @@ def build_graph(
                 "extract_attempts": attempt,
                 "extract_feedback": [str(exc)],
                 "trace": _event(
-                    "ingest", f"Attempt {attempt}: output rejected ({exc})."
+                    "ingest",
+                    f"Attempt {attempt}: output rejected ({exc}).",
+                    step_usage(tokens, deps.pricing),
                 ),
             }
         feedback = _extraction_feedback(extraction)
@@ -182,7 +196,7 @@ def build_graph(
             "corrections": extraction.corrections,
             "extract_attempts": attempt,
             "extract_feedback": feedback,
-            "trace": _event("ingest", message + "."),
+            "trace": _event("ingest", message + ".", step_usage(tokens, deps.pricing)),
         }
 
     def after_ingest(state: InvoiceState) -> Literal["ingest", "validate", "reject"]:
@@ -234,6 +248,10 @@ def build_graph(
         except TriageError as exc:
             return {"trace": _event("triage", f"{exc} Sending it to the approver.")}
         update: InvoiceState = {"triage": answer}
+        # The Decisions API reports its own cost; decision models bill input only.
+        use = StepUsage(
+            input_tokens=answer.input_tokens, output_tokens=0, cost_usd=answer.cost_usd
+        )
         quick = fast_path(
             answer,
             report,
@@ -242,7 +260,7 @@ def build_graph(
         )
         if quick is None:
             update["trace"] = _event(
-                "triage", f"{answer.describe()}. Needs the full review."
+                "triage", f"{answer.describe()}. Needs the full review.", use
             )
             return update
         decision, confirmed = quick
@@ -256,6 +274,7 @@ def build_graph(
             "triage",
             f"{answer.describe()}. Code confirmed {confirmed}, so the reasoning"
             f" approver was skipped. Outcome: {update['outcome']}.",
+            use,
         )
         return update
 
@@ -265,9 +284,10 @@ def build_graph(
         issues = critique.issues if critique and not critique.agrees else []
         invoice = _invoice(state)
         tools = ReviewTools(deps.inventory, deps.seen, invoice)
-        result = await deps.agents.approver.draft(
-            invoice, state["report"], issues, tools
-        )
+        with collecting() as tokens:
+            result = await deps.agents.approver.draft(
+                invoice, state["report"], issues, tools
+            )
         draft = result.draft
         rounds = state.get("review_rounds", 0) + 1
         trace: list[TraceEvent] = [
@@ -281,7 +301,9 @@ def build_graph(
             for step in result.steps
         ]
         trace += _event(
-            "approve", f"Draft {rounds}: {draft.decision}. {draft.rationale}"
+            "approve",
+            f"Draft {rounds}: {draft.decision}. {draft.rationale}",
+            step_usage(tokens, deps.pricing),
         )
         return {
             "draft": draft,
@@ -293,9 +315,10 @@ def build_graph(
     async def critique_node(state: InvoiceState) -> InvoiceState:
         _emit("approve", "critique")
         draft = state["draft"]
-        critique = await deps.agents.critic.review(
-            _invoice(state), state["report"], draft, state.get("tool_calls", [])
-        )
+        with collecting() as tokens:
+            critique = await deps.agents.critic.review(
+                _invoice(state), state["report"], draft, state.get("tool_calls", [])
+            )
         update: InvoiceState = {"critique": critique}
         if critique.agrees:
             message = "Critic agrees."
@@ -304,7 +327,7 @@ def build_graph(
         if critique.agrees or state["review_rounds"] >= settings.max_review_rounds:
             update["outcome"] = resolve(draft.decision, state["route"])
             message += f" Outcome: {update['outcome']}."
-        update["trace"] = _event("approve", message)
+        update["trace"] = _event("approve", message, step_usage(tokens, deps.pricing))
         return update
 
     def after_critique(

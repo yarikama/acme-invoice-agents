@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { Decision } from "../../api/types";
+import type { Decision, StepUsage } from "../../api/types";
 import { sentences } from "../../lib/text";
-import type { Turn } from "../../state/conversation";
+import { dollars, tokenWord, totals, type Turn } from "../../state/conversation";
 import type { TraceVoice } from "../../state/pipeline";
 import { PixelIcon, PixelSpinner, Typewriter } from "../Pixel";
 
@@ -28,6 +28,7 @@ function TurnFrame({
   name,
   role,
   ms,
+  usage,
   fresh,
   children,
 }: {
@@ -36,10 +37,17 @@ function TurnFrame({
   name: string;
   role: string;
   ms?: number;
+  usage?: StepUsage;
   fresh: boolean;
   children: ReactNode;
 }) {
   const took = seconds(ms);
+  // What the step cost, the way a tracer shows it: tokens, then dollars if priced.
+  const spent = usage
+    ? [tokenWord(usage.input_tokens + usage.output_tokens), usage.cost_usd !== null ? dollars(usage.cost_usd) : null]
+        .filter(Boolean)
+        .join(" · ")
+    : null;
   return (
     <li className={`turn ${fresh ? "turn-new" : ""}`}>
       <Avatar node={node} voice={voice} />
@@ -47,7 +55,10 @@ function TurnFrame({
         <div className="flex items-baseline gap-2">
           <span className="font-medium">{name}</span>
           <span className={`role role-${voice}`}>{role}</span>
-          {took && <span className="mono ml-auto text-xs text-ink-2">{took}</span>}
+          <span className="mono ml-auto flex gap-3 text-xs text-ink-2">
+            {spent && <span>{spent}</span>}
+            {took && <span>{took}</span>}
+          </span>
         </div>
         {children}
       </div>
@@ -93,7 +104,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
   switch (turn.kind) {
     case "validate":
       return (
-        <TurnFrame node="validate" voice="code" name="Validation" role="code" ms={turn.ms} fresh={fresh}>
+        <TurnFrame node="validate" voice="code" name="Validation" role="code" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           {turn.errors === null ? (
             <p className="m-0">{turn.text}</p>
           ) : (
@@ -108,7 +119,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "triage":
       return (
-        <TurnFrame node="triage" voice="model" name="Triage" role="decision model" ms={turn.ms} fresh={fresh}>
+        <TurnFrame node="triage" voice="model" name="Triage" role="decision model" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           {turn.decision ? (
             <div className="flex flex-wrap items-center gap-2">
               <Pill decision={turn.decision} />
@@ -125,7 +136,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "approver":
       return (
-        <TurnFrame node="review" voice="model" name="Approver" role="model" ms={turn.ms} fresh={fresh}>
+        <TurnFrame node="review" voice="model" name="Approver" role="model" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           {turn.tools.map((t, i) => (
             <div key={i} className="tool-use" style={fresh ? { animationDelay: `${i * 90}ms` } : undefined}>
               <PixelIcon node="tool" size={14} className="mt-1 text-[var(--code)]" />
@@ -155,7 +166,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "critic":
       return (
-        <TurnFrame node="critique" voice="model" name="Critic" role="model" ms={turn.ms} fresh={fresh}>
+        <TurnFrame node="critique" voice="model" name="Critic" role="model" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`pill ${turn.agrees ? "pill-approve" : "pill-reject"}`}>{turn.agrees ? "Agrees" : "Objects"}</span>
             {turn.outcome && <Stat>outcome: {turn.outcome}</Stat>}
@@ -165,7 +176,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "human":
       return (
-        <TurnFrame node="human_review" voice="human" name="VP" role="human" ms={turn.ms} fresh={fresh}>
+        <TurnFrame node="human_review" voice="human" name="VP" role="human" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`pill ${turn.approved ? "pill-approve" : "pill-reject"}`}>{turn.approved ? "Approved" : "Rejected"}</span>
             {turn.note && <span className="text-sm">{turn.note}</span>}
@@ -175,12 +186,29 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
     case "step": {
       const name = { ingest: "Ingest", pay: "Payment", reject: "Not paid", error: "Run failed" }[turn.node] ?? turn.node;
       return (
-        <TurnFrame node={turn.node} voice="code" name={name} role="code" ms={turn.ms} fresh={fresh}>
+        <TurnFrame node={turn.node} voice="code" name={name} role="code" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           <p className="m-0 text-[var(--ink)]">{turn.text}</p>
         </TurnFrame>
       );
     }
   }
+}
+
+/** The run so far, in one line: model tokens, cost and time. */
+function RunTotals({ turns, live }: { turns: Turn[]; live: boolean }) {
+  const t = totals(turns);
+  if (turns.length === 0) return null;
+  const parts = [
+    t.tokens ? tokenWord(t.tokens) : "no model calls",
+    t.tokens && t.cost !== null ? dollars(t.cost) : null,
+    t.ms ? seconds(t.ms) : null,
+  ].filter(Boolean);
+  return (
+    <p className="m-0 mb-4 flex flex-wrap items-center gap-2 text-sm text-ink-2">
+      <span className="stat">{live ? "so far" : "this run"}</span>
+      {parts.join(" · ")}
+    </p>
+  );
 }
 
 /**
@@ -199,6 +227,7 @@ export function Conversation({ label, turns, live, doing }: { label: string; tur
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" role="log" aria-label={`Agent run for ${label}`}>
+      <RunTotals turns={turns} live={live} />
       <ol className="m-0 flex min-h-0 flex-1 list-none flex-col gap-5 overflow-y-auto p-0 pr-1">
         {turns.map((t) => (
           <TurnView key={t.key} turn={t} fresh={t.key > lastSeen} />
