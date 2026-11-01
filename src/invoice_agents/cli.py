@@ -43,6 +43,7 @@ from invoice_agents import remote
 from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
+from invoice_agents.inbox import Inbox, watch
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
@@ -63,11 +64,22 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--invoice_path", "--invoice-path", type=Path, help="One invoice file"
     )
     target.add_argument("--dir", type=Path, help="Process every invoice in a folder")
+    target.add_argument(
+        "--watch",
+        type=Path,
+        nargs="?",
+        const=Path("data/inbox"),
+        metavar="FOLDER",
+        help="Process invoices as they arrive in a folder, like a mailbox"
+        " (default data/inbox); handled files move to processed/",
+    )
     parser.add_argument(
         "--vp",
-        choices=["ask", "approve", "reject"],
-        default="ask",
-        help="How to answer when an invoice needs a human VP (default: ask)",
+        choices=["ask", "approve", "reject", "wait"],
+        default=None,
+        help="How to answer when an invoice needs a human VP: ask here, approve,"
+        " reject, or wait for a VP in the web console (default: ask; wait with"
+        " --watch)",
     )
     parser.add_argument(
         "--json", action="store_true", help="Print results as JSON to stdout"
@@ -118,7 +130,7 @@ def _interactive(args: argparse.Namespace) -> bool:
     `--serve` alone keeps serving without a prompt off a terminal."""
     if args.interactive:
         return True
-    if args.once or args.json:
+    if args.once or args.json or args.watch:
         return False
     at_terminal = sys.stdin.isatty() and sys.stdout.isatty()
     if args.invoice_path or args.dir:
@@ -152,6 +164,12 @@ def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str] | None:
     """
     console.line()
     console.print(vp_card(summary))
+    if mode == "wait":
+        console.print(
+            "  Left waiting for a VP: decide in the web console, or with /approve"
+            " or /reject in the interactive console.\n"
+        )
+        return None
     if mode != "ask":
         console.print(f"  Answered by --vp {mode}.\n")
         return mode == "approve", f"--vp {mode}"
@@ -391,6 +409,27 @@ async def process(
     return results
 
 
+async def _watch(runner: Runner, folder: Path, vp_mode: str, conn: Connection) -> int:
+    """Process invoices as they land in the folder, until Ctrl-C."""
+    box = Inbox(folder)
+    where = "the API, so the web console shows them" if conn.api_up else "this process"
+    console.print(
+        f"  Watching {escape(str(folder))} for invoices; they run through {where}."
+        f" Handled files move to {escape(str(box.done))}. Ctrl-C to stop."
+    )
+    if vp_mode == "wait" and not conn.api_up:
+        console.print(
+            "  [bold]No API running:[/] invoices that need a VP can't wait for one"
+            " here. Start with --serve to decide them in the web console."
+        )
+
+    async def handle(batch: list[Path]) -> None:
+        await process(runner, batch, vp_mode)
+
+    await watch(box, handle)
+    return 0
+
+
 async def _run(args: argparse.Namespace) -> int:
     started: list[Any] = []
     try:
@@ -402,6 +441,8 @@ async def _run(args: argparse.Namespace) -> int:
             console.print(conn.banner(args.web))
             runner = conn.runner
 
+            if args.watch:
+                return await _watch(runner, args.watch, args.vp or "wait", conn)
             target = args.invoice_path or args.dir
             if target is None:
                 console.print("  Serving. Press Ctrl-C to stop.")
@@ -412,7 +453,7 @@ async def _run(args: argparse.Namespace) -> int:
                 console.print(f"  [bold]No invoice files at {escape(str(target))}.[/]")
                 return 2
 
-            results = await process(runner, paths, args.vp)
+            results = await process(runner, paths, args.vp or "ask")
             if args.json:
                 print(json.dumps(results, indent=2, default=str))
             # A rejected invoice is a result; a run that broke is not.
@@ -432,7 +473,13 @@ def main(argv: list[str] | None = None) -> int:
         settings = get_settings()
         Ledger(settings.db_path, settings.decisions_log).clear()
         console.print(f"  Started over: {settings.db_path} holds no received invoices.")
-        if not (args.invoice_path or args.dir or args.serve or args.interactive):
+        if not (
+            args.invoice_path
+            or args.dir
+            or args.watch
+            or args.serve
+            or args.interactive
+        ):
             return 0
     if args.verbose:
         # This app's steps in detail; HTTP clients stay at warnings, or their

@@ -68,13 +68,14 @@ from invoice_agents.cli import (
     process,
 )
 from invoice_agents.config import get_settings
+from invoice_agents.inbox import Inbox, watch
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import chat_model
 from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
 
 LOGS = Path(".acme-logs")
-VP_MODES = ("ask", "approve", "reject")
+VP_MODES = ("ask", "approve", "reject", "wait")
 HISTORY = LOGS / "history"
 
 
@@ -91,9 +92,16 @@ COMMANDS = [
         "dir", "/dir [folder]", "Process every file in a folder (default: samples)."
     ),
     Command("runs", "/runs", "Recent runs and where each one ended."),
+    Command(
+        "watch",
+        "/watch [folder]",
+        "Process invoices as they land in a folder, like a mailbox (Ctrl-C stops).",
+    ),
     Command("approve", "/approve <run> [note]", "Approve a run waiting for the VP."),
     Command("reject", "/reject <run> <reason>", "Reject a run waiting for the VP."),
-    Command("vp", "/vp [ask|approve|reject]", "How to answer when a run needs the VP."),
+    Command(
+        "vp", "/vp [ask|approve|reject|wait]", "How to answer when a run needs the VP."
+    ),
     Command("serve", "/serve", "Start the API and the web console."),
     Command("open", "/open", "Open the web console in the browser."),
     Command("status", "/status", "Provider, models, and what is running."),
@@ -320,7 +328,7 @@ class Shell:
         self.args = args
         self.loop = loop
         self.client = httpx.AsyncClient()
-        self.vp_mode: str = args.vp
+        self.vp_mode: str = args.vp or "ask"
         self.started: list[subprocess.Popen[bytes]] = []
         self.local: LocalRunner | None = None
         self.conn: Connection | None = None
@@ -331,6 +339,7 @@ class Shell:
             "run": self.run,
             "dir": self.dir,
             "runs": self.runs,
+            "watch": self.watch,
             "approve": lambda a: self.decide(a, approved=True),
             "reject": lambda a: self.decide(a, approved=False),
             "vp": self.vp,
@@ -704,6 +713,27 @@ class Shell:
             return
         if not quiet:
             console.print("  The API and the web console are up.")
+
+    def watch(self, args: list[str]) -> None:
+        if len(args) > 1:
+            self._usage("watch")
+            return
+        folder = Path(args[0]).expanduser() if args else get_settings().inbox_dir
+        self._connect()
+        assert self.conn is not None
+        box = Inbox(folder)
+        # Nobody answers a prompt while the folder is being watched.
+        mode = "wait" if self.vp_mode == "ask" else self.vp_mode
+        console.print(
+            f"  Watching {escape(str(folder))}; handled files move to"
+            f" {escape(str(box.done))}. Ctrl-C to stop."
+        )
+
+        async def handle(batch: list[Path]) -> None:
+            assert self.conn is not None
+            self.history += await process(self.conn.runner, batch, mode)
+
+        self.loop.run(watch(box, handle))
 
     def _process(self, paths: list[Path]) -> None:
         if not paths:
