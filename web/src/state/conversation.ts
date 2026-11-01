@@ -1,4 +1,4 @@
-import type { Decision } from "../api/types";
+import type { Decision, StepUsage } from "../api/types";
 import { splitToolLine } from "../lib/text";
 import type { TraceLine } from "./pipeline";
 
@@ -17,6 +17,8 @@ interface Base {
   key: number;
   // Milliseconds this turn took: since the previous turn, or the run's start.
   ms?: number;
+  // Tokens and cost of the model calls in this turn.
+  usage?: StepUsage;
 }
 
 export type Turn = Base &
@@ -96,7 +98,7 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
   const timed = (line: TraceLine): Base => {
     const ms = line.at !== undefined && last !== undefined ? Math.max(0, line.at - last) : undefined;
     if (line.at !== undefined) last = line.at;
-    return { key: line.seq, ms };
+    return { key: line.seq, ms, usage: line.usage };
   };
   // Tool calls and send-backs arrive just before the draft they led to.
   const flush = (line: TraceLine) => {
@@ -134,6 +136,30 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
   const tail = lines.at(-1);
   if (tail) flush(tail);
   return out;
+}
+
+/** A run's totals so far: tokens, cost (if every step was priced) and time. */
+export function totals(turns: Turn[]): { tokens: number; cost: number | null; ms: number } {
+  let tokens = 0;
+  let cost: number | null = 0;
+  let ms = 0;
+  for (const t of turns) {
+    ms += t.ms ?? 0;
+    if (!t.usage) continue;
+    tokens += t.usage.input_tokens + t.usage.output_tokens;
+    cost = cost === null || t.usage.cost_usd === null ? null : cost + t.usage.cost_usd;
+  }
+  return { tokens, cost, ms };
+}
+
+/** "2.1k tokens", "840 tokens". */
+export function tokenWord(n: number): string {
+  return `${n >= 1000 ? `${(n / 1000).toFixed(1)}k` : n} tokens`;
+}
+
+/** "$0.0042" below a cent, "$0.12" above. */
+export function dollars(usd: number): string {
+  return usd < 0.01 ? `$${usd.toFixed(4)}` : `$${usd.toFixed(2)}`;
 }
 
 /** What the run is doing now, in words, for the "thinking" line. */

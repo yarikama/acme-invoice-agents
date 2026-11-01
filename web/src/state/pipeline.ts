@@ -1,4 +1,4 @@
-import type { RunEvent } from "../api/types";
+import type { RunEvent, StepUsage } from "../api/types";
 import type { RunView } from "./runs";
 
 export type LedState = "off" | "run" | "done" | "flag" | "block" | "fail" | "wait" | "skip";
@@ -117,6 +117,8 @@ export interface TraceLine {
   text: string;
   // Epoch milliseconds when the line arrived, if the server said.
   at?: number;
+  // Tokens and cost of the step this line ends, if it called a model.
+  usage?: StepUsage;
 }
 
 // The VP's decision shows up once, as the human_review node's trace line.
@@ -129,7 +131,14 @@ export function traceLines(run: RunView, llm: boolean): TraceLine[] {
       const node = e.tool === "guardrail" ? "guardrail" : "tool";
       lines.push({ seq: e.seq, node, voice: "code", text: e.message, at: time(e.at) });
     } else if (e.type === "trace") {
-      lines.push({ seq: e.seq, node: e.node, voice: voiceOf(e.node, e.message, llm), text: e.message, at: time(e.at) });
+      lines.push({
+        seq: e.seq,
+        node: e.node,
+        voice: voiceOf(e.node, e.message, llm),
+        text: e.message,
+        at: time(e.at),
+        usage: e.usage,
+      });
     } else if (e.type === "run_error") {
       lines.push({ seq: e.seq, node: "error", voice: "code", text: e.message, at: time(e.at) });
     }

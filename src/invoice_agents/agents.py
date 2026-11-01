@@ -25,6 +25,7 @@ from invoice_agents.models import (
     ValidationReport,
 )
 from invoice_agents.tools import ReviewTools
+from invoice_agents.usage import record
 
 
 class Extraction(BaseModel):
@@ -221,6 +222,7 @@ async def _structured[T: BaseModel](
     )
     # include_raw=True always returns {raw, parsed, parsing_error}.
     out = cast(dict[str, Any], await with_retries(lambda: runnable.ainvoke(prompt)))
+    record(out.get("raw"))
     if out.get("parsing_error") or out.get("parsed") is None:
         raise ValueError(
             f"Model output did not match {schema.__name__}: {out.get('parsing_error')}"
@@ -275,6 +277,7 @@ class LLMApprover:
         )
         for _ in range(self.max_steps):
             reply = cast(AIMessage, await with_retries(lambda: agent.ainvoke(messages)))
+            record(reply)
             messages.append(reply)
             if not reply.tool_calls:
                 messages.append(HumanMessage("Call a tool, or call SubmitDecision."))
@@ -295,6 +298,7 @@ class LLMApprover:
         # Out of steps: decide with what has been gathered so far.
         final = self.llm.bind_tools([SubmitDecision], tool_choice=SUBMIT)
         reply = cast(AIMessage, await with_retries(lambda: final.ainvoke(messages)))
+        record(reply)
         for tc in reply.tool_calls:
             if tc["name"] == SUBMIT:
                 # Accepted as is: the policy route still overrides it in code.

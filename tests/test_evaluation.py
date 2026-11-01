@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from invoice_agents import evaluation
+from invoice_agents import evaluation, usage
 from invoice_agents.agents import NoExtractor, RuleCritic
 from invoice_agents.config import Settings
 from invoice_agents.evaluation import CASES, Case, cost, outcome_of, summary
@@ -114,12 +114,12 @@ def test_openrouter_pricing(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
     }
     monkeypatch.setattr(
-        evaluation.urllib.request,
+        usage.urllib.request,
         "urlopen",
         lambda *_a, **_k: io.BytesIO(json.dumps(body).encode()),
     )
 
-    assert evaluation.openrouter_pricing() == {"x-ai/grok-4.7": (0.000002, 0.000006)}
+    assert usage.openrouter_pricing() == {"x-ai/grok-4.7": (0.000002, 0.000006)}
 
 
 def test_every_attack_has_a_case() -> None:

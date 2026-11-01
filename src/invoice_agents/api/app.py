@@ -34,6 +34,7 @@ from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.inventory import SEED, Inventory
 from invoice_agents.llm import build_agents
 from invoice_agents.models import HumanDecision, SourceFormat
+from invoice_agents.usage import Pricing, openrouter_pricing
 
 KEEPALIVE_SECONDS = 15
 SUFFIXES = {f".{f.value}" for f in SourceFormat}
@@ -48,7 +49,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with aiosqlite.connect(settings.checkpoint_path) as conn:
         checkpointer = AsyncSqliteSaver(conn, serde=checkpoint_serde())
         deps = Deps(
-            agents=build_agents(settings), inventory=inventory, settings=settings
+            agents=build_agents(settings),
+            inventory=inventory,
+            settings=settings,
+            pricing=await asyncio.to_thread(load_pricing, settings),
         )
         manager = RunManager(build_graph(deps, checkpointer=checkpointer))
         app.state.settings = settings
@@ -57,6 +61,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             yield
         finally:
             await manager.close()
+
+
+def load_pricing(settings: Settings) -> Pricing:
+    """OpenRouter's model prices, for each step's cost. Without them the
+    console still shows tokens, so a failed fetch is not fatal."""
+    if settings.llm_provider != "openrouter":
+        return {}
+    try:
+        return openrouter_pricing()
+    except (OSError, ValueError):
+        return {}
 
 
 app = FastAPI(title="Acme Invoice Agents", lifespan=lifespan)
