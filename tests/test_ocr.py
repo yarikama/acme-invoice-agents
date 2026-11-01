@@ -58,8 +58,8 @@ def test_without_docling_the_error_says_how_to_install(
         ocr_module._docling_loader.cache_clear()
 
 
-def test_docling_text_goes_through_the_langchain_loader(
-    monkeypatch: pytest.MonkeyPatch,
+def test_docling_text_goes_through_the_langchain_loader_once_per_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     made: list[dict[str, Any]] = []
     converter = object()
@@ -76,16 +76,27 @@ def test_docling_text_goes_through_the_langchain_loader(
             return [Page("  # INVOICE"), Page("INV-1011  ")]
 
     monkeypatch.setattr(ocr_module, "_docling_loader", lambda: (Loader, converter))
-    assert ocr_module.docling_text(Path("a.png")) == "# INVOICE\n\nINV-1011"
+    monkeypatch.setattr(ocr_module, "_read", {})
+    scan = tmp_path / "a.png"
+    scan.write_bytes(b"one")
+    assert ocr_module.docling_text(scan) == "# INVOICE\n\nINV-1011"
     assert made == [
-        {"path": "a.png", "converter": converter, "export_type": "markdown"}
+        {"path": str(scan), "converter": converter, "export_type": "markdown"}
     ]
+    # An extraction retry reads the same file again: no second OCR pass.
+    ocr_module.docling_text(scan)
+    assert len(made) == 1
+    # A changed file is read again.
+    scan.write_bytes(b"two, longer")
+    ocr_module.docling_text(scan)
+    assert len(made) == 2
 
 
-async def test_the_graph_reads_and_checks_off_the_event_loop(
+async def test_the_graph_reads_files_off_the_event_loop(
     inventory: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Loading (with OCR) and validating run in worker threads, not on the loop."""
+    """Loading (with OCR) runs in a worker thread. Validation stays on the loop,
+    in one step with recording the invoice, so overlapping runs see each other."""
     from invoice_agents import graph
     from tests.test_graph import config, make_graph
 
@@ -101,5 +112,5 @@ async def test_the_graph_reads_and_checks_off_the_event_loop(
     state = await make_graph(inventory).ainvoke(
         {"path": str(SCANNED / "invoice_1011_scan.png")}, config()
     )
-    assert {"load_document", "validate"} <= set(seen)
+    assert "load_document" in seen and "validate" not in seen
     assert "Read the scan with OCR (docling)" in state["trace"][0]["message"]

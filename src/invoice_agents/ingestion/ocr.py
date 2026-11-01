@@ -48,17 +48,28 @@ def _docling_loader() -> tuple[Any, Any]:
 _lock = threading.Lock()
 
 
+# Text already read, by (path, size, mtime): an extraction retry reads the
+# same file again, and OCR takes seconds a page.
+_read: dict[tuple[str, int, int], str] = {}
+
+
 def docling_text(path: Path) -> str:
     """The document's text as Markdown, read by Docling's layout and OCR models.
 
     Goes through langchain-docling's DoclingLoader, exporting the whole file as
     one Markdown document: an invoice is short, so there is nothing to chunk.
     """
-    loader_cls, converter = _docling_loader()
-    loader = loader_cls(str(path), converter=converter, export_type="markdown")
+    stat = path.stat()
+    key = (str(path.resolve()), stat.st_size, stat.st_mtime_ns)
+    # The lock also covers building the converter, so two scans arriving
+    # together load the models once.
     with _lock:
-        docs = loader.load()
-    return "\n\n".join(d.page_content for d in docs).strip()
+        if key not in _read:
+            loader_cls, converter = _docling_loader()
+            loader = loader_cls(str(path), converter=converter, export_type="markdown")
+            docs = loader.load()
+            _read[key] = "\n\n".join(d.page_content for d in docs).strip()
+        return _read[key]
 
 
 BACKENDS: dict[str, Ocr] = {"docling": docling_text}

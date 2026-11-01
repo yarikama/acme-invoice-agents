@@ -22,6 +22,7 @@ from langgraph.types import Command
 
 from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.graph import InvoiceState
+from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.models import HumanDecision
 from invoice_agents.summary import Status, run_status, summarize
 
@@ -245,7 +246,7 @@ class RunManager:
                 )
             elif run.status in TERMINAL:
                 await self._emit(run, {"type": "done", "summary": run.summary})
-        except ExtractionUnavailableError as exc:
+        except (ExtractionUnavailableError, OcrUnavailableError) as exc:
             await self._fail(run, str(exc))
         except Exception as exc:
             log.exception("Run %s failed", run.id)
