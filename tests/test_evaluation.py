@@ -80,7 +80,8 @@ def test_an_exception_is_recorded_as_an_error(
     [result] = evaluation.asyncio.run(evaluation.run_all([case], offline, {}, 1))
 
     assert result.outcome == "error"
-    assert result.detail == "RuntimeError: boom"
+    # Where it was raised, so a miss in a live run can be traced afterwards.
+    assert result.detail.startswith("RuntimeError: boom (raised at test_evaluation.py:")
     assert result.correct is False
 
 

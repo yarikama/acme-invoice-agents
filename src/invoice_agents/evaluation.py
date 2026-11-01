@@ -32,7 +32,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from rich.console import Console
 from rich.table import Table
 
-from invoice_agents.agents import ExtractionUnavailableError
+from invoice_agents.agents import ExtractionUnavailableError, raised_at
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
 from invoice_agents.inventory import Inventory
@@ -182,6 +182,8 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
                 outcome, detail = "skipped", str(exc)
             except Exception as exc:
                 outcome, detail = "error", f"{type(exc).__name__}: {exc}"
+                if where := raised_at(exc):
+                    detail += f" (raised at {where[0].name}:{where[1]})"
         seconds = time.perf_counter() - start
 
     used = dict(usage.usage_metadata)
