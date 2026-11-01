@@ -14,12 +14,17 @@ export function useConsole() {
   const [state, dispatch] = useReducer(runsReducer, initialRuns);
   const [stream, setStream] = useState<StreamState>("connecting");
   const [provider, setProvider] = useState<string | null>(null);
+  // False until the first run list arrives, so the page doesn't claim to be empty.
+  const [loaded, setLoaded] = useState(false);
 
   const snapshot = useCallback((runs: RunOverview[]) => dispatch({ type: "snapshot", runs }), []);
 
   useEffect(() => {
     api.health().then((h) => setProvider(h.llm_provider), () => setProvider(null));
-    api.runs().then(snapshot, () => {});
+    api
+      .runs()
+      .then(snapshot, () => {})
+      .finally(() => setLoaded(true));
 
     // EventSource reconnects by itself and sends Last-Event-ID, so the
     // server replays only what was missed.
@@ -33,5 +38,5 @@ export function useConsole() {
     return () => source.close();
   }, [snapshot]);
 
-  return { state, stream, provider, snapshot };
+  return { state, stream, provider, snapshot, loaded };
 }

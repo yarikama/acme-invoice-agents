@@ -5,6 +5,7 @@ const LED_CLASS: Record<Segment["state"], string> = {
   run: "led-run",
   done: "led-done",
   flag: "led-flag",
+  block: "led-fail",
   fail: "led-fail",
   wait: "led-wait",
   skip: "led-skip",

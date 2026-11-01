@@ -19,7 +19,7 @@ export function Toolbar({ onStarted }: Props) {
     api.samples().then((list) => {
       setSamples(list);
       setSample((current) => current || (list[0]?.name ?? ""));
-    }, () => setError("Could not load the sample list. Is the API running?"));
+    }, () => setError("Can't reach the API. Start it with make api, then reload."));
   }, []);
 
   const run = async (start: () => Promise<RunOverview | RunOverview[]>) => {

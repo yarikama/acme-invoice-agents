@@ -60,7 +60,7 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <button type="button" className="key key-big key-go" disabled={sending !== null} onClick={() => decide(true)}>
             <span className="text-lg font-medium">{sending === "approve" ? "Approving…" : "Approve and pay"}</span>
-            <span className="mono text-xs">mock_payment · {inv ? money(inv.total, inv.currency) : ""}</span>
+            <span className="mono text-xs">{inv ? `${money(inv.total, inv.currency)} via mock_payment` : "via mock_payment"}</span>
           </button>
           <button type="button" className="key key-big" disabled={sending !== null} onClick={() => decide(false)}>
             <span className="text-lg font-medium">{sending === "reject" ? "Rejecting…" : "Reject"}</span>
