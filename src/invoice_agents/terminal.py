@@ -506,16 +506,27 @@ ACTIVITY = {
 }
 
 
+def _in_progress(t: Turn) -> bool:
+    """The approver's tool calls so far, before its draft arrives."""
+    return t.kind == "approver" and "rationale" not in t.data
+
+
 class RunView:
-    """A live view of one run, redrawn as its events arrive."""
+    """One run in the terminal: finished turns, then a short live status.
+
+    Finished turns are printed once and stay in the scrollback. Only the
+    status (lights, tokens, spinner) is redrawn, so the redrawn part is a few
+    lines tall: it never outgrows the screen, which made Rich crop the
+    spinner and repaint the whole screen on every frame.
+    """
 
     def __init__(self, name: str) -> None:
         self.name = name
         self.events: list[dict[str, Any]] = []
         self.status = "running"
         self.started = time.time()
-        # Turns already printed before a VP pause, not drawn again after it.
-        self.skip = 0
+        # Turns already handed out by `take`.
+        self.printed = 0
         self._spinner = Spinner("dots", style=SIGNAL)
 
     def add(self, event: dict[str, Any]) -> None:
@@ -523,12 +534,21 @@ class RunView:
             event = {**event, "at": time.time()}
         self.events.append(event)
 
+    def take(self) -> list[RenderableType]:
+        """Turns finished since the last call, to print above the status."""
+        drawn = turns(self.events, self.started)
+        if self.status == "running" and drawn and _in_progress(drawn[-1]):
+            drawn = drawn[:-1]
+        new = drawn[self.printed :]
+        self.printed += len(new)
+        return [render_turn(t) for t in new]
+
     def resumed(self) -> RunView:
-        """The view after a VP pause: same run, drawing only what comes next."""
+        """The view after a VP pause: same run, printing only what comes next."""
         nxt = RunView(self.name)
         nxt.events = list(self.events)
         nxt.started = self.started
-        nxt.skip = len(turns(self.events, self.started))
+        nxt.printed = self.printed
         return nxt
 
     def __rich__(self) -> RenderableType:
@@ -538,15 +558,14 @@ class RunView:
         total = run_usage(drawn)
         if total:
             parts.append(Text(f"  this run so far: {spent(total)}", style="#7c7c75"))
-        parts.append(Text())
-        parts += [render_turn(t) for t in drawn[self.skip :]]
         if self.status == "running":
             now = next((s for s in SEGMENTS if states[s] == "run"), None)
+            activity = f" {ACTIVITY.get(now or '', 'Working')}…"
+            if drawn and _in_progress(drawn[-1]):
+                calls = len(drawn[-1].data["tools"])
+                activity += f" {calls} tool call{'s' * (calls != 1)} so far"
             row = Table.grid()
-            row.add_row(
-                self._spinner,
-                Text(f" {ACTIVITY.get(now or '', 'Working')}…", style="italic #a6a69f"),
-            )
+            row.add_row(self._spinner, Text(activity, style="italic #a6a69f"))
             parts.append(Padding(row, (0, 0, 0, 2)))
         return Group(*parts)
 

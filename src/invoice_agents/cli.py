@@ -95,6 +95,13 @@ def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str]:
     return answer in ("y", "yes"), note or "decided in the CLI"
 
 
+def _print_finished(view: RunView) -> None:
+    """Print turns as they finish. While a Live view is up, Rich puts them
+    above it, so only the short status below is redrawn."""
+    for turn in view.take():
+        console.print(turn)
+
+
 class Runner(Protocol):
     async def process(self, path: Path, vp_mode: str) -> dict[str, Any]: ...
 
@@ -146,8 +153,10 @@ class LocalRunner:
                                     "usage": t.get("usage"),
                                 }
                             )
+                    _print_finished(view)
                 state = cast(InvoiceState, (await self.graph.aget_state(config)).values)
                 view.status = run_status(state, paused is not None)
+                _print_finished(view)
             if paused is None:
                 break
             approved, note = _decide(summarize(state, "awaiting_vp"), vp_mode)
@@ -173,8 +182,10 @@ class RemoteRunner:
                     view.started = event["at"]
                 if event["type"] in ("trace", "progress"):
                     view.add(event)
+                    _print_finished(view)
                 if event["type"] == "awaiting_vp":
                     view.status = "awaiting_vp"
+                    _print_finished(view)
                     live.stop()
                     approved, note = _decide(event["summary"], vp_mode)
                     view = view.resumed()
@@ -185,6 +196,7 @@ class RemoteRunner:
                     await self.api.decide(run_id, approved, note)
                 if event["type"] in ("done", "run_error"):
                     view.status = event.get("status", "failed")
+                    _print_finished(view)
         finally:
             live.stop()
         return {"file": path.name, **(await self.api.result(run_id))}
