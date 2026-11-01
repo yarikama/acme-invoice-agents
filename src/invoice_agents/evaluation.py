@@ -252,12 +252,18 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
         inventory = Inventory(Path(tmp) / "inventory.db")
         inventory.seed()
         deps = Deps(
-            agents=build_agents(settings), inventory=inventory, settings=settings
+            agents=build_agents(settings),
+            inventory=inventory,
+            settings=settings,
+            pricing=pricing,
         )
         graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
         start = time.perf_counter()
         findings: list[str] = []
         triage_cost = 0.0
+        # Usage each step reported on its trace line. Replay reports usage
+        # only there: its answers come from a file, not a model callback.
+        traced: list[dict[str, Any]] = []
         state: dict[str, Any] = {}
         with get_usage_metadata_callback() as usage:
             try:
@@ -267,6 +273,11 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
                     }
                     path = str(settings.samples_dir.parent / case.folder / name)
                     state = await graph.ainvoke({"path": path}, config)
+                    traced += [
+                        t["usage"]
+                        for t in state.get("trace", [])
+                        if t.get("usage") and t["stage"] != "triage"
+                    ]
                     if "triage" in state:
                         triage_cost += state["triage"].cost_usd or 0.0
                 outcome, detail = outcome_of(state)
@@ -282,6 +293,13 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
 
     used = dict(usage.usage_metadata)
     llm_cost = cost(used, pricing) if used else None
+    tokens_in = sum(u["input_tokens"] for u in used.values())
+    tokens_out = sum(u["output_tokens"] for u in used.values())
+    if not used and traced:
+        tokens_in = sum(int(u.get("input_tokens", 0)) for u in traced)
+        tokens_out = sum(int(u.get("output_tokens", 0)) for u in traced)
+        costs = [u.get("cost_usd") for u in traced]
+        llm_cost = None if None in costs else sum(c or 0.0 for c in costs)
     total_cost = (
         None
         if llm_cost is None and not triage_cost
@@ -307,8 +325,8 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
         outcome=outcome,
         correct=correct,
         seconds=round(seconds, 2),
-        input_tokens=sum(u["input_tokens"] for u in used.values()),
-        output_tokens=sum(u["output_tokens"] for u in used.values()),
+        input_tokens=tokens_in,
+        output_tokens=tokens_out,
         cost_usd=total_cost,
         detail=detail,
         findings=findings,
@@ -480,6 +498,9 @@ def main(argv: list[str] | None = None) -> int:
         settings = settings.model_copy(update={"critic_model": args.critic})
     cases = [c for c in cases_in(args.set) if not args.only or args.only in c.name]
     pricing = openrouter_pricing() if settings.llm_provider == "openrouter" else {}
+    if settings.llm_provider == "replay":
+        # The prices when the recording was made, as the console shows them.
+        pricing = Recording.shared(settings.replay_path).pricing
     if settings.record_to is not None and pricing:
         # Keep the prices with the recording, so replay can show costs; an
         # unpriced provider leaves the ones already there.

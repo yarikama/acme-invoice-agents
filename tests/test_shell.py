@@ -229,7 +229,9 @@ def test_through_the_api_runs_lists_and_answers_waiting_runs(
         assert "Approved INV-1" in said(capsys)
         s.handle("/reject abc refuse")
         assert "The API refused: VP token required" in said(capsys)
-        s.handle("/reject zz")
+        s.handle("/reject abc")  # a rejection needs a reason
+        assert "Usage: /reject <run> <reason>" in said(capsys)
+        s.handle("/reject zz wrong rate")
         assert "No run waiting for the VP starts with zz" in said(capsys)
         s.handle("/open")
         assert opened == ["http://localhost:5173"]
