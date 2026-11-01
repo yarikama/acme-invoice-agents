@@ -60,7 +60,9 @@ def test_a_wrong_outcome_fails_the_run(
     )
 
     assert evaluation.main(["--out", str(tmp_path)]) == 1
-    assert "MISS invoice_1016.json" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "MISS invoice_1016.json" in out
+    assert "0 paid that should not have been" in out
 
 
 def test_an_exception_is_recorded_as_an_error(
@@ -152,7 +154,7 @@ def test_repeat_reports_how_consistent_each_case_was(
     assert data["summary"]["repeat"] == 2
     assert data["summary"]["consistent_cases"] == data["summary"]["cases"] == 2
     assert sorted({r["attempt"] for r in data["results"]}) == [1, 2]
-    out = capsys.readouterr().out
+    out = " ".join(capsys.readouterr().out.split())  # rich wraps long lines
     assert "2/2" in out and "gave the same outcome all 2 times" in out
 
 
@@ -163,6 +165,11 @@ def test_consistency_names_flaky_cases() -> None:
         )
 
     assert evaluation.consistency([result("pay", 1)]) == {}
+    assert (
+        evaluation.summary([result("pay", 1), result("human", 2)])["wrongly_paid"] == 0
+    )
+    wrong = evaluation.Result("b.json", "reject", "pay", False, 1.0)
+    assert evaluation.summary([wrong])["wrongly_paid"] == 1
     flaky = evaluation.consistency([result("pay", 1), result("human", 2)])
     assert flaky == {
         "repeat": 2,
