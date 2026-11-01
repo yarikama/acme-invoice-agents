@@ -4,9 +4,11 @@ from typing import Any, cast
 
 import pytest
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
 from pydantic import BaseModel
 
 from invoice_agents.agents import (
+    SUBMIT,
     Extraction,
     ExtractionUnavailableError,
     LLMApprover,
@@ -16,14 +18,18 @@ from invoice_agents.agents import (
     RuleApprover,
     RuleCritic,
 )
+from invoice_agents.inventory import Inventory
 from invoice_agents.models import (
     ApprovalDraft,
     Critique,
     Finding,
     Invoice,
     Severity,
+    ToolCall,
     ValidationReport,
 )
+from invoice_agents.tools import ReviewTools
+from invoice_agents.validation import SeenInvoices
 
 INVOICE = Invoice(
     invoice_number="INV-1",
@@ -109,42 +115,161 @@ async def test_unparseable_output_raises(output: dict[str, Any]) -> None:
         await LLMExtractor(fake.as_llm()).extract("text", [])
 
 
-async def test_approver_includes_findings_and_critique() -> None:
-    draft = ApprovalDraft(decision="reject", rationale="Out of stock.")
-    fake = FakeChatModel(parsed(draft))
+class FakeToolModel:
+    """Plays back scripted AI turns and records what the agent sent."""
 
-    out = await LLMApprover(fake.as_llm()).draft(
-        INVOICE, report(ERROR), ["You ignored the stock error"]
+    def __init__(self, *turns: AIMessage) -> None:
+        self.turns = list(turns)
+        self.requests: list[list[BaseMessage]] = []
+        self.bindings: list[tuple[list[str], Any]] = []
+
+    def bind_tools(self, tools: list[Any], tool_choice: Any = None) -> Any:
+        names = [getattr(t, "name", None) or t.__name__ for t in tools]
+        self.bindings.append((names, tool_choice))
+        return self
+
+    async def ainvoke(self, messages: list[BaseMessage]) -> AIMessage:
+        self.requests.append(list(messages))
+        return self.turns.pop(0)
+
+    def as_llm(self) -> BaseChatModel:
+        return cast(BaseChatModel, self)
+
+
+def call(name: str, call_id: str, **args: Any) -> AIMessage:
+    return AIMessage("", tool_calls=[{"name": name, "args": args, "id": call_id}])
+
+
+def submit(decision: str, rationale: str, call_id: str = "s") -> AIMessage:
+    return call(SUBMIT, call_id, decision=decision, rationale=rationale)
+
+
+@pytest.fixture
+def tools(inventory: Inventory) -> ReviewTools:
+    return ReviewTools(inventory, SeenInvoices(), INVOICE)
+
+
+async def test_approver_looks_things_up_before_deciding(tools: ReviewTools) -> None:
+    fake = FakeToolModel(
+        call("check_inventory", "c1", item="GadgetX"),
+        submit("reject", "Only 5 GadgetX in stock."),
     )
 
-    assert out == draft
-    [prompt] = fake.prompts
+    out = await LLMApprover(fake.as_llm()).draft(INVOICE, report(ERROR), [], tools)
+
+    assert out.draft == ApprovalDraft(
+        decision="reject", rationale="Only 5 GadgetX in stock."
+    )
+    assert [c.describe() for c in out.tool_calls] == [
+        "check_inventory(GadgetX): GadgetX: 5 in stock, list price $750.00."
+    ]
+    names, choice = fake.bindings[0]
+    assert names == ["check_inventory", "vendor_history", "convert_to_usd", SUBMIT]
+    assert choice == "any"
+    # The tool's answer went back to the model with the matching call id.
+    reply = fake.requests[1][-1]
+    assert isinstance(reply, ToolMessage)
+    assert reply.tool_call_id == "c1"
+    assert "5 in stock" in reply.content
+
+
+async def test_approver_prompt_has_findings_and_critique(tools: ReviewTools) -> None:
+    fake = FakeToolModel(submit("reject", "Out of stock."))
+
+    await LLMApprover(fake.as_llm()).draft(
+        INVOICE, report(ERROR), ["You ignored the stock error"], tools
+    )
+
+    prompt = str(fake.requests[0][0].content)
     assert "[error] OUT_OF_STOCK: FakeItem out. 0 left" in prompt
     assert "A reviewer rejected your previous draft" in prompt
     assert "- You ignored the stock error" in prompt
     assert '"invoice_number": "INV-1"' in prompt
 
 
-async def test_approver_with_clean_report() -> None:
-    fake = FakeChatModel(parsed(ApprovalDraft(decision="approve", rationale="ok")))
+async def test_approver_with_clean_report(tools: ReviewTools) -> None:
+    fake = FakeToolModel(submit("approve", "ok"))
 
-    await LLMApprover(fake.as_llm()).draft(INVOICE, report(), [])
+    out = await LLMApprover(fake.as_llm()).draft(INVOICE, report(), [], tools)
 
-    assert "No findings: every check passed." in fake.prompts[0]
-    assert "reviewer rejected" not in fake.prompts[0]
+    assert out.tool_calls == []
+    prompt = str(fake.requests[0][0].content)
+    assert "No findings: every check passed." in prompt
+    assert "reviewer rejected" not in prompt
 
 
-async def test_critic_sees_the_draft() -> None:
+async def test_approver_is_nudged_when_it_answers_in_prose(tools: ReviewTools) -> None:
+    fake = FakeToolModel(
+        AIMessage("I think we should approve."), submit("approve", "ok")
+    )
+
+    out = await LLMApprover(fake.as_llm()).draft(INVOICE, report(), [], tools)
+
+    assert out.draft.decision == "approve"
+    assert "call SubmitDecision" in str(fake.requests[1][-1].content)
+
+
+async def test_approver_retries_an_invalid_decision(tools: ReviewTools) -> None:
+    fake = FakeToolModel(submit("pay it", "sure", "bad"), submit("approve", "ok"))
+
+    out = await LLMApprover(fake.as_llm()).draft(INVOICE, report(), [], tools)
+
+    assert out.draft.decision == "approve"
+    feedback = fake.requests[1][-1]
+    assert isinstance(feedback, ToolMessage)
+    assert "Invalid decision" in str(feedback.content)
+
+
+async def test_approver_must_decide_when_out_of_steps(tools: ReviewTools) -> None:
+    fake = FakeToolModel(
+        call("convert_to_usd", "c1", amount=100, currency="EUR"),
+        call("convert_to_usd", "c2", amount=100, currency="EUR"),
+        submit("escalate", "Still unsure."),
+    )
+
+    out = await LLMApprover(fake.as_llm(), max_steps=2).draft(
+        INVOICE, report(WARNING), [], tools
+    )
+
+    assert out.draft.decision == "escalate"
+    assert len(out.tool_calls) == 2
+    assert fake.bindings[-1] == ([SUBMIT], SUBMIT)
+
+
+async def test_approver_that_never_decides_is_an_error(tools: ReviewTools) -> None:
+    fake = FakeToolModel(call("vendor_history", "c1", vendor="X"), AIMessage("no"))
+
+    with pytest.raises(ValueError, match="did not submit"):
+        await LLMApprover(fake.as_llm(), max_steps=1).draft(
+            INVOICE, report(), [], tools
+        )
+
+
+async def test_critic_sees_the_draft_and_the_lookups() -> None:
     critique = Critique(agrees=False, issues=["EUR needs FX"])
     fake = FakeChatModel(parsed(critique))
     draft = ApprovalDraft(decision="approve", rationale="Looks fine")
+    checked = [ToolCall(name="convert_to_usd", args={"a": 1}, result="$1.08")]
 
-    out = await LLMCritic(fake.as_llm()).review(INVOICE, report(WARNING), draft)
+    out = await LLMCritic(fake.as_llm()).review(
+        INVOICE, report(WARNING), draft, checked
+    )
 
     assert out == critique
-    assert "Draft decision: approve" in fake.prompts[0]
-    assert "Draft rationale: Looks fine" in fake.prompts[0]
-    assert "FOREIGN_CURRENCY" in fake.prompts[0]
+    prompt = fake.prompts[0]
+    assert "Draft decision: approve" in prompt
+    assert "Draft rationale: Looks fine" in prompt
+    assert "FOREIGN_CURRENCY" in prompt
+    assert "- convert_to_usd(1): $1.08" in prompt
+
+
+async def test_critic_is_told_when_nothing_was_checked() -> None:
+    fake = FakeChatModel(parsed(Critique(agrees=True)))
+    draft = ApprovalDraft(decision="approve", rationale="ok")
+
+    await LLMCritic(fake.as_llm()).review(INVOICE, report(), draft, [])
+
+    assert "What the approver looked up:\nNothing." in fake.prompts[0]
 
 
 async def test_no_extractor_explains_itself() -> None:
@@ -152,23 +277,27 @@ async def test_no_extractor_explains_itself() -> None:
         await NoExtractor().extract("text", [])
 
 
-async def test_rule_approver_dedupes_titles() -> None:
-    draft = await RuleApprover().draft(INVOICE, report(ERROR, ERROR), [])
+async def test_rule_approver_dedupes_titles(tools: ReviewTools) -> None:
+    out = await RuleApprover().draft(INVOICE, report(ERROR, ERROR), [], tools)
 
-    assert draft.decision == "reject"
-    assert draft.rationale == "Hard failures: FakeItem out."
+    assert out.draft.decision == "reject"
+    assert out.draft.rationale == "Hard failures: FakeItem out."
+    assert out.tool_calls == []
 
 
-async def test_rule_approver_escalates_warnings_and_approves_clean() -> None:
-    assert (await RuleApprover().draft(INVOICE, report(WARNING), [])).decision == (
-        "escalate"
-    )
-    assert (await RuleApprover().draft(INVOICE, report(), [])).decision == "approve"
+async def test_rule_approver_escalates_warnings_and_approves_clean(
+    tools: ReviewTools,
+) -> None:
+    warned = await RuleApprover().draft(INVOICE, report(WARNING), [], tools)
+    clean = await RuleApprover().draft(INVOICE, report(), [], tools)
+
+    assert warned.draft.decision == "escalate"
+    assert clean.draft.decision == "approve"
 
 
 async def test_rule_critic_catches_ignored_errors() -> None:
     lenient = ApprovalDraft(decision="approve", rationale="fine")
     strict = ApprovalDraft(decision="reject", rationale="error")
 
-    assert not (await RuleCritic().review(INVOICE, report(ERROR), lenient)).agrees
-    assert (await RuleCritic().review(INVOICE, report(ERROR), strict)).agrees
+    assert not (await RuleCritic().review(INVOICE, report(ERROR), lenient, [])).agrees
+    assert (await RuleCritic().review(INVOICE, report(ERROR), strict, [])).agrees

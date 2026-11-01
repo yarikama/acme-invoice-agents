@@ -6,12 +6,21 @@ no network, so tests are deterministic and the CLI works without a key.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
 from langchain_core.language_models import BaseChatModel
-from pydantic import BaseModel, Field
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from pydantic import BaseModel, Field, ValidationError
 
-from invoice_agents.models import ApprovalDraft, Critique, Invoice, ValidationReport
+from invoice_agents.models import (
+    ApprovalDraft,
+    Critique,
+    Invoice,
+    ToolCall,
+    ValidationReport,
+)
+from invoice_agents.tools import ReviewTools
 
 
 class Extraction(BaseModel):
@@ -21,6 +30,21 @@ class Extraction(BaseModel):
         description="Each place where the text was ambiguous or misread and what "
         "you chose, e.g. 'read 2O26 as 2026 (letter O for zero)'",
     )
+
+
+@dataclass(frozen=True)
+class Review:
+    """An approval draft and the tool calls the approver made to reach it."""
+
+    draft: ApprovalDraft
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+
+class SubmitDecision(ApprovalDraft):
+    """Submit your final decision. Call this once, after checking what you need."""
+
+
+SUBMIT = SubmitDecision.__name__
 
 
 class ExtractionUnavailableError(RuntimeError):
@@ -33,13 +57,21 @@ class Extractor(Protocol):
 
 class Approver(Protocol):
     async def draft(
-        self, invoice: Invoice, report: ValidationReport, critique: list[str]
-    ) -> ApprovalDraft: ...
+        self,
+        invoice: Invoice,
+        report: ValidationReport,
+        critique: list[str],
+        tools: ReviewTools,
+    ) -> Review: ...
 
 
 class Critic(Protocol):
     async def review(
-        self, invoice: Invoice, report: ValidationReport, draft: ApprovalDraft
+        self,
+        invoice: Invoice,
+        report: ValidationReport,
+        draft: ApprovalDraft,
+        checked: list[ToolCall],
     ) -> Critique: ...
 
 
@@ -79,13 +111,22 @@ Policy:
 - Warnings need judgment: approve only if each one is explained and harmless,
   escalate when unsure, reject when they point to fraud or a bad invoice.
 
+Tools:
+- check_inventory: stock and list price of an item
+- vendor_history: this vendor's earlier invoices in this batch
+- convert_to_usd: the USD value of a foreign-currency amount
+Use them to confirm what your decision depends on, for example whether a
+foreign total crosses $10,000, or whether a price is far above list. The
+findings were computed in code and are correct; do not re-check arithmetic.
+
 Invoice:
 {invoice}
 
 Validation findings:
 {findings}
 {critique}
-Decide approve, reject or escalate, and give the rationale citing findings."""
+Decide approve, reject or escalate. Then call SubmitDecision once, with a
+rationale that cites the findings and what your tool calls showed."""
 
 CRITIQUE_PROMPT = """You audit approval decisions. Find what the draft got wrong.
 
@@ -98,6 +139,9 @@ Invoice:
 
 Findings:
 {findings}
+
+What the approver looked up:
+{checked}
 
 Draft decision: {decision}
 Draft rationale: {rationale}"""
@@ -133,12 +177,19 @@ class LLMExtractor:
 
 
 class LLMApprover:
-    def __init__(self, llm: BaseChatModel) -> None:
+    """A tool-calling agent: looks things up, then submits a decision."""
+
+    def __init__(self, llm: BaseChatModel, max_steps: int = 6) -> None:
         self.llm = llm
+        self.max_steps = max_steps
 
     async def draft(
-        self, invoice: Invoice, report: ValidationReport, critique: list[str]
-    ) -> ApprovalDraft:
+        self,
+        invoice: Invoice,
+        report: ValidationReport,
+        critique: list[str],
+        tools: ReviewTools,
+    ) -> Review:
         critique_text = (
             "\nA reviewer rejected your previous draft:\n"
             + "\n".join(f"- {c}" for c in critique)
@@ -151,7 +202,41 @@ class LLMApprover:
             findings=_findings_text(report),
             critique=critique_text,
         )
-        return await _structured(self.llm, ApprovalDraft, prompt)
+        messages: list[BaseMessage] = [HumanMessage(prompt)]
+        calls: list[ToolCall] = []
+        agent = self.llm.bind_tools(
+            [*tools.as_langchain(), SubmitDecision], tool_choice="any"
+        )
+        for _ in range(self.max_steps):
+            reply = cast(AIMessage, await agent.ainvoke(messages))
+            messages.append(reply)
+            if not reply.tool_calls:
+                messages.append(HumanMessage("Call a tool, or call SubmitDecision."))
+                continue
+            draft: ApprovalDraft | None = None
+            for tc in reply.tool_calls:
+                # Every call gets an answer, or the next request is invalid.
+                if tc["name"] == SUBMIT:
+                    try:
+                        draft = ApprovalDraft.model_validate(tc["args"])
+                        result = "Decision recorded."
+                    except ValidationError as exc:
+                        result = f"Invalid decision, try again: {exc}"
+                else:
+                    call = tools.run(tc["name"], tc["args"])
+                    calls.append(call)
+                    result = call.result
+                messages.append(ToolMessage(result, tool_call_id=tc["id"] or ""))
+            if draft is not None:
+                return Review(draft, calls)
+
+        # Out of steps: decide with what has been gathered so far.
+        final = self.llm.bind_tools([SubmitDecision], tool_choice=SUBMIT)
+        reply = cast(AIMessage, await final.ainvoke(messages))
+        for tc in reply.tool_calls:
+            if tc["name"] == SUBMIT:
+                return Review(ApprovalDraft.model_validate(tc["args"]), calls)
+        raise ValueError("The approver did not submit a decision.")
 
 
 class LLMCritic:
@@ -159,11 +244,16 @@ class LLMCritic:
         self.llm = llm
 
     async def review(
-        self, invoice: Invoice, report: ValidationReport, draft: ApprovalDraft
+        self,
+        invoice: Invoice,
+        report: ValidationReport,
+        draft: ApprovalDraft,
+        checked: list[ToolCall],
     ) -> Critique:
         prompt = CRITIQUE_PROMPT.format(
             invoice=invoice.model_dump_json(indent=2),
             findings=_findings_text(report),
+            checked="\n".join(f"- {c.describe()}" for c in checked) or "Nothing.",
             decision=draft.decision,
             rationale=draft.rationale,
         )
@@ -181,25 +271,37 @@ class NoExtractor:
 
 
 class RuleApprover:
+    """Decides from the findings alone; it has no use for tools."""
+
     async def draft(
-        self, invoice: Invoice, report: ValidationReport, critique: list[str]
-    ) -> ApprovalDraft:
+        self,
+        invoice: Invoice,
+        report: ValidationReport,
+        critique: list[str],
+        tools: ReviewTools,
+    ) -> Review:
         if report.errors:
             titles = "; ".join(dict.fromkeys(f.title for f in report.errors))
-            return ApprovalDraft(
+            draft = ApprovalDraft(
                 decision="reject", rationale=f"Hard failures: {titles}."
             )
-        if report.warnings:
+        elif report.warnings:
             titles = "; ".join(dict.fromkeys(f.title for f in report.warnings))
-            return ApprovalDraft(
+            draft = ApprovalDraft(
                 decision="escalate", rationale=f"Needs a human look: {titles}."
             )
-        return ApprovalDraft(decision="approve", rationale="Every check passed.")
+        else:
+            draft = ApprovalDraft(decision="approve", rationale="Every check passed.")
+        return Review(draft)
 
 
 class RuleCritic:
     async def review(
-        self, invoice: Invoice, report: ValidationReport, draft: ApprovalDraft
+        self,
+        invoice: Invoice,
+        report: ValidationReport,
+        draft: ApprovalDraft,
+        checked: list[ToolCall],
     ) -> Critique:
         if report.errors and draft.decision != "reject":
             return Critique(

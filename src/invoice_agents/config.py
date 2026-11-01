@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     near_threshold_ratio: float = 0.95
     max_extract_attempts: int = 3
     max_review_rounds: int = 2
+    # Model turns the approver gets for tool calls before it must decide.
+    max_tool_steps: int = 6
 
 
 @lru_cache

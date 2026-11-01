@@ -18,11 +18,13 @@ PRESSURE_WORDS = re.compile(
 
 @dataclass
 class SeenInvoices:
-    """Invoice numbers already processed in this run, for duplicate detection."""
+    """Invoices already processed in this run, for duplicates and vendor history."""
 
     revisions: dict[str, set[str | None]] = field(default_factory=dict)
+    invoices: list[Invoice] = field(default_factory=list)
 
     def add(self, invoice: Invoice) -> None:
+        self.invoices.append(invoice)
         if invoice.invoice_number:
             key = _number_key(invoice.invoice_number)
             self.revisions.setdefault(key, set()).add(invoice.revision)

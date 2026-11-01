@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -90,6 +90,18 @@ Decision = Literal["approve", "reject", "escalate"]
 class ApprovalDraft(BaseModel):
     decision: Decision
     rationale: str = Field(description="Why, citing the findings that drove it")
+
+
+class ToolCall(BaseModel):
+    """One tool the approver called while drafting, and what it returned."""
+
+    name: str
+    args: dict[str, Any]
+    result: str
+
+    def describe(self) -> str:
+        args = ", ".join(str(v) for v in self.args.values())
+        return f"{self.name}({args}): {self.result}"
 
 
 class Critique(BaseModel):

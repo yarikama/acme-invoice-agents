@@ -7,11 +7,11 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.types import Command
 
-from invoice_agents.agents import Extraction, RuleApprover, RuleCritic
+from invoice_agents.agents import Extraction, Review, RuleApprover, RuleCritic
 from invoice_agents.config import Settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.llm import Agents
-from invoice_agents.models import Invoice, LineItem
+from invoice_agents.models import Critique, Invoice, LineItem, ToolCall
 from tests.conftest import INVOICES
 
 
@@ -112,3 +112,43 @@ async def test_checkpoints_restore_state_types_without_warnings(inventory, caplo
     await graph.ainvoke({"path": str(INVOICES / "invoice_1014.xml")}, cfg)
     await graph.ainvoke(Command(resume={"approved": True}), cfg)
     assert "unregistered type" not in caplog.text
+
+
+class ToolUsingApprover:
+    """Checks stock with a real tool call, then defers to the rule approver."""
+
+    async def draft(self, invoice, report, critique, tools) -> Review:
+        call = tools.run("check_inventory", {"item": "WidgetA"})
+        ruled = await RuleApprover().draft(invoice, report, critique, tools)
+        return Review(ruled.draft, [call])
+
+
+class RecordingCritic:
+    def __init__(self) -> None:
+        self.checked: list[list[ToolCall]] = []
+
+    async def review(self, invoice, report, draft, checked) -> Critique:
+        self.checked.append(checked)
+        return Critique(agrees=True)
+
+
+async def test_tool_calls_reach_the_trace_and_the_critic(inventory):
+    critic = RecordingCritic()
+    agents = Agents(StubExtractor(INV_1001), ToolUsingApprover(), critic)
+    deps = Deps(
+        agents=agents, inventory=inventory, settings=Settings(llm_provider="offline")
+    )
+    graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
+
+    state = await graph.ainvoke({"path": str(INVOICES / "invoice_1001.txt")}, config())
+
+    [tool_line] = [t for t in state["trace"] if t.get("tool")]
+    assert tool_line == {
+        "stage": "approve",
+        "tool": "check_inventory",
+        "message": "check_inventory(WidgetA): WidgetA: 15 in stock,"
+        " list price $250.00.",
+    }
+    assert [c.name for c in state["tool_calls"]] == ["check_inventory"]
+    assert critic.checked == [state["tool_calls"]]
+    assert "payment" in state

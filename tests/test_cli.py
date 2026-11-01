@@ -8,10 +8,11 @@ from typing import Any
 import pytest
 
 from invoice_agents import cli
-from invoice_agents.agents import NoExtractor, RuleCritic
+from invoice_agents.agents import NoExtractor, Review, RuleCritic
 from invoice_agents.config import Settings
 from invoice_agents.llm import Agents
-from invoice_agents.models import ApprovalDraft, Invoice, ValidationReport
+from invoice_agents.models import Invoice, ValidationReport
+from invoice_agents.tools import ReviewTools
 from tests.conftest import INVOICES
 
 
@@ -107,8 +108,12 @@ def test_one_failure_does_not_stop_the_batch(
 ) -> None:
     class BrokenApprover:
         async def draft(
-            self, invoice: Invoice, report: ValidationReport, critique: list[str]
-        ) -> ApprovalDraft:
+            self,
+            invoice: Invoice,
+            report: ValidationReport,
+            critique: list[str],
+            tools: ReviewTools,
+        ) -> Review:
             raise RuntimeError("provider returned 402")
 
     monkeypatch.setattr(
