@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from invoice_agents import cli
+from invoice_agents import cli, graph
 from invoice_agents.agents import NoExtractor, Review, RuleCritic
 from invoice_agents.config import Settings
 from invoice_agents.ledger import Ledger
@@ -168,7 +168,7 @@ def test_one_failure_does_not_stop_the_batch(
             raise RuntimeError("provider returned 402")
 
     monkeypatch.setattr(
-        cli,
+        graph,
         "build_agents",
         lambda _settings: Agents(NoExtractor(), BrokenApprover(), RuleCritic()),
     )
@@ -190,7 +190,7 @@ def test_a_tool_call_is_shown_once_as_it_happens(
     )
 
     agents = Agents(StubExtractor(INV_1001), ToolUsingApprover(), RecordingCritic())
-    monkeypatch.setattr(cli, "build_agents", lambda _settings: agents)
+    monkeypatch.setattr(graph, "build_agents", lambda _settings: agents)
     path = INVOICES / "invoice_1001.txt"
     assert cli.main([f"--invoice_path={path}", "--json"]) == 0
     out, err = capsys.readouterr()

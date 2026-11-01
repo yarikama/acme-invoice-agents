@@ -43,13 +43,18 @@ from rich.markup import escape
 from invoice_agents import logs, remote
 from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.config import Settings, get_settings
-from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
+from invoice_agents.graph import (
+    InvoiceState,
+    build_graph,
+    checkpoint_serde,
+    run_events,
+    stored_deps,
+)
 from invoice_agents.inbox import Inbox, watch
 from invoice_agents.ingestion import UnsupportedFormatError
 from invoice_agents.ingestion.ocr import OcrUnavailableError
-from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
-from invoice_agents.llm import build_agents, load_pricing
+from invoice_agents.llm import load_pricing
 from invoice_agents.payment import MockBank
 from invoice_agents.summary import run_status, summarize
 from invoice_agents.terminal import RunView, banner, batch_summary, result_card, vp_card
@@ -227,18 +232,9 @@ class LocalRunner:
     """Runs the graph in this process."""
 
     def __init__(self, settings: Settings) -> None:
-        inventory = Inventory(settings.db_path)
-        inventory.seed()
-        self.ledger = Ledger(settings.db_path, settings.decisions_log)
-        deps = Deps(
-            agents=build_agents(settings),
-            inventory=inventory,
-            settings=settings,
-            seen=self.ledger,
-            bank=MockBank(settings.db_path),
-            # Prices for each step's cost, as the API shows them.
-            pricing=load_pricing(settings),
-        )
+        # Prices for each step's cost, as the API shows them.
+        deps = stored_deps(settings, load_pricing(settings))
+        self.ledger = deps.seen
         self.graph = build_graph(
             deps, checkpointer=InMemorySaver(serde=checkpoint_serde())
         )
@@ -265,40 +261,11 @@ class LocalRunner:
         while True:
             paused = None
             with Live(view, console=console, refresh_per_second=12, transient=False):
-                async for mode, raw in self.graph.astream(
-                    payload, config, stream_mode=["updates", "custom"]
-                ):
-                    chunk = cast(dict[str, Any], raw)
-                    if mode == "custom" and "trace" in chunk:
-                        # A tool call, shown the moment it finished.
-                        view.add({"type": "trace", "node": "review", **chunk["trace"]})
-                        continue
-                    if mode == "custom":
-                        view.add(
-                            {
-                                "type": "progress",
-                                "stage": chunk["stage"],
-                                "step": chunk["status"],
-                            }
-                        )
-                        continue
-                    for node, update in chunk.items():
-                        if node == "__interrupt__":
-                            paused = update[0].value
-                            continue
-                        for t in (update or {}).get("trace", []):
-                            if t.get("streamed"):
-                                continue
-                            view.add(
-                                {
-                                    "type": "trace",
-                                    "node": node,
-                                    "message": t["message"],
-                                    "tool": t.get("tool"),
-                                    "usage": t.get("usage"),
-                                    "data": t.get("data"),
-                                }
-                            )
+                async for event in run_events(self.graph, payload, config):
+                    if event["type"] == "interrupt":
+                        paused = event["request"]
+                    else:
+                        view.add(event)
                     _print_finished(view)
                 state = cast(InvoiceState, (await self.graph.aget_state(config)).values)
                 view.status = run_status(state, paused is not None)

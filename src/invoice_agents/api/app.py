@@ -35,12 +35,10 @@ from invoice_agents import logs
 from invoice_agents.api.chat import ChatService, ChatUnavailableError
 from invoice_agents.api.runs import RunManager, RunNotFoundError, RunStateError
 from invoice_agents.config import Settings, get_settings
-from invoice_agents.graph import Deps, build_graph, checkpoint_serde
+from invoice_agents.graph import build_graph, checkpoint_serde, stored_deps
 from invoice_agents.inventory import Inventory
-from invoice_agents.ledger import Ledger
-from invoice_agents.llm import build_agents, chat_model, load_pricing
+from invoice_agents.llm import chat_model, load_pricing
 from invoice_agents.models import HumanDecision, SourceFormat
-from invoice_agents.payment import MockBank
 
 log = logging.getLogger("invoice_agents.api")
 SUFFIXES = {f".{f.value}" for f in SourceFormat}
@@ -61,22 +59,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "VP_TOKENS is unset: anyone who can reach this API can approve"
             " payments. Fine for a local demo, not for anything else."
         )
-    inventory = Inventory(settings.db_path)
-    inventory.seed()
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(settings.checkpoint_path) as conn:
         checkpointer = AsyncSqliteSaver(conn, serde=checkpoint_serde())
-        ledger = Ledger(settings.db_path, settings.decisions_log)
-        bank = MockBank(settings.db_path)
-        deps = Deps(
-            agents=build_agents(settings),
-            inventory=inventory,
-            settings=settings,
-            seen=ledger,
-            bank=bank,
-            pricing=await asyncio.to_thread(load_pricing, settings),
+        deps = stored_deps(settings, await asyncio.to_thread(load_pricing, settings))
+        manager = RunManager(
+            build_graph(deps, checkpointer=checkpointer), deps.seen, deps.bank
         )
-        manager = RunManager(build_graph(deps, checkpointer=checkpointer), ledger, bank)
         chat = ChatService(
             settings,
             manager,
