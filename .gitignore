@@ -26,3 +26,6 @@ logs/
 .vscode/
 .coverage
 htmlcov/
+
+# Eval reports
+eval-results/

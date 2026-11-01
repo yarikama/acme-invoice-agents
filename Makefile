@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check db run run-all api web web-check clean
+.PHONY: install lint format typecheck test check db eval run run-all api web web-check clean
 
 install:
 	uv sync
@@ -24,6 +24,9 @@ check: lint typecheck test web-check
 
 db:
 	uv run python -c "from invoice_agents.inventory import Inventory; Inventory('inventory.db').seed()"
+
+eval:
+	uv run python -m invoice_agents.evaluation
 
 run:
 	uv run python main.py --invoice_path=$(INVOICE)
