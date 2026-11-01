@@ -103,7 +103,17 @@ class Api:
 def _spawn(cmd: list[str], cwd: Path, log: Path) -> subprocess.Popen[bytes]:
     log.parent.mkdir(parents=True, exist_ok=True)
     return subprocess.Popen(
-        cmd, cwd=cwd, stdout=log.open("wb"), stderr=subprocess.STDOUT
+        cmd,
+        cwd=cwd,
+        stdout=log.open("wb"),
+        stderr=subprocess.STDOUT,
+        # Not the terminal: Vite reads keyboard shortcuts from stdin, and two
+        # readers on one terminal split the keys (and the bytes of a CJK
+        # character) between them, so typing in the console went missing.
+        stdin=subprocess.DEVNULL,
+        # Own session: Ctrl-C in the console stops a run, not the servers;
+        # `stop` shuts them down when the console exits.
+        start_new_session=True,
     )
 
 

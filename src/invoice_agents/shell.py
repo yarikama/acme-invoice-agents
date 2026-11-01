@@ -19,7 +19,9 @@ import asyncio
 import contextlib
 import difflib
 import glob
+import os
 import shlex
+import signal
 import subprocess
 import sys
 import webbrowser
@@ -34,7 +36,7 @@ from prompt_toolkit import completion
 from prompt_toolkit.application import Application
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.document import Document
-from prompt_toolkit.filters import has_completions
+from prompt_toolkit.filters import Condition, has_completions, is_searching
 from prompt_toolkit.formatted_text import StyleAndTextTuples
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent, merge_key_bindings
@@ -218,7 +220,8 @@ class Prompt:
     def _keys(self) -> KeyBindings:
         keys = KeyBindings()
 
-        @keys.add("enter")
+        # Not while searching history (Ctrl-R): there Enter takes the match.
+        @keys.add("enter", filter=~is_searching)
         def _(event: KeyPressEvent) -> None:
             state = self.buffer.complete_state
             if state and state.current_completion:
@@ -235,9 +238,15 @@ class Prompt:
         def _(_event: KeyPressEvent) -> None:
             self.buffer.complete_previous()
 
-        @keys.add("escape", eager=True)
+        # Not eager: Option+arrow and Option+Delete arrive as Esc then a key,
+        # and an eager Esc would swallow them.
+        @keys.add("escape", filter=has_completions)
         def _(_event: KeyPressEvent) -> None:
             self.buffer.cancel_completion()
+
+        @keys.add("c-z", filter=Condition(lambda: hasattr(signal, "SIGTSTP")))
+        def _(event: KeyPressEvent) -> None:
+            event.app.suspend_to_background()
 
         @keys.add("c-c")
         def _(event: KeyPressEvent) -> None:
@@ -283,6 +292,20 @@ STYLE = Style.from_dict(
         "scrollbar.button": "bg:#3a3a37",
     }
 )
+
+
+def _fancy_prompt(status: Callable[[], str]) -> Prompt | None:
+    """The input box, or None for plain input(): piped input, a dumb terminal,
+    or a terminal prompt_toolkit can't drive."""
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return None
+    if os.environ.get("TERM") in ("dumb", "unknown"):
+        return None
+    try:
+        return Prompt(status)
+    except Exception as exc:  # pragma: no cover - depends on the terminal
+        console.print(f"  [bold]Plain input instead:[/] {escape(str(exc))}")
+        return None
 
 
 class Shell:
@@ -331,8 +354,7 @@ class Shell:
         )
 
     def loop_forever(self) -> int:
-        tty = sys.stdin.isatty() and sys.stdout.isatty()
-        prompt = Prompt(self._status_line) if tty else None
+        prompt = _fancy_prompt(self._status_line)
         while True:
             try:
                 line = prompt.read() if prompt else input()

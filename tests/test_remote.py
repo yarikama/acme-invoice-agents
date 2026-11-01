@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -253,6 +254,19 @@ async def test_serve_gives_up_when_a_server_dies(
         await remote.serve(
             "http://localhost:8000", "http://localhost:5173", tmp_path / "logs"
         )
+
+
+def test_servers_never_read_the_terminal(tmp_path: Path) -> None:
+    """Vite reads shortcuts from stdin; sharing the terminal with the console's
+    input box split the typed keys between them."""
+    script = (
+        "import os, sys; print(sys.stdin.read() == '', os.getsid(0) == os.getpid())"
+    )
+    log = tmp_path / "out.log"
+    p = remote._spawn([sys.executable, "-c", script], tmp_path, log)
+    p.wait(timeout=10)
+    # No stdin (reads nothing), and its own session (Ctrl-C doesn't reach it).
+    assert log.read_text().split() == ["True", "True"]
 
 
 def test_spawn_and_stop_a_real_process(tmp_path: Path) -> None:

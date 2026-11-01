@@ -432,3 +432,10 @@ async def test_the_assistant_asks_with_a_schema_and_counts_tokens() -> None:
     with pytest.raises(ValueError, match="bad json"):
         await assistant.plan(cast(Any, Unparsed()), "hi")
     assert assistant.known_files(Path("/nonexistent")) == "(none found)"
+
+
+def test_a_dumb_terminal_gets_plain_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True, raising=False)
+    monkeypatch.setenv("TERM", "dumb")
+    assert shell._fancy_prompt(lambda: "") is None
