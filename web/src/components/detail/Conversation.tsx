@@ -327,7 +327,13 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
           usage={turn.usage}
           fresh={fresh}
         >
-          {paid ? (
+          {paid?.duplicate ? (
+            <p className="m-0">
+              Already paid <span className="font-medium">{money(paid.amount, paid.currency)}</span> to {paid.vendor}:
+              the bank had key <span className="mono text-sm">{paid.idempotency_key}</span>, so no money moved this
+              time.
+            </p>
+          ) : paid ? (
             <p className="m-0">
               Paid <span className="font-medium">{money(paid.amount, paid.currency)}</span> to {paid.vendor} through
               mock_payment.

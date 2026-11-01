@@ -71,6 +71,7 @@ from invoice_agents.config import get_settings
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import chat_model
+from invoice_agents.payment import MockBank
 from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
 
 LOGS = Path(".acme-logs")
@@ -588,6 +589,7 @@ class Shell:
         else:
             s = get_settings()
             Ledger(s.db_path, s.decisions_log).clear()
+            MockBank(s.db_path).clear()
         self.history.clear()
         console.print(
             "  Started over: no past runs, and no invoice counts as received."

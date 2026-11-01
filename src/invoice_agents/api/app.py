@@ -37,6 +37,7 @@ from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import build_agents
 from invoice_agents.models import HumanDecision, SourceFormat
+from invoice_agents.payment import MockBank
 from invoice_agents.replay import Recording
 from invoice_agents.usage import Pricing, openrouter_pricing
 
@@ -58,14 +59,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with aiosqlite.connect(settings.checkpoint_path) as conn:
         checkpointer = AsyncSqliteSaver(conn, serde=checkpoint_serde())
         ledger = Ledger(settings.db_path, settings.decisions_log)
+        bank = MockBank(settings.db_path)
         deps = Deps(
             agents=build_agents(settings),
             inventory=inventory,
             settings=settings,
             seen=ledger,
+            bank=bank,
             pricing=await asyncio.to_thread(load_pricing, settings),
         )
-        manager = RunManager(build_graph(deps, checkpointer=checkpointer), ledger)
+        manager = RunManager(build_graph(deps, checkpointer=checkpointer), ledger, bank)
         restored = await manager.restore()
         if restored:
             log.info("Restored %d run(s) waiting for a VP.", len(restored))

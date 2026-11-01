@@ -495,12 +495,21 @@ def render_turn(t: Turn) -> RenderableType:
         output = d.get("output") or {}
         payment = output.get("payment")
         if payment and payment.get("status") == "success":
-            line = Text("Paid ", style=MUTED)
+            line = Text(
+                "Already paid " if payment.get("duplicate") else "Paid ", style=MUTED
+            )
             line.append(
                 money(payment.get("amount"), payment.get("currency")), style="bold"
             )
             line.append(f" to {payment.get('vendor')}", style=MUTED)
-            line.append("  via mock_payment", style=MUTED)
+            if payment.get("duplicate"):
+                line.append(
+                    f"; key {payment.get('idempotency_key')} was used before, so"
+                    " no money moved this time",
+                    style=MUTED,
+                )
+            else:
+                line.append("  via mock_payment", style=MUTED)
             body.append(line)
         elif t.node == "reject" and len(sentences(d["text"])) > 2:
             # The full reasoning is in the approver's turn and the result card.
@@ -783,7 +792,8 @@ def result_card(file: str, result: dict[str, Any]) -> Panel:
 
     payment = result.get("payment") or {}
     if payment.get("status") == "success":
-        paid = Text("Paid ", style="#a6a69f")
+        word = "Already paid " if payment.get("duplicate") else "Paid "
+        paid = Text(word, style="#a6a69f")
         paid.append(money(payment.get("amount"), payment.get("currency")), style="bold")
         paid.append(f" to {payment.get('vendor')}", style="#a6a69f")
         parts += [Text(), paid]

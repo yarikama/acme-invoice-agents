@@ -49,7 +49,7 @@ from invoice_agents.models import (
     ToolCall,
     ValidationReport,
 )
-from invoice_agents.payment import mock_payment
+from invoice_agents.payment import MockBank
 from invoice_agents.tools import ReviewTools
 from invoice_agents.triage import TriageAnswer, TriageError, fast_path
 from invoice_agents.usage import Pricing, StepUsage, Tokens, collecting, step_usage
@@ -127,6 +127,8 @@ class Deps:
     inventory: Inventory
     settings: Settings
     seen: SeenInvoices = field(default_factory=SeenInvoices)
+    # The mock bank: pays once per idempotency key.
+    bank: MockBank = field(default_factory=MockBank)
     # Model prices, for the cost of each step; empty means tokens only.
     pricing: Pricing = field(default_factory=dict)
 
@@ -487,8 +489,7 @@ def build_graph(
     async def pay(state: InvoiceState, config: RunnableConfig) -> InvoiceState:
         _emit("pay", "start")
         invoice = _invoice(state)
-        assert invoice.vendor and invoice.total is not None
-        result = mock_payment(invoice.vendor, invoice.total, invoice.currency)
+        result = deps.bank.pay(invoice)
         paid = result.status == "success"
         deps.seen.settle(
             _run_id(config),
@@ -499,7 +500,10 @@ def build_graph(
             "payment": result,
             "trace": _event(
                 "pay",
-                f"mock_payment returned {result.status}.",
+                f"Already paid under key {result.idempotency_key}; no money moved"
+                " this time."
+                if result.duplicate
+                else f"mock_payment returned {result.status}.",
                 data={"payment": result.model_dump(mode="json")},
             ),
         }

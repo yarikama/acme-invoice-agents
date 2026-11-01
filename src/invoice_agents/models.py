@@ -134,3 +134,8 @@ class PaymentResult(BaseModel):
     vendor: str
     amount: float
     currency: str
+    # The bank's idempotency key: one payment per key, however often asked.
+    idempotency_key: str | None = None
+    # True when this key was already paid: the earlier payment, returned
+    # again, with no money moved this time.
+    duplicate: bool = False

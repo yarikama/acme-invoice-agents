@@ -47,6 +47,7 @@ from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import build_agents
+from invoice_agents.payment import MockBank
 from invoice_agents.summary import run_status, summarize
 from invoice_agents.terminal import RunView, banner, batch_summary, result_card, vp_card
 
@@ -198,6 +199,7 @@ class LocalRunner:
             inventory=inventory,
             settings=settings,
             seen=self.ledger,
+            bank=MockBank(settings.db_path),
         )
         self.graph = build_graph(
             deps, checkpointer=InMemorySaver(serde=checkpoint_serde())
@@ -431,6 +433,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.reset:
         settings = get_settings()
         Ledger(settings.db_path, settings.decisions_log).clear()
+        MockBank(settings.db_path).clear()
         console.print(f"  Started over: {settings.db_path} holds no received invoices.")
         if not (args.invoice_path or args.dir or args.serve or args.interactive):
             return 0
