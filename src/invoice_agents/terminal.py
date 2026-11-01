@@ -765,6 +765,19 @@ def result_card(file: str, result: dict[str, Any]) -> Panel:
             line.append(f"  {f.get('title') or f.get('detail', '')}")
             parts.append(line)
 
+    codes = {f.get("code") for f in result.get("findings", [])}
+    if codes & {"DUPLICATE", "ALREADY_PAID"}:
+        # Runs are remembered across sessions, so a second demo run of the
+        # samples finds them all already received.
+        parts += [
+            Text(),
+            Text(
+                "The ledger remembers every invoice received. To run the samples"
+                " again from scratch: python main.py --reset, or /reset.",
+                style="#7c7c75",
+            ),
+        ]
+
     payment = result.get("payment") or {}
     if payment.get("status") == "success":
         paid = Text("Paid ", style="#a6a69f")

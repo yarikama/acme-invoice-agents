@@ -42,7 +42,8 @@ def test_offline_run_scores_structured_files_and_skips_text(
     data = json.loads(report.read_text())
     by_case = {r["case"]: r for r in data["results"]}
     assert by_case["invoice_1001.txt"]["outcome"] == "skipped"
-    assert by_case["invoice_1004_revised.json +"]["outcome"] == "human"
+    # The original was paid, so its revision is rejected, not paid twice.
+    assert by_case["invoice_1004_revised.json +"]["outcome"] == "reject"
     assert by_case["invoice_1016.json"]["findings"] == ["UNKNOWN_ITEM"]
     assert data["summary"]["accuracy"] == 1.0
     assert data["summary"]["total_cost_usd"] is None

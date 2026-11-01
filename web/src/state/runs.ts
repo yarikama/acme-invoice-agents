@@ -45,6 +45,7 @@ export function runsReducer(state: RunsState, action: RunsAction): RunsState {
       const e = action.event;
       // The stream replays history on reconnect; skip what we already have.
       if (e.seq <= state.lastSeq) return state;
+      if (e.type === "reset") return { ...initialRuns, lastSeq: e.seq };
       const existing = state.runs[e.run_id];
       const run = existing ?? blank(e.run_id, e.source, e.status, e.created_at);
       const next: RunView = {

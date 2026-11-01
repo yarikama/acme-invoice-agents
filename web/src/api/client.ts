@@ -15,6 +15,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const body = await res.json().catch(() => null);
     throw new ApiError(res.status, body?.detail ?? res.statusText);
   }
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -35,6 +36,8 @@ export const api = {
     form.append("file", file);
     return request<RunOverview>("/api/runs/upload", { method: "POST", body: form });
   },
+  /** Forget every run and received invoice, so the samples can run again. */
+  reset: () => request<void>("/api/reset", { method: "POST" }),
   /** The VP's answer; `token` is a VP's bearer token when the API requires one. */
   decide: (runId: string, approved: boolean, note: string, token?: string) => {
     const init = json({ approved, note });

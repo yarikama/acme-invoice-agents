@@ -10,6 +10,7 @@ import pytest
 from invoice_agents import cli
 from invoice_agents.agents import NoExtractor, Review, RuleCritic
 from invoice_agents.config import Settings
+from invoice_agents.ledger import Ledger
 from invoice_agents.llm import Agents
 from invoice_agents.models import Invoice, ValidationReport
 from invoice_agents.tools import ReviewTools
@@ -32,6 +33,7 @@ def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
         _env_file=None,  # pyright: ignore[reportCallIssue]
         llm_provider="offline",
         db_path=tmp_path / "inventory.db",
+        decisions_log=tmp_path / "decisions.jsonl",
     )
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
     return settings
@@ -157,3 +159,14 @@ def test_a_tool_call_is_shown_once_as_it_happens(
     out, err = capsys.readouterr()
     assert json.loads(out)[0]["status"] == "paid"
     assert err.count("check_inventory(WidgetA)") == 1
+
+
+def test_reset_forgets_what_was_received(
+    capsys: pytest.CaptureFixture[str], offline: Settings
+) -> None:
+    sample = f"--invoice_path={INVOICES / 'invoice_1015.csv'}"
+    assert [r["status"] for r in run(capsys, sample)] == ["paid"]
+    assert [r["status"] for r in run(capsys, sample)] == ["rejected"]  # duplicate
+    assert cli.main(["--reset"]) == 0
+    assert Ledger(offline.db_path).entries == []
+    assert [r["status"] for r in run(capsys, sample, "--reset")] == ["paid"]

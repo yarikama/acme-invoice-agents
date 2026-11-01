@@ -26,6 +26,7 @@ def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
         _env_file=None,  # pyright: ignore[reportCallIssue]
         llm_provider="offline",
         db_path=tmp_path / "inventory.db",
+        decisions_log=tmp_path / "decisions.jsonl",
         samples_dir=tmp_path / "samples",
     )
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
@@ -488,3 +489,18 @@ def test_a_dumb_terminal_gets_plain_input(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr("sys.stdout.isatty", lambda: True, raising=False)
     monkeypatch.setenv("TERM", "dumb")
     assert shell._fancy_prompt(lambda: "") is None
+
+
+def test_reset_starts_over(
+    sh: shell.Shell, offline: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sample = str(INVOICES / "invoice_1015.csv")
+    sh.handle(sample)
+    sh.handle(sample)
+    assert [r["status"] for r in sh.history] == ["paid", "rejected"]
+
+    sh.handle("/reset")
+    assert "Started over" in said(capsys)
+    assert sh.history == []
+    sh.handle(sample)  # no longer a duplicate
+    assert [r["status"] for r in sh.history] == ["paid"]

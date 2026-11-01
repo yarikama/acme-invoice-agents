@@ -45,6 +45,7 @@ from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
+from invoice_agents.ledger import Ledger
 from invoice_agents.llm import build_agents
 from invoice_agents.summary import run_status, summarize
 from invoice_agents.terminal import RunView, banner, batch_summary, result_card, vp_card
@@ -99,6 +100,11 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--no-serve",
         action="store_true",
         help="In the interactive console, don't start the API and web console",
+    )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Forget every invoice received so far, then run the target if any",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
@@ -170,15 +176,32 @@ class LocalRunner:
     def __init__(self, settings: Settings) -> None:
         inventory = Inventory(settings.db_path)
         inventory.seed()
+        self.ledger = Ledger(settings.db_path, settings.decisions_log)
         deps = Deps(
-            agents=build_agents(settings), inventory=inventory, settings=settings
+            agents=build_agents(settings),
+            inventory=inventory,
+            settings=settings,
+            seen=self.ledger,
         )
         self.graph = build_graph(
             deps, checkpointer=InMemorySaver(serde=checkpoint_serde())
         )
 
     async def process(self, path: Path, vp_mode: str) -> dict[str, Any]:
-        config: Any = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        run_id = str(uuid.uuid4())
+        try:
+            result = await self._process(run_id, path, vp_mode)
+        except Exception as exc:
+            self.ledger.settle(run_id, "failed", f"{type(exc).__name__}: {exc}")
+            raise
+        if result["status"] == "awaiting_vp":
+            # This process's checkpoints end with it, so nothing can resume
+            # the run: free the invoice number for a later run.
+            self.ledger.settle(run_id, "dropped", "Left waiting for a VP in the CLI.")
+        return result
+
+    async def _process(self, run_id: str, path: Path, vp_mode: str) -> dict[str, Any]:
+        config: Any = {"configurable": {"thread_id": run_id}}
         payload: Any = {"path": str(path)}
         view = RunView(path.name)
         while True:
@@ -381,6 +404,12 @@ def main(argv: list[str] | None = None) -> int:
         format="%(message)s",
         handlers=[RichHandler(console=console, show_path=False)],
     )
+    if args.reset:
+        settings = get_settings()
+        Ledger(settings.db_path, settings.decisions_log).clear()
+        console.print(f"  Started over: {settings.db_path} holds no received invoices.")
+        if not (args.invoice_path or args.dir or args.serve or args.interactive):
+            return 0
     with _signals_end_the_cli():
         if _interactive(args):
             from invoice_agents.shell import run_shell

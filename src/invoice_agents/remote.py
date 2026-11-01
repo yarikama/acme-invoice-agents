@@ -75,18 +75,32 @@ class Api:
                 if event["type"] in ("done", "run_error"):
                     return
 
-    async def decide(self, run_id: str, approved: bool, note: str) -> None:
+    def _vp_auth(self) -> dict[str, str] | None:
         # A VP's token, when the API requires one (VP_TOKENS on the server),
         # from the environment or .env like every other setting.
         token = get_settings().vp_token
-        auth = f"Bearer {token.get_secret_value()}" if token else None
+        return (
+            {"Authorization": f"Bearer {token.get_secret_value()}"} if token else None
+        )
+
+    async def decide(self, run_id: str, approved: bool, note: str) -> None:
         r = await self.client.post(
             f"{self.base}/api/runs/{run_id}/decision",
             json={"approved": approved, "note": note},
-            headers={"Authorization": auth} if auth else None,
+            headers=self._vp_auth(),
             timeout=30,
         )
         r.raise_for_status()
+
+    async def reset(self) -> str | None:
+        """Forget every run and received invoice. The reason if refused."""
+        r = await self.client.post(
+            f"{self.base}/api/reset", headers=self._vp_auth(), timeout=30
+        )
+        if r.status_code in (401, 403, 409):
+            return str(r.json().get("detail", r.text))
+        r.raise_for_status()
+        return None
 
     async def result(self, run_id: str) -> dict[str, Any]:
         r = await self.client.get(f"{self.base}/api/runs/{run_id}", timeout=30)

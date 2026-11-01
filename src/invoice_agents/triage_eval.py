@@ -94,14 +94,17 @@ async def prepare(case: Case, settings: Settings) -> Prepared | None:
         graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
         state: dict[str, Any] = {}
         try:
+            last = case.files[-1]
             for name in case.files:
                 config: RunnableConfig = {
                     "configurable": {"thread_id": uuid.uuid4().hex}
                 }
+                # Earlier files run to the end, so the ledger knows whether
+                # they were paid; the last one stops before the approver.
                 state = await graph.ainvoke(
                     {"path": str(settings.samples_dir / name)},
                     config,
-                    interrupt_before=["review"],
+                    interrupt_before=["review"] if name == last else None,
                 )
         except ExtractionUnavailableError:
             return None

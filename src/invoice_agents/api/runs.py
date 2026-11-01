@@ -10,7 +10,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,6 +25,7 @@ from invoice_agents.graph import InvoiceState
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.models import HumanDecision
 from invoice_agents.summary import Status, run_status, summarize
+from invoice_agents.validation import SeenInvoices
 
 log = logging.getLogger(__name__)
 
@@ -70,9 +71,29 @@ class Run:
         }
 
 
+def _node_of(item: Mapping[str, Any]) -> str:
+    """The graph node that wrote a trace line in the state, which only keeps
+    its stage: for runs rebuilt from a checkpoint."""
+    stage, message = item.get("stage", ""), item.get("message", "")
+    if stage == "approve":
+        if item.get("tool") or message.startswith("Draft "):
+            return "review"
+        if message.startswith("Critic "):
+            return "critique"
+        if message.startswith("VP "):
+            return "human_review"
+    if stage == "pay" and message.startswith("Not paid"):
+        return "reject"
+    return stage
+
+
 class RunManager:
-    def __init__(self, graph: CompiledStateGraph) -> None:
+    def __init__(
+        self, graph: CompiledStateGraph, ledger: SeenInvoices | None = None
+    ) -> None:
         self.graph = graph
+        # The graph's record of received invoices, kept across restarts.
+        self.ledger = ledger or SeenInvoices()
         self.runs: dict[str, Run] = {}
         # Every event from every run, in order: one stream for the whole console.
         self.log: list[dict[str, Any]] = []
@@ -96,7 +117,7 @@ class RunManager:
             created_at=datetime.now(UTC).isoformat(),
         )
         self.runs[run.id] = run
-        self._spawn(self._drive(run, {"path": str(path)}))
+        self._spawn(self._drive(run, {"path": str(path), "source": source}))
         return run
 
     def decide(self, run_id: str, decision: HumanDecision) -> Run:
@@ -135,7 +156,7 @@ class RunManager:
 
         async def drive_all() -> None:
             for run in runs:
-                await self._drive(run, {"path": str(run.path)})
+                await self._drive(run, {"path": str(run.path), "source": run.source})
 
         self._spawn(drive_all())
         return runs
@@ -168,6 +189,70 @@ class RunManager:
             for event in pending:
                 yield event
             cursor += len(pending)
+
+    async def restore(self) -> list[Run]:
+        """Bring back runs that were waiting for a VP when the API stopped.
+
+        Their state is in the checkpointer and their invoices in the ledger.
+        A run that stopped anywhere else can't be resumed: it is marked
+        failed, so its invoice number is free to be sent again.
+        """
+        restored = []
+        for entry in self.ledger.entries:
+            if entry.outcome is not None or entry.run_id in self.runs:
+                continue
+            run = Run(
+                id=entry.run_id,
+                source=entry.source,
+                path=Path(entry.source),
+                created_at=entry.received_at,
+            )
+            snapshot = await self.graph.aget_state(run.config)
+            paused = [i.value for t in snapshot.tasks for i in t.interrupts]
+            if not paused:
+                self.ledger.settle(
+                    run.id, "failed", "Interrupted when the API stopped."
+                )
+                continue
+            state = cast(InvoiceState, snapshot.values)
+            run.path = Path(state["path"])
+            self.runs[run.id] = run
+            await self._emit(run, {"type": "started", "source": run.source})
+            for item in state.get("trace", []):
+                await self._emit(run, {"type": "trace", "node": _node_of(item), **item})
+            run.status = "awaiting_vp"
+            run.summary = summarize(state, run.status)
+            await self._emit(
+                run,
+                {"type": "awaiting_vp", "request": paused[0], "summary": run.summary},
+            )
+            run.settled.set()
+            restored.append(run)
+        return restored
+
+    async def reset(self) -> None:
+        """Forget every run and every received invoice: a clean slate for a
+        demo. Refused while a run is still working. Every console hears it
+        on the event stream and clears its list."""
+        busy = [r.id for r in self.runs.values() if r.status in ("running", "queued")]
+        if busy:
+            raise RunStateError(f"{len(busy)} run(s) still working; try again shortly")
+        self.ledger.clear()
+        self.runs.clear()
+        async with self._log_changed:
+            self.log.append(
+                {
+                    "type": "reset",
+                    "id": 0,
+                    "seq": len(self.log),
+                    "run_id": "",
+                    "source": "",
+                    "created_at": "",
+                    "at": datetime.now(UTC).isoformat(),
+                    "status": "queued",
+                }
+            )
+            self._log_changed.notify_all()
 
     async def close(self) -> None:
         for task in self._tasks:
@@ -267,5 +352,6 @@ class RunManager:
 
     async def _fail(self, run: Run, message: str) -> None:
         run.status = "failed"
+        self.ledger.settle(run.id, "failed", message)
         # Not "error": EventSource reserves that name for connection errors.
         await self._emit(run, {"type": "run_error", "message": message})

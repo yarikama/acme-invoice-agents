@@ -2,12 +2,13 @@
 
 import json
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
 from invoice_agents.api.app import app, lifespan
-from invoice_agents.api.runs import RunManager
+from invoice_agents.api.runs import Run, RunManager
 from invoice_agents.config import Settings, get_settings
 from tests.conftest import INVOICES
 
@@ -27,6 +28,7 @@ async def client(tmp_path, monkeypatch, vp_tokens) -> AsyncIterator[AsyncClient]
     monkeypatch.setenv("LLM_PROVIDER", "offline")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "inventory.db"))
     monkeypatch.setenv("CHECKPOINT_PATH", str(tmp_path / "checkpoints.db"))
+    monkeypatch.setenv("DECISIONS_LOG", str(tmp_path / "decisions.jsonl"))
     monkeypatch.setenv("UPLOADS_DIR", str(tmp_path / "uploads"))
     monkeypatch.setenv("SAMPLES_DIR", str(INVOICES))
     get_settings.cache_clear()
@@ -199,8 +201,13 @@ async def test_batch_runs_in_order(client):
 
     status = {r["source"]: manager().get(r["id"]).status for r in runs}
     assert status["invoice_1004.json"] == "paid"
-    # The revision arrives after the original, so it is flagged for the VP.
-    assert status["invoice_1004_revised.json"] == "awaiting_vp"
+    # The revision arrives after the original was paid: paying it as well
+    # would pay twice, so it is rejected with the reason.
+    revised = next(r for r in runs if r["source"] == "invoice_1004_revised.json")
+    assert status["invoice_1004_revised.json"] == "rejected"
+    summary = manager().get(revised["id"]).summary
+    assert summary is not None
+    assert "ALREADY_PAID" in {f["code"] for f in summary["findings"]}
     assert status["invoice_1007.csv"] == "rejected"
     assert status["invoice_1001.txt"] == "failed"
     listed = (await client.get("/api/runs")).json()
@@ -300,3 +307,49 @@ async def test_a_tool_call_reaches_the_stream_once_before_the_draft(
     assert lines.index(tool[0]) < next(
         i for i, m in enumerate(lines) if m.startswith("Draft 1")
     )
+
+
+async def test_a_run_waiting_for_a_vp_survives_a_restart(client, tmp_path):
+    # Before: after a restart GET /api/runs was empty and the decision 404'd.
+    run = (await client.post("/api/runs", json={"sample": "invoice_1014.xml"})).json()
+    await settle(run["id"])
+    paid = (await client.post("/api/runs", json={"sample": "invoice_1015.csv"})).json()
+    await settle(paid["id"])
+    assert manager().get(run["id"]).status == "awaiting_vp"
+
+    async with lifespan(app):  # a new process on the same files
+        listed = (await client.get("/api/runs")).json()
+        assert [r["id"] for r in listed] == [run["id"]]
+        restored = manager().get(run["id"])
+        assert restored.status == "awaiting_vp"
+        assert restored.source == "invoice_1014.xml"
+        kinds = [e["type"] for e in restored.events]
+        assert kinds[0] == "started" and kinds[-1] == "awaiting_vp"
+        nodes = [e["node"] for e in restored.events if e["type"] == "trace"]
+        assert nodes[:2] == ["ingest", "validate"] and "review" in nodes
+
+        resp = await client.post(
+            f"/api/runs/{run['id']}/decision", json={"approved": True}
+        )
+        assert resp.status_code == 202
+        await settle(run["id"])
+        assert manager().get(run["id"]).status == "paid"
+
+
+async def test_reset_forgets_runs_and_received_invoices(client):
+    run = (await client.post("/api/runs", json={"sample": "invoice_1015.csv"})).json()
+    await settle(run["id"])
+    assert (await client.post("/api/reset")).status_code == 204
+    assert (await client.get("/api/runs")).json() == []
+    # Every open console hears it on the event stream.
+    assert manager().log[-1]["type"] == "reset"
+
+    # The same invoice again is not a duplicate any more.
+    again = (await client.post("/api/runs", json={"sample": "invoice_1015.csv"})).json()
+    await settle(again["id"])
+    assert manager().get(again["id"]).status == "paid"
+
+
+async def test_reset_waits_for_running_work(client):
+    manager().runs["busy"] = Run(id="busy", source="x", path=Path("x"), created_at="")
+    assert (await client.post("/api/reset")).status_code == 409

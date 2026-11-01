@@ -34,6 +34,7 @@ from invoice_agents.api.runs import RunManager, RunNotFoundError, RunStateError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.inventory import SEED, Inventory
+from invoice_agents.ledger import Ledger
 from invoice_agents.llm import build_agents
 from invoice_agents.models import HumanDecision, SourceFormat
 from invoice_agents.replay import Recording
@@ -56,13 +57,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(settings.checkpoint_path) as conn:
         checkpointer = AsyncSqliteSaver(conn, serde=checkpoint_serde())
+        ledger = Ledger(settings.db_path, settings.decisions_log)
         deps = Deps(
             agents=build_agents(settings),
             inventory=inventory,
             settings=settings,
+            seen=ledger,
             pricing=await asyncio.to_thread(load_pricing, settings),
         )
-        manager = RunManager(build_graph(deps, checkpointer=checkpointer))
+        manager = RunManager(build_graph(deps, checkpointer=checkpointer), ledger)
+        restored = await manager.restore()
+        if restored:
+            log.info("Restored %d run(s) waiting for a VP.", len(restored))
         app.state.settings = settings
         app.state.manager = manager
         try:
@@ -233,6 +239,22 @@ async def decide(
     decision = decision.model_copy(update={"by": by})
     try:
         return manager.decide(run_id, decision).overview()
+    except RunStateError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+
+@app.post("/api/reset", status_code=204)
+async def reset(
+    manager: ManagerDep,
+    settings: SettingsDep,
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    """Start over: forget every run and every invoice received, so the
+    samples can run again without being flagged as duplicates. With
+    VP_TOKENS set, only a VP may do it."""
+    _vp(settings, authorization)
+    try:
+        await manager.reset()
     except RunStateError as exc:
         raise HTTPException(409, str(exc)) from exc
 

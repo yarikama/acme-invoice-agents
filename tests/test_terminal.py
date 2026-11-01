@@ -485,3 +485,14 @@ def test_a_vp_name_with_brackets_keeps_the_verdict() -> None:
         "by": "Dana Whitfield (Finance)",
         "note": "ok (fx).",
     }
+
+
+def test_a_duplicate_says_how_to_start_over() -> None:
+    dup = {
+        "status": "rejected",
+        "findings": [
+            {"code": "DUPLICATE", "severity": "error", "title": "t", "detail": "d"}
+        ],
+    }
+    assert "python main.py --reset" in text(result_card("f", dup))
+    assert "--reset" not in text(result_card("f", {"status": "paid"}))

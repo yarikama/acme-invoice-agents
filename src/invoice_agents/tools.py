@@ -13,7 +13,7 @@ from langchain_core.tools import BaseTool, StructuredTool
 
 from invoice_agents.inventory import Inventory, item_key
 from invoice_agents.models import Invoice, ToolCall
-from invoice_agents.validation import SeenInvoices
+from invoice_agents.validation import Received, SeenInvoices
 
 # Fixed mock rates: the system runs offline, so there is no live FX feed.
 USD_PER_UNIT: dict[str, float] = {
@@ -66,16 +66,20 @@ class ReviewTools:
     def vendor_history(self, vendor: str) -> str:
         """List earlier invoices from this vendor that were already processed."""
         key = item_key(vendor)
-        earlier = [inv for inv in self._others() if item_key(inv.vendor or "") == key]
+        earlier = [e for e in self._others() if item_key(e.invoice.vendor or "") == key]
         if not earlier:
             return "No earlier invoices from this vendor."
-        lines = [
-            f"{inv.invoice_number or 'no number'}"
-            f"{f' rev {inv.revision}' if inv.revision else ''},"
-            f" {inv.invoice_date or 'undated'},"
-            f" {inv.currency} {inv.total if inv.total is not None else 'no total'}"
-            for inv in earlier
-        ]
+        lines = []
+        for e in earlier:
+            inv = e.invoice
+            outcome = e.outcome or "not settled yet"
+            lines.append(
+                f"{inv.invoice_number or 'no number'}"
+                f"{f' rev {inv.revision}' if inv.revision else ''},"
+                f" {inv.invoice_date or 'undated'},"
+                f" {inv.currency} {inv.total if inv.total is not None else 'no total'}"
+                f" ({outcome})"
+            )
         return f"{len(earlier)} earlier from {vendor}: " + "; ".join(lines) + "."
 
     def convert_to_usd(self, amount: float, currency: str) -> str:
@@ -120,9 +124,12 @@ class ReviewTools:
             self.on_step(step)
         return step
 
-    def _others(self) -> list[Invoice]:
-        """Processed invoices except this one (it is recorded before review)."""
-        others = list(self.seen.invoices)
-        if self.current in others:
-            others.remove(self.current)
-        return others
+    def _others(self) -> list[Received]:
+        """Received invoices except this run's own copy, which is recorded
+        before review: the last one equal to it. An identical invoice from
+        an earlier run stays, since that is the duplicate to see."""
+        entries = self.seen.entries
+        for i in range(len(entries) - 1, -1, -1):
+            if entries[i].invoice == self.current:
+                return entries[:i] + entries[i + 1 :]
+        return entries

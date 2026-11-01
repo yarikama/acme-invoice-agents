@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     critic_reasoning: Literal["low", "medium", "high"] | None = None
 
     db_path: Path = Path("inventory.db")
+    # One JSON line per settled invoice: outcome, reason, amount. The same
+    # records are in the ledger table of the database above.
+    decisions_log: Path | None = Path("logs/decisions.jsonl")
     # API: graph checkpoints, so a run paused for the VP survives a restart.
     checkpoint_path: Path = Path("checkpoints.db")
     samples_dir: Path = Path("data/invoices")
