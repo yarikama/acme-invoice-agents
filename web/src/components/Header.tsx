@@ -36,7 +36,7 @@ export function Header({
 }) {
   const { dark, toggle } = useTheme();
   return (
-    <header className="border-b border-seam bg-panel">
+    <header className="glass-bar sticky top-0 z-10 border-b border-[var(--glass-edge)]">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
         <div className="flex items-center gap-2">
           <Logo size={22} />

@@ -27,7 +27,7 @@ export function InvoiceSummary({ run }: { run: RunView }) {
       <p className="m-0 mt-2 text-2xl font-medium">{inv?.vendor ?? (inv ? "No vendor" : run.source)}</p>
       {inv && (
         <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <span className="text-4xl font-light">{money(inv.total, inv.currency)}</span>
+          <span className="display text-4xl">{money(inv.total, inv.currency)}</span>
           <span className="text-sm text-ink-2">
             Due {inv.due_date ?? "not stated"}
             {inv.payment_terms ? `, ${inv.payment_terms}` : ""}
