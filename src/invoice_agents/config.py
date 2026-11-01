@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     vp_tokens: Annotated[dict[str, SecretStr], NoDecode] = {}
     # The CLI's own token, sent when it decides through the API.
     vp_token: SecretStr | None = None
+    # The assistant's memory: one conversation, in Redis so the terminal and
+    # the web console share it. Without Redis it lasts for one process.
+    redis_url: str = "redis://localhost:6379/0"
+    chat_session: str = "console"
     extract_model: str = "grok-4.3"
     review_model: str = "grok-4.7"
     # Cap output, reasoning included: without it the provider reserves the

@@ -1,5 +1,6 @@
 import {
   ChartLineUpIcon,
+  ChatCircleDotsIcon,
   CheckCircleIcon,
   CircleNotchIcon,
   CreditCardIcon,
@@ -53,4 +54,5 @@ export const SECTION_ICON = {
   lineItems: ListBulletsIcon,
   routing: FlowArrowIcon,
   throughput: ChartLineUpIcon,
+  assistant: ChatCircleDotsIcon,
 } satisfies Record<string, Icon>;

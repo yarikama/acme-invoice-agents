@@ -18,6 +18,7 @@ import pytest
 from invoice_agents import cli, shell
 from invoice_agents.config import Settings
 from tests.conftest import INVOICES
+from tests.fakes import FakePlanner
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +29,7 @@ def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
         db_path=tmp_path / "inventory.db",
         decisions_log=tmp_path / "decisions.jsonl",
         samples_dir=tmp_path / "samples",
+        redis_url="",  # never the developer's Redis
     )
     monkeypatch.setattr(cli, "get_settings", lambda: settings)
     monkeypatch.setattr(shell, "get_settings", lambda: settings)
@@ -424,8 +426,10 @@ def test_a_sentence_goes_to_the_assistant_and_code_filters_its_plan(
         ],
     )
 
-    async def planned(_llm: object, request: str) -> tuple[assistant.Plan, Any]:
-        assert request == "please ingest 1015"
+    async def planned(
+        _llm: object, request: str, history: Any, via: str
+    ) -> tuple[assistant.Plan, Any]:
+        assert (request, via) == ("please ingest 1015", "terminal")
         return answer, {"grok-4.3": {"input_tokens": 1000, "output_tokens": 200}}
 
     monkeypatch.setattr(assistant, "plan", planned)
@@ -437,6 +441,14 @@ def test_a_sentence_goes_to_the_assistant_and_code_filters_its_plan(
     assert "Not run: /rm isn't a command the assistant may use" in out
     assert "→ /run" in out and "invoice_1015.csv" in out and "INV-1015" in out
     assert [r["status"] for r in sh.history] == ["paid"]
+    # No Redis in tests: remembered for this session, and it says so.
+    assert "not shared with the web console" in out
+    # What came of it joins the conversation, for the next request.
+    assert sh.memory is not None
+    assert sh.memory.messages[-1].text == "INV-1015 was paid: Every check passed."
+
+    sh.handle("/history")
+    assert "INV-1015 was paid: Every check passed." in said(capsys)
 
     async def broken(*_a: object) -> Any:
         raise ValueError("rate limited")
@@ -447,44 +459,66 @@ def test_a_sentence_goes_to_the_assistant_and_code_filters_its_plan(
 
 
 async def test_the_assistant_asks_with_a_schema_and_counts_tokens() -> None:
-    from langchain_core.messages import AIMessage
 
-    from invoice_agents import assistant
+    from invoice_agents import assistant, memory
 
-    seen: list[Any] = []
-    reply = AIMessage(
-        "{}",
-        usage_metadata={"input_tokens": 900, "output_tokens": 40, "total_tokens": 940},
-        response_metadata={"model_name": "x-ai/grok-4.3"},
-    )
-
-    class Model:
-        def with_structured_output(self, schema: Any, **kwargs: Any) -> "Model":
-            seen.append((schema, kwargs))
-            return self
-
-        async def ainvoke(self, prompt: Any) -> dict[str, Any]:
-            seen.append(prompt)
-            plan = assistant.Plan(reply="ok", steps=[])
-            return {"raw": reply, "parsed": plan, "parsing_error": None}
-
-    answer, tokens = await assistant.plan(cast(Any, Model()), "hi")
+    model = FakePlanner(assistant.Plan(reply="ok", steps=[]), None)
+    history = memory.LocalHistory()
+    answer, tokens = await assistant.plan(cast(Any, model), "hi", history, "terminal")
     assert answer.reply == "ok"
     assert tokens == {"x-ai/grok-4.3": {"input_tokens": 900, "output_tokens": 40}}
-    assert seen[0] == (
+    assert model.schema == (
         assistant.Plan,
         {"method": "json_schema", "include_raw": True},
     )
-    system = seen[1][0][1]
+    system = model.prompts[0][0].content
     assert "invoice_1015.csv" in system and "cannot approve" in system
 
-    class Unparsed(Model):
-        async def ainvoke(self, prompt: Any) -> dict[str, Any]:
-            return {"raw": reply, "parsed": None, "parsing_error": "bad json"}
-
     with pytest.raises(ValueError, match="bad json"):
-        await assistant.plan(cast(Any, Unparsed()), "hi")
+        await assistant.plan(cast(Any, model), "hi", history, "terminal")
+    # A failed plan leaves nothing half-said in the conversation.
+    assert [m.text for m in history.messages] == ["hi", "ok"]
     assert assistant.known_files(Path("/nonexistent")) == "(none found)"
+
+
+async def test_the_assistant_remembers_the_conversation_within_a_buffer() -> None:
+
+    from invoice_agents import assistant, memory
+
+    run = assistant.Step(command="run", args=["data/invoices/invoice_1004.json"])
+    model = FakePlanner(
+        assistant.Plan(reply="Running 1004.", steps=[run]),
+        assistant.Plan(reply="It was paid.", steps=[]),
+        assistant.Plan(reply="Sure.", steps=[]),
+    )
+    history = memory.LocalHistory()
+    await assistant.plan(cast(Any, model), "run 1004", history, "terminal")
+    history.add_message(memory.answered("INV-1004 was paid.", "terminal"))
+    await assistant.plan(cast(Any, model), "what happened to it?", history, "web")
+
+    # The second prompt carries the first request, the plan and its outcome.
+    second = [m.text for m in model.prompts[1][1:]]
+    assert second == [
+        "run 1004",
+        "Running 1004.",
+        "INV-1004 was paid.",
+        "what happened to it?",
+    ]
+    said, planned, _outcome, asked, answered = history.messages
+    assert said.additional_kwargs["via"] == "terminal"
+    assert planned.additional_kwargs["commands"] == [
+        "/run data/invoices/invoice_1004.json"
+    ]
+    assert asked.additional_kwargs["via"] == "web"
+    assert answered.text == "It was paid."
+
+    # Only the last few messages go into a prompt, starting on a request.
+    await assistant.plan(cast(Any, model), "thanks", history, "web", buffer=3)
+    assert [m.text for m in model.prompts[2][1:]] == [
+        "what happened to it?",
+        "It was paid.",
+        "thanks",
+    ]
 
 
 def test_a_dumb_terminal_gets_plain_input(monkeypatch: pytest.MonkeyPatch) -> None:

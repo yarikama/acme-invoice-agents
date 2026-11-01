@@ -317,3 +317,35 @@ async def test_reset_through_the_api_says_why_it_was_refused() -> None:
         api = remote.Api("http://api", c)
         assert await api.reset() is None
         assert await api.reset() == "1 run(s) still working"
+
+
+def test_serve_starts_redis_only_when_it_is_missing_and_installed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    spawned: list[list[str]] = []
+
+    class Proc:
+        def poll(self) -> None:
+            return None
+
+    def spawn(cmd: list[str], _cwd: Path, _log: Path) -> Proc:
+        spawned.append(cmd)
+        return Proc()
+
+    monkeypatch.setattr(remote, "_spawn", spawn)
+    monkeypatch.setattr(remote.shutil, "which", lambda _name: "/usr/bin/redis-server")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6399/0")
+    get_settings.cache_clear()
+    calls = iter([False, True])  # down before the start, up just after
+    monkeypatch.setattr(remote.memory, "redis_up", lambda _url: next(calls))
+    assert remote._start_redis(tmp_path) is not None
+    assert spawned[0][:3] == ["/usr/bin/redis-server", "--port", "6399"]
+
+    # Already up, not installed, or not on this machine: nothing to start.
+    monkeypatch.setattr(remote.memory, "redis_up", lambda _url: True)
+    assert remote._start_redis(tmp_path) is None
+    monkeypatch.setattr(remote.memory, "redis_up", lambda _url: False)
+    monkeypatch.setenv("REDIS_URL", "redis://cache.example.com:6379/0")
+    get_settings.cache_clear()
+    assert remote._start_redis(tmp_path) is None
+    get_settings.cache_clear()

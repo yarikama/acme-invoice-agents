@@ -11,13 +11,16 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
+from invoice_agents import memory
 from invoice_agents.config import get_settings
 
 REPO = Path(__file__).resolve().parents[2]
@@ -140,6 +143,11 @@ async def serve(
 ) -> list[subprocess.Popen[bytes]]:
     """Start the API and the console unless they already run; wait until both answer."""
     started: list[subprocess.Popen[bytes]] = []
+    # Redis first: the API decides at startup whether the assistant's
+    # conversation is shared with the terminal.
+    redis_server = await asyncio.to_thread(_start_redis, log_dir)
+    if redis_server is not None:
+        started.append(redis_server)
     if not await reachable(f"{api_url}/api/health"):
         cmd = [sys.executable, "-m", "uvicorn", "invoice_agents.api.app:app"]
         cmd += ["--port", _port(api_url)]
@@ -163,6 +171,28 @@ async def serve(
         await asyncio.sleep(0.25)
     stop(started)
     raise RuntimeError(f"The API or the console did not start; see {log_dir}.")
+
+
+def _start_redis(log_dir: Path) -> subprocess.Popen[bytes] | None:
+    """Start a local Redis for the shared chat memory, if one is configured on
+    this machine, isn't running, and redis-server is installed. In memory
+    only: the conversation lasts as long as the servers do."""
+    url = get_settings().redis_url
+    parsed = urlparse(url)
+    server = shutil.which("redis-server")
+    local = parsed.hostname in ("localhost", "127.0.0.1")
+    if not url or not local or server is None or memory.redis_up(url):
+        return None
+    log_dir.mkdir(parents=True, exist_ok=True)
+    cmd = [server, "--port", str(parsed.port or 6379), "--save", ""]
+    cmd += ["--appendonly", "no", "--dir", str(log_dir.resolve())]
+    process = _spawn(cmd, REPO, log_dir / "redis.log")
+    for _ in range(40):
+        if memory.redis_up(url):
+            return process
+        time.sleep(0.05)
+    stop([process])
+    return None
 
 
 def stop(processes: list[subprocess.Popen[bytes]]) -> None:

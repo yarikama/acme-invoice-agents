@@ -28,14 +28,15 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from invoice_agents.api.chat import ChatService, ChatUnavailableError
 from invoice_agents.api.runs import RunManager, RunNotFoundError, RunStateError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
-from invoice_agents.llm import build_agents
+from invoice_agents.llm import build_agents, chat_model
 from invoice_agents.models import HumanDecision, SourceFormat
 from invoice_agents.replay import Recording
 from invoice_agents.usage import Pricing, openrouter_pricing
@@ -66,14 +67,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             pricing=await asyncio.to_thread(load_pricing, settings),
         )
         manager = RunManager(build_graph(deps, checkpointer=checkpointer), ledger)
+        chat = ChatService(
+            settings,
+            manager,
+            lambda: chat_model(settings, settings.extract_model, "low"),
+        )
         restored = await manager.restore()
         if restored:
             log.info("Restored %d run(s) waiting for a VP.", len(restored))
         app.state.settings = settings
         app.state.manager = manager
+        app.state.chat = chat
         try:
             yield
         finally:
+            await chat.close()
             await manager.close()
 
 
@@ -137,13 +145,47 @@ def _samples(settings: Settings) -> list[Path]:
 
 
 @app.get("/api/health")
-async def health(settings: SettingsDep) -> dict[str, Any]:
+async def health(settings: SettingsDep, request: Request) -> dict[str, Any]:
+    chat: ChatService = request.app.state.chat
     return {
         "status": "ok",
         "llm_provider": settings.llm_provider,
         # The console asks for a VP token up front when this is true.
         "vp_auth": bool(settings.vp_tokens),
+        # The assistant needs a live model; "shared" means Redis holds the
+        # conversation, so the terminal sees it too.
+        "chat": {"available": chat.available, "shared": chat.shared},
     }
+
+
+class ChatRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+def get_chat(request: Request) -> ChatService:
+    return request.app.state.chat
+
+
+ChatDep = Annotated[ChatService, Depends(get_chat)]
+
+
+@app.get("/api/chat")
+async def chat_messages(chat: ChatDep, after: int = -1) -> dict[str, Any]:
+    """The shared conversation, from the terminal and the web console."""
+    messages = await asyncio.to_thread(chat.messages, after)
+    return {"messages": messages, "available": chat.available, "shared": chat.shared}
+
+
+@app.post("/api/chat")
+async def chat_say(body: ChatRequest, chat: ChatDep) -> dict[str, Any]:
+    """Ask the assistant; it may start runs. Returns the messages it added."""
+    try:
+        return {"messages": await chat.say(body.text.strip())}
+    except ChatUnavailableError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except Exception as exc:  # the provider, the network or a bad answer
+        log.warning("The assistant couldn't answer: %s", exc)
+        raise HTTPException(502, f"The assistant couldn't answer: {exc}") from exc
 
 
 @app.get("/api/samples")

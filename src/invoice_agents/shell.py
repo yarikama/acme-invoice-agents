@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
+from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
 from prompt_toolkit import completion
 from prompt_toolkit.application import Application
@@ -58,7 +59,7 @@ from rich.padding import Padding
 from rich.table import Table
 from rich.text import Text
 
-from invoice_agents import assistant, remote
+from invoice_agents import assistant, memory, remote
 from invoice_agents.cli import (
     Connection,
     LocalRunner,
@@ -103,6 +104,11 @@ COMMANDS = [
         "reset",
         "/reset",
         "Start over: forget past runs, so the samples aren't duplicates.",
+    ),
+    Command(
+        "history",
+        "/history",
+        "The conversation with the assistant, from here and the web console.",
     ),
     Command("clear", "/clear", "Clear the screen."),
     Command("help", "/help [command]", "All commands, or one."),
@@ -327,6 +333,8 @@ class Shell:
         # Results of runs in this process, for /runs when there is no API.
         self.history: list[dict[str, Any]] = []
         self.llm: BaseChatModel | None = None
+        # The assistant's conversation, shared with the web console via Redis.
+        self.memory: BaseChatMessageHistory | None = None
         self.handlers: dict[str, Callable[[list[str]], Any]] = {
             "run": self.run,
             "dir": self.dir,
@@ -340,6 +348,7 @@ class Shell:
             "inventory": self.inventory,
             "eval": self.eval,
             "reset": self.reset,
+            "history": self.transcript,
             "clear": lambda _a: console.clear(),
             "help": self.help,
         }
@@ -650,9 +659,20 @@ class Shell:
             return
         if self.llm is None:
             self.llm = chat_model(s, s.extract_model, "low")
+        if self.memory is None:
+            self.memory, shared = memory.history(s)
+            if not shared:
+                console.print(
+                    f"  [#a6a69f]No Redis at {escape(s.redis_url or 'REDIS_URL')}: this"
+                    " conversation"
+                    " is remembered for this session only, not shared with the web"
+                    " console.[/]"
+                )
         try:
             with console.status(f"Asking {s.extract_model}…"):
-                answer, tokens = self.loop.run(assistant.plan(self.llm, request))
+                answer, tokens = self.loop.run(
+                    assistant.plan(self.llm, request, self.memory, "terminal")
+                )
         except Exception as exc:  # the provider, the network or a bad answer
             console.print(
                 f"  [bold]The assistant couldn't answer:[/] {escape(str(exc))}"
@@ -672,8 +692,31 @@ class Shell:
             console.print(Text.assemble("    → ", (command, f"bold {SIGNAL}")))
         if steps:
             console.print()
+        before = len(self.history)
         for step in steps:
             self.handlers[step.command](step.args)
+        if outcome := memory.outcomes(self.history[before:]):
+            # What came of it, for "why was that one rejected?" next time,
+            # here or in the web console.
+            self.memory.add_message(memory.answered(outcome, "terminal"))
+
+    def transcript(self, _args: list[str]) -> None:
+        """The conversation so far, from the terminal and the web console."""
+        if self.memory is None:
+            self.memory, _ = memory.history(get_settings())
+        messages = self.memory.messages[-memory.SHOWN :]
+        if not messages:
+            console.print("  Nothing said yet. Type a request in plain words.")
+            return
+        for m in messages:
+            extra = m.additional_kwargs
+            who = "you" if m.type == "human" else "assistant"
+            line = Text(f"  {who}", style="bold" if m.type == "human" else SIGNAL)
+            line.append(f" · {extra.get('via', '?')}", style="#7c7c75")
+            console.print(line)
+            console.print(Padding(Text(m.text), (0, 0, 0, 4)))
+            for c in extra.get("commands", []):
+                console.print(Text.assemble("    → ", (c, f"bold {SIGNAL}")))
 
     def _status_line(self) -> str:
         s = get_settings()

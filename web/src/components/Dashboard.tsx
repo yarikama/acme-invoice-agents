@@ -24,6 +24,7 @@ import { Findings } from "./detail/Findings";
 import { InvoiceSummary } from "./detail/InvoiceSummary";
 import { LineItems } from "./detail/LineItems";
 import { InboxTable } from "./InboxTable";
+import { ChatPanel } from "./ChatPanel";
 import { StatusBank } from "./StatusBank";
 import { StatusLight } from "./StatusLight";
 import { Widget } from "./Widget";
@@ -234,6 +235,17 @@ export function Dashboard({
         }
       >
         {findings ? <Findings findings={findings} /> : <Muted>Findings appear once validation runs.</Muted>}
+      </Widget>
+    ),
+    assistant: (d) => (
+      <Widget
+        id="assistant"
+        title="Assistant"
+        icon={SECTION_ICON.assistant}
+        draggable={d}
+        aside={<span className="cap whitespace-nowrap">shared with the terminal</span>}
+      >
+        <ChatPanel />
       </Widget>
     ),
     lines: (d) => (
