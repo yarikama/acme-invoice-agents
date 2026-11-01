@@ -14,12 +14,15 @@
   --r-sm: 6px;
   --r: 8px;
   --r-lg: 14px;
-  /* Darker than the panels so the frosted glass stands off the page. */
-  --canvas: #d6d6d1;
+  /* Darker than the panels so the frosted glass stands off the page; a soft
+     top-to-bottom fall and a fine grain give the page a frosted surface. */
+  --canvas: #c9c9c4;
+  --canvas-top: #d2d2cd;
+  --canvas-bottom: #c3c3bd;
   --panel: #f6f6f4;
   --raised: #ffffff;
   --ink: #111111;
-  --ink-2: #55554f;
+  --ink-2: #4b4b45;
   --seam: #c6c6c0;
   --pale: #e3e3df;
   --key-shadow: #111111;
@@ -27,12 +30,16 @@
   --glass-edge: rgb(17 17 17 / 0.13);
   --glass-hi: rgb(255 255 255 / 0.9);
   --tile: rgb(255 255 255 / 0.55);
-  --wash: rgb(255 255 255 / 0.65);
+  --wash: rgb(255 255 255 / 0.35);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 
 .dark {
   --canvas: #161615;
+  --canvas-top: #1c1c1b;
+  --canvas-bottom: #101010;
   --panel: #1f1f1e;
   --raised: #292927;
   --ink: #edede9;
@@ -45,6 +52,8 @@
   --glass-hi: rgb(255 255 255 / 0.06);
   --tile: rgb(255 255 255 / 0.04);
   --wash: rgb(255 255 255 / 0.05);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
@@ -67,7 +76,9 @@
     margin: 0;
     /* A soft light from the top left, so the frosted panels have something to show. */
     background:
+      var(--grain) 0 0 / 200px 200px,
       radial-gradient(70rem 45rem at 0% 0%, var(--wash), transparent 70%),
+      linear-gradient(to bottom, var(--canvas-top), var(--canvas-bottom)),
       var(--canvas);
     background-attachment: fixed;
     color: var(--ink);
@@ -154,7 +165,7 @@
 
   /* Cards: rounded panels with a hairline edge. */
   .card {
-    background: var(--glass);
+    background: var(--grain-soft) 0 0 / 200px 200px, var(--glass);
     border: 1px solid var(--glass-edge);
     border-radius: var(--r-lg);
     box-shadow:
