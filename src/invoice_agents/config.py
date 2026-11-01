@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # One JSON line per settled invoice: outcome, reason, amount. The same
     # records are in the ledger table of the database above.
     decisions_log: Path | None = Path("logs/decisions.jsonl")
+    # The API's structured log: every step as a JSON line (see logs.py).
+    log_json: Path | None = None
     # API: graph checkpoints, so a run paused for the VP survives a restart.
     checkpoint_path: Path = Path("checkpoints.db")
     samples_dir: Path = Path("data/invoices")

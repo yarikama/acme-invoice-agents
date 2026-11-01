@@ -12,10 +12,12 @@ import urllib.request
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 Pricing = dict[str, tuple[float, float]]  # model -> (USD per input, per output token)
-Tokens = dict[str, dict[str, int]]  # model -> {"input_tokens", "output_tokens"}
+# model -> {"input_tokens", "output_tokens"}, and "replayed": 1 when the
+# answer came from a recording rather than the model.
+Tokens = dict[str, dict[str, int]]
 
 
 class StepUsage(TypedDict):
@@ -25,6 +27,9 @@ class StepUsage(TypedDict):
     output_tokens: int
     # None when a model's price is unknown (e.g. direct xAI, or offline).
     cost_usd: float | None
+    # The answer came from a recording (LLM_PROVIDER=replay): the tokens and
+    # cost are the live run's, the time is not.
+    replayed: NotRequired[bool]
 
 
 _current: ContextVar[Tokens | None] = ContextVar("usage", default=None)
@@ -60,6 +65,8 @@ def add(into: Tokens, tokens: Tokens) -> None:
         counts = into.setdefault(model, {"input_tokens": 0, "output_tokens": 0})
         counts["input_tokens"] += int(u.get("input_tokens", 0))
         counts["output_tokens"] += int(u.get("output_tokens", 0))
+        if u.get("replayed"):
+            counts["replayed"] = 1
 
 
 def cost(tokens: dict[str, Any], pricing: Pricing) -> float | None:
@@ -77,12 +84,15 @@ def step_usage(tokens: Tokens, pricing: Pricing) -> StepUsage | None:
     """One step's totals, or None if it made no model calls."""
     if not tokens:
         return None
-    return StepUsage(
+    step = StepUsage(
         model=", ".join(tokens),
         input_tokens=sum(u["input_tokens"] for u in tokens.values()),
         output_tokens=sum(u["output_tokens"] for u in tokens.values()),
         cost_usd=cost(tokens, pricing),
     )
+    if any(u.get("replayed") for u in tokens.values()):
+        step["replayed"] = True
+    return step
 
 
 def openrouter_pricing() -> Pricing:

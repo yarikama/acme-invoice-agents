@@ -39,7 +39,7 @@ from rich.live import Live
 from rich.logging import RichHandler
 from rich.markup import escape
 
-from invoice_agents import remote
+from invoice_agents import logs, remote
 from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
@@ -118,6 +118,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--reset",
         action="store_true",
         help="Forget every invoice received so far, then run the target if any",
+    )
+    parser.add_argument(
+        "--log-json",
+        type=Path,
+        metavar="FILE",
+        help="Also write each step to FILE as JSON lines (run id, stage, usage)",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
@@ -494,6 +500,13 @@ def main(argv: list[str] | None = None) -> int:
         # This app's steps in detail; HTTP clients stay at warnings, or their
         # connection chatter buries them.
         logging.getLogger("invoice_agents").setLevel(logging.DEBUG)
+    if args.log_json:
+        # The JSON file gets every step; the terminal keeps to warnings
+        # (or debug with -v).
+        logs.to_json_file(args.log_json)
+        for handler in logging.getLogger().handlers:
+            if not args.verbose:
+                handler.setLevel(logging.WARNING)
     with _signals_end_the_cli():
         if _interactive(args):
             from invoice_agents.shell import run_shell
