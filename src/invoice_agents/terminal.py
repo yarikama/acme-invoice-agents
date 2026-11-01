@@ -60,11 +60,17 @@ WORDMARK = [
 
 
 def banner(
-    console_url: str | None, *, live: bool, mirrored: bool, mode: str
+    console_url: str | None,
+    *,
+    live: bool,
+    mirrored: bool,
+    mode: str,
+    start: str = "python main.py --serve",
 ) -> RenderableType:
     """The Acme mark and name, then where to watch the run in a browser.
 
-    `mirrored` says whether runs go through the API, and so show in the console.
+    `mirrored` says whether runs go through the API, and so show in the console;
+    `start` is how to start the console from where the reader is.
     """
     art = Text()
     lines = [*WORDMARK, "invoice agents: Grok judges, code decides", ""]
@@ -90,7 +96,7 @@ def banner(
         where.append("○ ", style="#a6a69f")
         where.append("Web console offline. ", style="bold")
         where.append("Run ", style="#a6a69f")
-        where.append("python main.py --serve", style="bold")
+        where.append(start, style="bold")
         where.append(" to start it, then open ", style="#a6a69f")
         where.append(console_url or "http://localhost:5173", style="underline")
     how = Text(f"  {mode}", style="#7c7c75")

@@ -13,14 +13,16 @@ Requires [uv](https://docs.astral.sh/uv/) and Node 20+ for the console.
 ```bash
 make install                # Python and web dependencies, pre-commit hooks
 cp .env.example .env        # replay mode: no API key needed
+python main.py             # interactive: starts the API and the console, then takes /commands
 python main.py --invoice_path=data/invoices/invoice_1013.json
 python main.py --dir data/invoices --vp ask
-python main.py --serve      # the API and the console; open http://localhost:5173
 ```
 
 `.env.example` starts in **replay** mode. The extraction agent, the approver and the critic answer from a recording of a live Grok run (`data/replay/recording.json`), while validation, the payment policy, the VP pause and payment all run for real. A reviewer without a key sees the same agent conversation, tool calls and per-step costs the live run produced. To run the models live, set `LLM_PROVIDER=openrouter` and `OPENROUTER_API_KEY`.
 
-`--vp ask|approve|reject` answers invoices that pause for a VP, and `--json` prints the results to stdout. While the API is up, the CLI runs through it, so every run also shows in the console.
+With a file or folder the CLI runs it and exits; `-i` stays in the interactive console afterwards. `--vp ask|approve|reject` answers invoices that pause for a VP, and `--json` prints the results to stdout. While the API is up, the CLI runs through it, so every run also shows in the console.
+
+With no file, `python main.py` starts the API and the web console (`--no-serve` skips them) and opens a prompt with the console's actions as commands: `/run <file>` (or drag a file in), `/dir`, `/runs`, `/approve <run>` and `/reject <run>` for invoices waiting for a VP, `/inventory`, `/eval`, `/open`, `/status` and `/help`. A mistyped command gets the closest match, Tab completes commands and paths, Ctrl-C stops a run without leaving, and invoices run in one session are checked against each other for duplicates.
 
 ## What it changes for Acme
 
@@ -141,7 +143,7 @@ The linter exists because of what the eval showed. In early runs Grok paid INV-1
 - **The console** updates live from one server-sent event stream. The inbox, the overview, the routing and settled-over-time charts, and the selected invoice's line items and findings are widgets that can be dragged and resized; light and dark themes both pass contrast checks.
 - **The agent stream reads as a conversation:** who acted and on which model, what they looked up, what they decided, how long each step took and what it cost in tokens and dollars, with a total for the run.
 - **The VP decision card** turns orange when an invoice waits, and separates the policy reason, the agent's reasoning point by point and the flags to weigh. Approve resumes the run.
-- **The CLI** shows the same conversation in the terminal, with the pipeline as a row of lights, and asks the VP question inline. `--serve` starts the API and the console and prints the link.
+- **The CLI** shows the same conversation in the terminal, with the pipeline as a row of lights, and asks the VP question inline. Its interactive mode starts the API and the console and takes the console's actions as `/commands`.
 
 ## Design decisions
 
@@ -179,7 +181,7 @@ make eval       # the eval; ARGS="--set all --repeat 3 --triage typesafe/jev-1.1
 make format
 ```
 
-CI runs 213 Python tests (98% coverage) and 37 web tests on every push; the pre-commit hook runs the linters and type checks. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. LangChain's tracing works as usual: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send every model and tool call to LangSmith.
+CI runs 228 Python tests (98% coverage) and 37 web tests on every push; the pre-commit hook runs the linters and type checks. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. LangChain's tracing works as usual: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send every model and tool call to LangSmith.
 
 ## What's left out
 

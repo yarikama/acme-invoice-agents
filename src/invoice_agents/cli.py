@@ -1,8 +1,12 @@
 """Command line entry point: process one invoice or a folder of them.
 
+    python main.py                    # the interactive console (see shell.py)
     python main.py --invoice_path=data/invoices/invoice_1001.txt
     python main.py --dir data/invoices
     python main.py --serve            # start the API and the web console
+
+With a file or folder the CLI runs it and exits, so scripts and the brief's
+command behave the same; `-i` stays in the interactive console afterwards.
 
 If the API is running, invoices go through it, so each run also appears in
 the web console; otherwise the graph runs here. Either way the terminal shows
@@ -19,6 +23,7 @@ import logging
 import sys
 import time
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -28,6 +33,7 @@ from langgraph.types import Command
 from rich.console import Console
 from rich.live import Live
 from rich.logging import RichHandler
+from rich.markup import escape
 
 from invoice_agents import remote
 from invoice_agents.agents import ExtractionUnavailableError
@@ -73,11 +79,29 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--web", default=DEFAULT_WEB, help=f"Console address (default {DEFAULT_WEB})"
     )
+    parser.add_argument(
+        "-i",
+        "--interactive",
+        action="store_true",
+        help="Stay in the interactive console after the file or folder",
+    )
+    parser.add_argument(
+        "--no-serve",
+        action="store_true",
+        help="In the interactive console, don't start the API and web console",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
-    args = parser.parse_args(argv)
-    if not (args.invoice_path or args.dir or args.serve):
-        parser.error("give --invoice_path, --dir or --serve")
-    return args
+    return parser.parse_args(argv)
+
+
+def _interactive(args: argparse.Namespace) -> bool:
+    """No file or folder opens the console; so does -i. `--serve` alone keeps
+    serving without a prompt when stdin isn't a terminal (a container, say)."""
+    if args.interactive:
+        return True
+    if args.invoice_path or args.dir:
+        return False
+    return not args.serve or sys.stdin.isatty()
 
 
 def _decide(summary: dict[str, Any], mode: str) -> tuple[bool, str]:
@@ -228,46 +252,80 @@ async def _process_all(
     return results
 
 
-async def _run(args: argparse.Namespace) -> int:
+@dataclass
+class Connection:
+    """Where runs go: through the API when it is up, otherwise in this process."""
+
+    runner: Runner
+    api_up: bool
+    web_up: bool
+    mode: str
+
+    def banner(self, web: str, start: str = "python main.py --serve") -> Any:
+        return banner(
+            web, live=self.web_up, mirrored=self.api_up, mode=self.mode, start=start
+        )
+
+
+async def connect(
+    args: argparse.Namespace,
+    client: httpx.AsyncClient,
+    local: LocalRunner | None = None,
+) -> Connection:
     settings = get_settings()
+    api_up = not args.local and await remote.reachable(f"{args.api}/api/health", client)
+    web_up = await remote.reachable(args.web, client)
+    if api_up:
+        mode = (
+            f"Runs go through the API at {args.api},"
+            " so each one also appears in the console."
+        )
+        return Connection(
+            RemoteRunner(remote.Api(args.api, client)), api_up, web_up, mode
+        )
+    mode = f"Running here with the {settings.llm_provider} provider."
+    return Connection(local or LocalRunner(settings), api_up, web_up, mode)
+
+
+def invoice_files(target: Path) -> list[Path]:
+    """The file itself, or a folder's visible files in name order."""
+    paths = sorted(target.iterdir()) if target.is_dir() else [target]
+    return [p for p in paths if p.is_file() and not p.name.startswith(".")]
+
+
+async def process(
+    runner: Runner, paths: list[Path], vp_mode: str
+) -> list[dict[str, Any]]:
+    """Run the files and, for more than one, print the batch summary."""
+    t0 = time.perf_counter()
+    results = await _process_all(runner, paths, vp_mode)
+    if len(results) > 1:
+        console.print(batch_summary(results, time.perf_counter() - t0))
+    return results
+
+
+async def _run(args: argparse.Namespace) -> int:
     started: list[Any] = []
     try:
         if args.serve:
             with console.status("Starting the API and the web console…"):
                 started = await remote.serve(args.api, args.web, Path(".acme-logs"))
         async with httpx.AsyncClient() as client:
-            api_up = not args.local and await remote.reachable(
-                f"{args.api}/api/health", client
-            )
-            web_up = await remote.reachable(args.web, client)
-            if api_up:
-                mode = (
-                    f"Runs go through the API at {args.api},"
-                    " so each one also appears in the console."
-                )
-                runner: Runner = RemoteRunner(remote.Api(args.api, client))
-            else:
-                mode = f"Running here with the {settings.llm_provider} provider."
-                runner = LocalRunner(settings)
-            console.print(banner(args.web, live=web_up, mirrored=api_up, mode=mode))
+            conn = await connect(args, client)
+            console.print(conn.banner(args.web))
+            runner = conn.runner
 
-            paths = (
-                [args.invoice_path]
-                if args.invoice_path
-                else sorted(args.dir.iterdir())
-                if args.dir
-                else []
-            )
-            paths = [p for p in paths if p.is_file() and not p.name.startswith(".")]
-            if not paths:
+            target = args.invoice_path or args.dir
+            if target is None:
                 console.print("  Serving. Press Ctrl-C to stop.")
                 await asyncio.Event().wait()
                 return 0
+            paths = invoice_files(target) if target.exists() else []
+            if not paths:
+                console.print(f"  [bold]No invoice files at {escape(str(target))}.[/]")
+                return 2
 
-            t0 = time.perf_counter()
-            results = await _process_all(runner, paths, args.vp)
-            if len(results) > 1:
-                console.print(batch_summary(results, time.perf_counter() - t0))
+            results = await process(runner, paths, args.vp)
             if args.json:
                 print(json.dumps(results, indent=2, default=str))
             return 0
@@ -282,6 +340,10 @@ def main(argv: list[str] | None = None) -> int:
         format="%(message)s",
         handlers=[RichHandler(console=console, show_path=False)],
     )
+    if _interactive(args):
+        from invoice_agents.shell import run_shell
+
+        return run_shell(args)
     try:
         return asyncio.run(_run(args))
     except KeyboardInterrupt:

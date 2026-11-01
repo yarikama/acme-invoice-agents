@@ -138,8 +138,3 @@ def test_one_failure_does_not_stop_the_batch(
 
     assert result["status"] == "failed"
     assert result["reason"] == "RuntimeError: provider returned 402"
-
-
-def test_needs_a_target() -> None:
-    with pytest.raises(SystemExit):
-        cli.main([])
