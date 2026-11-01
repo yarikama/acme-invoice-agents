@@ -115,6 +115,8 @@ class Turn:
     node: str
     took: float | None = None
     data: dict[str, Any] = field(default_factory=dict)
+    # Tokens and cost of the turn's model calls, from its trace line.
+    usage: dict[str, Any] | None = None
 
 
 def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
@@ -168,10 +170,11 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
                 }
             else:
                 data |= {"rationale": msg}
-            out.append(Turn("approver", "review", timed(at), data))
+            out.append(Turn("approver", "review", timed(at), data, e.get("usage")))
             tools, sendbacks = [], []
             continue
         flush(at)
+        before = len(out)
         if node == "validate":
             m = re.match(
                 r"^(\d+) errors?, (\d+) warnings?; "
@@ -228,9 +231,36 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
             )
         else:
             out.append(Turn("step", node, timed(at), {"text": msg}))
+        if len(out) > before:
+            out[-1].usage = e.get("usage")
     if events:
         flush(None)
     return out
+
+
+def spent(usage: dict[str, Any] | None) -> str:
+    """ "2.1k tokens · $0.0042", or "" for a step with no model calls."""
+    if not usage:
+        return ""
+    n = int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0))
+    words = f"{n / 1000:.1f}k tokens" if n >= 1000 else f"{n} tokens"
+    usd = usage.get("cost_usd")
+    if usd is not None:
+        words += f" · ${usd:.4f}" if usd < 0.01 else f" · ${usd:.2f}"
+    return words
+
+
+def run_usage(all_turns: list[Turn]) -> dict[str, Any] | None:
+    """The run's tokens, and its cost if every step was priced."""
+    used = [t.usage for t in all_turns if t.usage]
+    if not used:
+        return None
+    costs = [u.get("cost_usd") for u in used]
+    return {
+        "input_tokens": sum(int(u.get("input_tokens", 0)) for u in used),
+        "output_tokens": sum(int(u.get("output_tokens", 0)) for u in used),
+        "cost_usd": None if None in costs else sum(c or 0.0 for c in costs),
+    }
 
 
 def _took(seconds: float | None) -> str:
@@ -265,7 +295,14 @@ NAME = {
 }
 
 
-def _header(node: str, name: str, role: str, voice: str, took: float | None) -> Table:
+def _header(
+    node: str,
+    name: str,
+    role: str,
+    voice: str,
+    took: float | None,
+    usage: dict[str, Any] | None = None,
+) -> Table:
     row = Table.grid(expand=True)
     row.add_column()
     row.add_column(justify="right")
@@ -273,7 +310,8 @@ def _header(node: str, name: str, role: str, voice: str, took: float | None) -> 
     left.append(f" {GLYPH.get(node, '•')} ", style=f"bold #111111 on {VOICE[voice]}")
     left.append(f"  {name}", style="bold")
     left.append(f"  {role}", style=VOICE[voice])
-    row.add_row(left, Text(_took(took), style="#7c7c75"))
+    right = "  ".join(x for x in (spent(usage), _took(took)) if x)
+    row.add_row(left, Text(right, style="#7c7c75"))
     return row
 
 
@@ -281,7 +319,7 @@ def render_turn(t: Turn) -> RenderableType:
     d = t.data
     body: list[RenderableType] = []
     if t.kind == "validate":
-        head = _header("validate", "Validation", "code", "code", t.took)
+        head = _header("validate", "Validation", "code", "code", t.took, t.usage)
         if "errors" in d:
             line = Text()
             line.append(
@@ -299,7 +337,7 @@ def render_turn(t: Turn) -> RenderableType:
         else:
             body.append(Text(d["text"]))
     elif t.kind == "triage":
-        head = _header("triage", "Triage", "decision model", "model", t.took)
+        head = _header("triage", "Triage", "decision model", "model", t.took, t.usage)
         if "decision" in d:
             line = _pill(d["decision"].capitalize(), DECISION_STYLE[d["decision"]])
             line.append(f"  {d['sure']}% sure  ·  suspicion {d['suspicion']}%  ")
@@ -313,7 +351,7 @@ def render_turn(t: Turn) -> RenderableType:
         else:
             body.append(Text(d["text"]))
     elif t.kind == "approver":
-        head = _header("review", "Approver", "model", "model", t.took)
+        head = _header("review", "Approver", "model", "model", t.took, t.usage)
         for call, result in d.get("tools", []):
             line = Text("⚒ ", style=VOICE["code"])
             line.append(call, style="bold")
@@ -332,7 +370,7 @@ def render_turn(t: Turn) -> RenderableType:
             body.append(line)
         body.extend(Text(f"▪ {s}") for s in sentences(d.get("rationale", "")))
     elif t.kind == "critic":
-        head = _header("critique", "Critic", "model", "model", t.took)
+        head = _header("critique", "Critic", "model", "model", t.took, t.usage)
         line = _pill(
             "Agrees" if d["agrees"] else "Objects",
             DECISION_STYLE["approve" if d["agrees"] else "reject"],
@@ -343,7 +381,7 @@ def render_turn(t: Turn) -> RenderableType:
         if d.get("issues"):
             body.append(Text(d["issues"]))
     elif t.kind == "human":
-        head = _header("human_review", "VP", "human", "human", t.took)
+        head = _header("human_review", "VP", "human", "human", t.took, t.usage)
         line = _pill(
             "Approved" if d["approved"] else "Rejected",
             DECISION_STYLE["approve" if d["approved"] else "reject"],
@@ -353,7 +391,12 @@ def render_turn(t: Turn) -> RenderableType:
         body.append(line)
     else:
         head = _header(
-            t.node, NAME.get(t.node, t.node.capitalize()), "code", "code", t.took
+            t.node,
+            NAME.get(t.node, t.node.capitalize()),
+            "code",
+            "code",
+            t.took,
+            t.usage,
         )
         body.append(Text(d["text"]))
     return Group(head, Padding(Group(*body), (0, 0, 1, 6)))
@@ -473,8 +516,13 @@ class RunView:
 
     def __rich__(self) -> RenderableType:
         states = lights(self.events, self.status)
-        parts: list[RenderableType] = [render_lights(states), Text()]
-        parts += [render_turn(t) for t in turns(self.events, self.started)[self.skip :]]
+        parts: list[RenderableType] = [render_lights(states)]
+        drawn = turns(self.events, self.started)
+        total = run_usage(drawn)
+        if total:
+            parts.append(Text(f"  this run so far: {spent(total)}", style="#7c7c75"))
+        parts.append(Text())
+        parts += [render_turn(t) for t in drawn[self.skip :]]
         if self.status == "running":
             now = next((s for s in SEGMENTS if states[s] == "run"), None)
             row = Table.grid()

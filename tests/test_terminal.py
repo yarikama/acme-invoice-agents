@@ -244,3 +244,43 @@ def test_batch_summary_counts_vp_decisions_as_a_person() -> None:
     assert "in 40ms" in text(batch_summary(results, 0.04))
     assert "2 settled with no person, 2 sent to a VP" in out
     assert "Skipped" in out and "Failed" not in out
+
+
+def test_usage_shows_beside_each_turn_and_as_a_run_total() -> None:
+    from invoice_agents.terminal import run_usage, spent
+
+    priced = {"input_tokens": 1800, "output_tokens": 300, "cost_usd": 0.0042}
+    events = [
+        trace("ingest", "Parsed XML in code.", 1.0),
+        {**trace("review", "Draft 1: approve. Fine.", 9.0), "usage": priced},
+        {
+            **trace("critique", "Critic agrees. Outcome: pay.", 12.0),
+            "usage": {"input_tokens": 500, "output_tokens": 0, "cost_usd": None},
+        },
+    ]
+    got = turns(events, started=0.0)
+    assert got[1].usage == priced and got[0].usage is None
+    assert spent(priced) == "2.1k tokens · $0.0042"
+    assert (
+        spent({"input_tokens": 40, "output_tokens": 0, "cost_usd": 0.5})
+        == "40 tokens · $0.50"
+    )
+    assert spent(None) == ""
+    assert run_usage(got) == {
+        "input_tokens": 2300,
+        "output_tokens": 300,
+        "cost_usd": None,
+    }
+    assert run_usage(got[:2]) == {
+        "input_tokens": 1800,
+        "output_tokens": 300,
+        "cost_usd": 0.0042,
+    }
+    assert run_usage(got[:1]) is None
+
+    view = RunView("x")
+    view.started = 0.0
+    for e in events[:2]:
+        view.add(e)
+    out = text(view)
+    assert "2.1k tokens · $0.0042" in out and "this run so far: 2.1k tokens" in out
