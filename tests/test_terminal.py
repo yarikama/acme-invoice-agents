@@ -7,7 +7,9 @@ from invoice_agents.terminal import (
     banner,
     batch_summary,
     lights,
-    result_line,
+    money,
+    render_turn,
+    result_card,
     sentences,
     turns,
     vp_card,
@@ -242,24 +244,146 @@ def test_vp_card_has_each_section() -> None:
     assert "ignored" not in out
 
 
-def test_result_lines() -> None:
-    assert "Waiting for a VP" in text(
-        result_line("f", {**SUMMARY, "status": "awaiting_vp"})
+def test_result_card_says_who_decided_and_why() -> None:
+    result = {
+        **SUMMARY,
+        "status": "paid",
+        "payment": {
+            "status": "success",
+            "vendor": "TechParts",
+            "amount": 4455.0,
+            "currency": "USD",
+        },
+        "trace": [
+            {
+                "stage": "approve",
+                "message": "Draft 1: approve. Fine.",
+                "usage": {"input_tokens": 900, "output_tokens": 100, "cost_usd": 0.004},
+            },
+            {
+                "stage": "approve",
+                "message": "Critic agrees. Outcome: human.",
+                "usage": {"input_tokens": 400, "output_tokens": 50, "cost_usd": 0.001},
+            },
+            {"stage": "approve", "message": "VP approved (Dana). Note: ok"},
+        ],
+    }
+    out = text(result_card("f", result))
+    for words in (
+        "Paid",
+        "INV-1014",
+        "€4,125.00",
+        "Approver  Approve",
+        "Critic  Agrees",
+        "VP  Approved",
+        "▪ Converted at 1.08.",
+        "FOREIGN_CURRENCY",
+        "Paid $4,455.00 to TechParts",
+        "1.4k tokens · $0.0050 across 2 model steps",
+    ):
+        assert words in out
+    assert "NOTE" not in out
+
+
+def test_result_card_for_runs_without_a_model() -> None:
+    waiting = text(
+        result_card("f", {**SUMMARY, "status": "awaiting_vp", "draft": None})
     )
-    assert "billed in EUR" in text(
-        result_line("f", {**SUMMARY, "status": "awaiting_vp"})
+    assert "Waiting for a VP" in waiting and "Billed in EUR." in waiting
+    failed = text(result_card("broken.pdf", {"status": "failed", "reason": "boom"}))
+    assert "broken.pdf" in failed and "▪ boom" in failed
+    objected = text(
+        result_card(
+            "f",
+            {
+                "status": "rejected",
+                "invoice": {"total": -250.0, "currency": "CAD"},
+                "trace": [
+                    {"message": "Critic objects: no."},
+                    {"message": "VP rejected."},
+                ],
+            },
+        )
     )
-    failed = text(result_line("broken.pdf", {"status": "failed", "reason": "boom"}))
-    assert "broken.pdf" in failed and "boom" in failed
-    assert "GBP 1.00" not in text(
-        result_line("f", {"status": "paid", "invoice": {"total": 1, "currency": "GBP"}})
-    )
-    assert "CAD 1.00" in text(
-        result_line("f", {"status": "paid", "invoice": {"total": 1, "currency": "CAD"}})
-    )
-    assert "no amount" in text(
-        result_line("f", {"status": "paid", "invoice": {"total": None}})
-    )
+    assert "no vendor" in objected and "CAD -250.00" in objected
+    assert "Critic  Objects" in objected and "VP  Rejected" in objected
+
+
+def test_money() -> None:
+    assert money(-250, "USD") == "-$250.00"
+    assert money(1, "GBP") == "£1.00"
+    assert money(None, "USD") == "no amount"
+
+
+def test_turns_show_what_each_step_produced() -> None:
+    invoice = {
+        "invoice_number": "INV-1009",
+        "vendor": None,
+        "total": -250.0,
+        "currency": "USD",
+        "due_date": None,
+        "line_items": [
+            {"item": "WidgetA", "quantity": -5, "unit_price": 250, "amount": None},
+            {"item": "WidgetB", "quantity": 2.5, "unit_price": 500, "amount": 1250},
+        ],
+    }
+    findings = [
+        {"code": "NOTE", "severity": "info", "title": "t", "detail": "fyi"},
+        {
+            "code": "INVALID_QUANTITY",
+            "severity": "error",
+            "title": "t",
+            "detail": "WidgetA has quantity -5.",
+        },
+    ]
+    events = [
+        {
+            **trace("ingest", "Attempt 1: extracted with the LLM.", 1.0),
+            "data": {"invoice": invoice, "corrections": ["read 2O26 as 2026"]},
+        },
+        {
+            **trace("validate", "1 error, 0 warnings; policy route: reject.", 1.1),
+            "data": {"findings": findings},
+        },
+        trace("reject", "Not paid. One. Two. Three. Four.", 1.2),
+    ]
+    out = text(Group(*(render_turn(t) for t in turns(events, 1.0))))
+    for words in (
+        "INV-1009  no vendor  -$250.00  due not stated",
+        "WidgetA",
+        "-$1,250.00",
+        "2.5",
+        "$1,250.00",
+        "✎ read 2O26 as 2026",
+        "✕ INVALID_QUANTITY  WidgetA has quantity -5.",
+        "· NOTE  fyi",
+        "Not paid. One.",
+    ):
+        assert words in out, words
+    assert "Four." not in out
+    # Errors come before notes.
+    assert out.index("INVALID_QUANTITY") < out.index("NOTE")
+
+    clean = [
+        {
+            **trace("validate", "0 errors, 0 warnings; policy route: auto.", 1.0),
+            "data": {"findings": []},
+        },
+        {
+            **trace("pay", "mock_payment returned success.", 1.1),
+            "data": {
+                "payment": {
+                    "status": "success",
+                    "vendor": "W",
+                    "amount": 10.0,
+                    "currency": "USD",
+                }
+            },
+        },
+    ]
+    out = text(Group(*(render_turn(t) for t in turns(clean, 1.0))))
+    assert "✓ Every check passed" in out
+    assert "Paid $10.00 to W  via mock_payment" in out
 
 
 def test_batch_summary_counts_vp_decisions_as_a_person() -> None:

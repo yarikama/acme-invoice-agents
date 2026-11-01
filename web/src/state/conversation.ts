@@ -1,4 +1,4 @@
-import type { Decision, StepUsage } from "../api/types";
+import type { Decision, StageOutput, StepUsage } from "../api/types";
 import { splitToolLine } from "../lib/text";
 import type { TraceLine } from "./pipeline";
 
@@ -19,6 +19,8 @@ interface Base {
   ms?: number;
   // Tokens and cost of the model calls in this turn.
   usage?: StepUsage;
+  // What the step produced: the extracted invoice, the findings, the payment.
+  output?: StageOutput;
 }
 
 export type Turn = Base &
@@ -102,13 +104,23 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
   const timed = (line: TraceLine): Base => {
     const ms = line.at !== undefined && last !== undefined ? Math.max(0, line.at - last) : undefined;
     if (line.at !== undefined) last = line.at;
-    return { key: line.seq, ms, usage: line.usage };
+    return { key: line.seq, ms, usage: line.usage, output: line.output };
   };
   // Tool calls and send-backs arrive just before the draft they led to.
   const flush = (line: TraceLine) => {
     if (tools.length || sendbacks.length) {
       const key = opened ?? line.seq;
-      out.push({ ...timed(line), key, kind: "approver", tools, sendbacks, round: null, decision: null, rationale: "" });
+      out.push({
+        ...timed(line),
+        key,
+        output: undefined,
+        kind: "approver",
+        tools,
+        sendbacks,
+        round: null,
+        decision: null,
+        rationale: "",
+      });
       tools = [];
       sendbacks = [];
       opened = undefined;

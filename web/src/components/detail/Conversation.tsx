@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import type { Decision, StepUsage } from "../../api/types";
+import type { Decision, Finding, StageOutput, StepUsage } from "../../api/types";
+import { money } from "../../lib/format";
 import { sentences } from "../../lib/text";
 import { dollars, tokenWord, totals, type Turn } from "../../state/conversation";
 import type { TraceVoice } from "../../state/pipeline";
@@ -110,6 +111,76 @@ function Reasoning({ text, fresh }: { text: string; fresh: boolean }) {
   );
 }
 
+/** What ingest pulled out of the document: who, how much, when, and the lines. */
+function Extracted({ output }: { output: StageOutput }) {
+  const inv = output.invoice;
+  if (!inv) return null;
+  const cur = inv.currency;
+  return (
+    <div className="bubble flex flex-col gap-3">
+      <dl className="extracted">
+        <div>
+          <dt>Vendor</dt>
+          <dd>{inv.vendor ?? <span className="text-ink-2">not found</span>}</dd>
+        </div>
+        <div>
+          <dt>Total</dt>
+          <dd className="font-medium">{money(inv.total, cur)}</dd>
+        </div>
+        <div>
+          <dt>Due</dt>
+          <dd>{inv.due_date ?? <span className="text-ink-2">not stated</span>}</dd>
+        </div>
+        <div>
+          <dt>Number</dt>
+          <dd className="mono text-sm">{inv.invoice_number ?? "none"}</dd>
+        </div>
+      </dl>
+      {inv.line_items.length > 0 && (
+        <ul className="m-0 flex list-none flex-col gap-1 p-0 text-sm">
+          {inv.line_items.map((li, i) => (
+            <li key={i} className="flex items-baseline gap-3">
+              <span className="mono text-xs">{li.item}</span>
+              <span className={li.quantity <= 0 ? "font-medium text-[var(--color-signal)]" : "text-ink-2"}>
+                × {li.quantity}
+              </span>
+              <span className="ml-auto tabular-nums">{money(li.amount ?? li.quantity * li.unit_price, cur)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {output.corrections?.map((c, i) => (
+        <p key={i} className="m-0 text-sm text-ink-2">
+          Read as: {c}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+const SEVERITY_WORD = { error: "fail", warning: "flag", info: "note" } as const;
+const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 } as const;
+
+/** Each check that tripped, worst first; a clean pass says so. */
+function Checks({ findings }: { findings: Finding[] }) {
+  const sorted = [...findings].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
+  const clean = !findings.some((f) => f.severity !== "info");
+  return (
+    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+      {clean && <li className="text-sm">Every check passed against inventory, history and policy.</li>}
+      {sorted.map((f, i) => (
+        <li key={`${f.code}-${i}`} className="flex items-start gap-3 text-sm">
+          <span className={`chip chip-${f.severity}`}>{SEVERITY_WORD[f.severity]}</span>
+          <span className="min-w-0">
+            <span className="mono text-xs">{f.code}</span>{" "}
+            <span className={f.severity === "info" ? "text-ink-2" : ""}>{f.detail}</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
   switch (turn.kind) {
     case "validate":
@@ -137,6 +208,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
               {turn.reason && <span className="text-sm text-ink-2">{turn.reason}</span>}
             </div>
           )}
+          {turn.output?.findings && <Checks findings={turn.output.findings} />}
         </TurnFrame>
       );
     case "triage":
@@ -244,9 +316,21 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
     case "step": {
       const name =
         { ingest: "Ingest", pay: "Payment", reject: "Not paid", error: "Run failed" }[turn.node] ?? turn.node;
+      const paid = turn.output?.payment?.status === "success" ? turn.output.payment : null;
       return (
         <TurnFrame node={turn.node} voice="code" name={name} role="code" ms={turn.ms} usage={turn.usage} fresh={fresh}>
-          <p className="m-0 text-[var(--ink)]">{turn.text}</p>
+          {paid ? (
+            <p className="m-0">
+              Paid <span className="font-medium">{money(paid.amount, paid.currency)}</span> to {paid.vendor} through
+              mock_payment.
+            </p>
+          ) : (
+            <p className={`m-0 ${turn.output?.invoice ? "text-sm text-ink-2" : "text-[var(--ink)]"}`}>
+              {/* The approver's turn above already gives the full reasoning. */}
+              {turn.node === "reject" ? sentences(turn.text).slice(0, 2).join(" ") : turn.text}
+            </p>
+          )}
+          {turn.output?.invoice && <Extracted output={turn.output} />}
         </TurnFrame>
       );
     }

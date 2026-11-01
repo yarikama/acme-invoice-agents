@@ -36,6 +36,21 @@ export interface Finding {
   detail: string;
 }
 
+export interface Payment {
+  status: string;
+  vendor: string;
+  amount: number;
+  currency: string;
+}
+
+/** What a step produced, on its trace line: the extraction, the checks, the payment. */
+export interface StageOutput {
+  invoice?: Invoice;
+  corrections?: string[];
+  findings?: Finding[];
+  payment?: Payment;
+}
+
 export interface TraceEntry {
   stage: string;
   message: string;
@@ -50,7 +65,7 @@ export interface Summary {
   // Why the rules send this invoice to a VP, when they do.
   route_reason?: string | null;
   draft: { decision: Decision; rationale: string } | null;
-  payment: { status: string; vendor: string; amount: number; currency: string } | null;
+  payment: Payment | null;
   reason: string | null;
   trace: TraceEntry[];
 }
@@ -92,7 +107,15 @@ export type RunEvent = EventBase &
     | { type: "started" }
     | { type: "progress"; stage: string; step: string }
     // `tool` is set when the line records a tool call the approver made.
-    | { type: "trace"; node: string; stage: string; message: string; tool?: string; usage?: StepUsage }
+    | {
+        type: "trace";
+        node: string;
+        stage: string;
+        message: string;
+        tool?: string;
+        usage?: StepUsage;
+        data?: StageOutput;
+      }
     | { type: "awaiting_vp"; request: unknown; summary: Summary }
     | { type: "decision"; approved: boolean; note: string }
     | { type: "done"; summary: Summary }

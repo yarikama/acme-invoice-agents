@@ -69,6 +69,27 @@ async def test_clean_text_invoice_is_paid(inventory):
     assert [e["stage"] for e in state["trace"]][-1] == "pay"
 
 
+async def test_each_step_reports_what_it_produced(inventory):
+    graph = make_graph(inventory)
+    state = await graph.ainvoke({"path": str(INVOICES / "invoice_1001.txt")}, config())
+    data = {t["stage"]: t.get("data") for t in state["trace"] if t.get("data")}
+    assert data["ingest"]["invoice"]["vendor"] == "Widgets Inc."
+    assert data["ingest"]["corrections"] == ["read 2O26 as 2026"]
+    assert isinstance(data["validate"]["findings"], list)
+    assert data["pay"]["payment"] == {
+        "status": "success",
+        "vendor": "Widgets Inc.",
+        "amount": 5000.0,
+        "currency": "USD",
+    }
+    # A document parsed in code reports its invoice too.
+    state = await graph.ainvoke({"path": str(INVOICES / "invoice_1016.json")}, config())
+    [ingest] = [t for t in state["trace"] if t["stage"] == "ingest"]
+    assert ingest["data"]["invoice"]["invoice_number"] == "INV-1016"
+    [validate] = [t for t in state["trace"] if t["stage"] == "validate"]
+    assert {f["code"] for f in validate["data"]["findings"]} >= {"UNKNOWN_ITEM"}
+
+
 async def test_extraction_retries_with_feedback(inventory):
     extractor = StubExtractor(INV_1001, fail_first=True)
     graph = make_graph(inventory, extractor)

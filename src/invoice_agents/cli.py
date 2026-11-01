@@ -47,7 +47,7 @@ from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import build_agents
 from invoice_agents.summary import run_status, summarize
-from invoice_agents.terminal import RunView, banner, batch_summary, result_line, vp_card
+from invoice_agents.terminal import RunView, banner, batch_summary, result_card, vp_card
 
 console = Console(stderr=True)
 
@@ -215,6 +215,7 @@ class LocalRunner:
                                     "message": t["message"],
                                     "tool": t.get("tool"),
                                     "usage": t.get("usage"),
+                                    "data": t.get("data"),
                                 }
                             )
                     _print_finished(view)
@@ -286,7 +287,7 @@ async def _process_all(
             }
         # A live view can end mid-line when output isn't a terminal.
         console.line()
-        console.print(result_line(path.name, result))
+        console.print(result_card(path.name, result))
         console.print()
         results.append(result)
     return results

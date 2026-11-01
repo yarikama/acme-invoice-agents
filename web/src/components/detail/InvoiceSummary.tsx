@@ -1,4 +1,5 @@
 import { money } from "../../lib/format";
+import { soFar } from "../../state/pipeline";
 import type { RunView } from "../../state/runs";
 
 function closing(run: RunView): string {
@@ -18,7 +19,7 @@ function closing(run: RunView): string {
 
 /** Who billed what, and where the run stands. */
 export function InvoiceSummary({ run }: { run: RunView }) {
-  const inv = run.summary?.invoice;
+  const inv = soFar(run).invoice;
   return (
     <div className="flex flex-col gap-1">
       <span className="flex flex-wrap gap-2">
