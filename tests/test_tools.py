@@ -97,3 +97,12 @@ def test_langchain_tools_have_schemas(tools: ReviewTools) -> None:
     assert list(by_name) == ["check_inventory", "vendor_history", "convert_to_usd"]
     assert "stock and list price" in by_name["check_inventory"].description
     assert set(by_name["convert_to_usd"].args) == {"amount", "currency"}
+
+
+def test_run_coerces_arguments_the_model_sent_as_strings(tools: ReviewTools) -> None:
+    # Models sometimes send numbers as strings; this used to fail on the format.
+    call = tools.run("convert_to_usd", {"amount": "100", "currency": "GBP"})
+    assert call.result.startswith("GBP 100.00 is $127.00")
+    assert tools.run(
+        "convert_to_usd", {"amount": "lots", "currency": "GBP"}
+    ).result.startswith("Bad arguments for convert_to_usd:")
