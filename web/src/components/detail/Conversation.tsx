@@ -396,25 +396,28 @@ export function Conversation({
   live: boolean;
   doing: string;
 }) {
-  const end = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLOListElement>(null);
   // Turns present on first render are history; only later ones animate.
   // The parent keys this component by run, so switching runs starts fresh.
   const [lastSeen] = useState(() => turns.at(-1)?.key ?? -1);
+  // Follow a live run by scrolling the turn list itself, never the page:
+  // the page stays where the person put it.
   useEffect(() => {
-    if (live) end.current?.scrollIntoView({ block: "nearest" });
+    const el = list.current;
+    if (live && el) el.scrollTop = el.scrollHeight;
   }, [turns.length, live]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" role="log" aria-label={`Agent run for ${label}`}>
       <RunTotals turns={turns} live={live} />
-      <ol className="m-0 flex min-h-0 flex-1 list-none flex-col gap-5 overflow-y-auto p-0 pr-1">
+      <ol ref={list} className="m-0 flex min-h-0 flex-1 list-none flex-col gap-5 overflow-y-auto p-0 pr-1">
         {turns.map((t) => (
           <TurnView key={t.key} turn={t} fresh={t.key > lastSeen} />
         ))}
         {turns.length === 0 && !live && <li className="text-ink-2">Nothing has run yet.</li>}
       </ol>
       {live && (
-        <div ref={end} className="turn mt-5">
+        <div className="turn mt-5">
           <span className="avatar avatar-model avatar-active" aria-hidden="true">
             <PixelSpinner />
           </span>
