@@ -7,7 +7,8 @@ function closing(run: RunView): string {
   if (run.status === "paid" && s?.payment)
     return `Paid ${money(s.payment.amount, s.payment.currency)} through mock_payment.`;
   if (run.status === "rejected") return s?.reason ?? "Rejected.";
-  if (run.status === "failed") return run.error ?? "The run failed.";
+  if (run.status === "failed")
+    return `The run stopped before a decision, so nothing was paid.${run.error ? ` ${run.error}` : ""}`;
   if (run.status === "awaiting_vp") {
     if (s?.route_reason) return `Paused for a VP: ${s.route_reason}.`;
     if (s?.draft?.decision === "escalate") return "Paused for a VP: the agent escalated it.";

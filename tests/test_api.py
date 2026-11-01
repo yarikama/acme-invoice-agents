@@ -362,3 +362,14 @@ async def test_inventory_comes_from_the_database(client, tmp_path):
     rows = {r["item"]: r for r in (await client.get("/api/inventory")).json()}
     assert rows["WidgetA"]["stock"] == 3
     assert rows["GadgetX"]["unit_price"] == 750
+
+
+async def test_a_rejection_needs_a_reason(client):
+    run = (await client.post("/api/runs", json={"sample": "invoice_1014.xml"})).json()
+    await settle(run["id"])
+    resp = await client.post(
+        f"/api/runs/{run['id']}/decision", json={"approved": False, "note": "  "}
+    )
+    assert resp.status_code == 422
+    assert "needs a reason" in resp.json()["detail"]
+    assert manager().get(run["id"]).status == "awaiting_vp"
