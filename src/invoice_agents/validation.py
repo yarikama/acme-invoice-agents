@@ -430,20 +430,47 @@ def _vendor_key(name: str) -> str:
     return item_key(COMPANY_SUFFIXES.sub("", name))
 
 
+def _closest(key: str, vendors: list[str]) -> str | None:
+    for vendor in vendors:
+        if SequenceMatcher(None, key, _vendor_key(vendor)).ratio() >= LOOKALIKE_RATIO:
+            return vendor
+    return None
+
+
 def _lookalike_vendor(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
-    """A name a letter or two off a vendor already paid: "Summit Manufactruing
-    Co." for "Summit Manufacturing Co." is how impostor invoices get paid."""
+    """A name a letter or two off a vendor already invoiced: "Summit
+    Manufactruing Co." for "Summit Manufacturing Co." is how impostor invoices
+    get paid.
+
+    Vendors count in the order they were first seen, and a name close to an
+    earlier vendor is a suspect, not a vendor: an impostor's second invoice is
+    flagged like its first. Order is all there is to go on here, so an impostor
+    seen before the real vendor would flag the real one instead; a vendor
+    master file would settle that.
+    """
     if not inv.vendor:
         return []
+    vendors: list[str] = []
+    suspects: dict[str, str] = {}  # suspect name key -> the vendor it resembles
+    for other in seen.invoices:
+        if not other.vendor or other is inv:
+            continue
+        key = _vendor_key(other.vendor)
+        if key in suspects or any(_vendor_key(v) == key for v in vendors):
+            continue
+        close = _closest(key, vendors)
+        if close:
+            suspects[key] = close
+        else:
+            vendors.append(other.vendor)
+
     key = _vendor_key(inv.vendor)
-    known = {o.vendor for o in seen.invoices if o.vendor and o is not inv}
-    if any(_vendor_key(k) == key for k in known):
+    if key in suspects:
+        close: str | None = suspects[key]
+    elif any(_vendor_key(v) == key for v in vendors):
         return []
-    close = [
-        k
-        for k in sorted(known)
-        if SequenceMatcher(None, key, _vendor_key(k)).ratio() >= LOOKALIKE_RATIO
-    ]
+    else:
+        close = _closest(key, vendors)
     if not close:
         return []
     return [
@@ -451,7 +478,7 @@ def _lookalike_vendor(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
             "LOOKALIKE_VENDOR",
             Severity.WARNING,
             "Vendor name is close to a known vendor's",
-            f"{inv.vendor!r} is not {close[0]!r}, a vendor already invoiced, but"
+            f"{inv.vendor!r} is not {close!r}, a vendor already invoiced, but"
             " differs by a letter or two. Confirm it is a real, separate vendor.",
         )
     ]
