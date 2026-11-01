@@ -115,6 +115,8 @@ export interface TraceLine {
   node: string;
   voice: TraceVoice;
   text: string;
+  // Epoch milliseconds when the line arrived, if the server said.
+  at?: number;
 }
 
 // The VP's decision shows up once, as the human_review node's trace line.
@@ -125,14 +127,25 @@ export function traceLines(run: RunView, llm: boolean): TraceLine[] {
       // The model asked; code answered. The result is a fact, so it reads as code.
       // A guardrail line is code sending the approver's decision back.
       const node = e.tool === "guardrail" ? "guardrail" : "tool";
-      lines.push({ seq: e.seq, node, voice: "code", text: e.message });
+      lines.push({ seq: e.seq, node, voice: "code", text: e.message, at: time(e.at) });
     } else if (e.type === "trace") {
-      lines.push({ seq: e.seq, node: e.node, voice: voiceOf(e.node, e.message, llm), text: e.message });
+      lines.push({ seq: e.seq, node: e.node, voice: voiceOf(e.node, e.message, llm), text: e.message, at: time(e.at) });
     } else if (e.type === "run_error") {
-      lines.push({ seq: e.seq, node: "error", voice: "code", text: e.message });
+      lines.push({ seq: e.seq, node: "error", voice: "code", text: e.message, at: time(e.at) });
     }
   }
   return lines;
+}
+
+function time(iso: string | undefined): number | undefined {
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+/** When the run started, for timing its first step. */
+export function startedAt(run: RunView): number | undefined {
+  const first = run.events.find((e) => e.type === "started") ?? run.events[0];
+  return time(first?.at);
 }
 
 function voiceOf(node: string, message: string, llm: boolean): TraceVoice {
