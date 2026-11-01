@@ -58,7 +58,13 @@ CASES: list[Case] = [
     Case(("invoice_1001.txt",), "pay", "Clean, within stock."),
     Case(("invoice_1002.txt",), "reject", "20 GadgetX against 5 in stock."),
     Case(("invoice_1003.txt",), "reject", "FakeItem has no stock; pay-now pressure."),
-    Case(("invoice_1004.json",), "pay", "Clean."),
+    Case(
+        ("invoice_1004.json",),
+        "pay",
+        "Clean, though the vendor address is the Simpsons' house.",
+        # Escalating that address to a person is a fair call; rejecting is not.
+        also_ok=("human",),
+    ),
     Case(
         ("invoice_1004.json", "invoice_1004_revised.json"),
         "human",
@@ -88,9 +94,7 @@ CASES: list[Case] = [
     Case(
         ("invoice_1014.xml",),
         "human",
-        "Billed in EUR; payments run in USD.",
-        # The current policy lets the approver pay once it has converted to USD.
-        also_ok=("pay",),
+        "Billed in EUR; policy sends foreign currency to a VP.",
     ),
     Case(("invoice_1015.csv",), "pay", "Clean."),
     Case(("invoice_1016.json",), "reject", "WidgetC is not in the inventory."),

@@ -13,7 +13,11 @@ function closing(run: RunView): string {
   if (run.status === "paid" && s?.payment) return `Paid ${money(s.payment.amount, s.payment.currency)} through mock_payment.`;
   if (run.status === "rejected") return s?.reason ?? "Rejected.";
   if (run.status === "failed") return run.error ?? "The run failed.";
-  if (run.status === "awaiting_vp") return "Paused until a VP decides.";
+  if (run.status === "awaiting_vp") {
+    if (s?.route_reason) return `Paused for a VP: ${s.route_reason}.`;
+    if (s?.draft?.decision === "escalate") return "Paused for a VP: the agent escalated it.";
+    return "Paused until a VP decides.";
+  }
   if (run.status === "queued") return "Queued behind the runs before it.";
   return "Agents are working on it.";
 }

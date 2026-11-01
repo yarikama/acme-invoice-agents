@@ -10,6 +10,7 @@ function Total({ runs }: { runs: RunView[] }) {
   const usd = priced.filter((r) => r.summary!.invoice!.currency === "USD");
   const sum = usd.reduce((acc, r) => acc + r.summary!.invoice!.total!, 0);
   const other = priced.length - usd.length;
+  if (usd.length === 0) return <span className="whitespace-nowrap">{other} non-USD</span>;
   return (
     <>
       <span className="whitespace-nowrap">{money(sum)}</span>

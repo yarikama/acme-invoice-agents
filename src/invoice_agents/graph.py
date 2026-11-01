@@ -18,8 +18,8 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
-from invoice_agents.agents import Extraction
-from invoice_agents.approval import Outcome, Route, policy_route, resolve
+from invoice_agents.agents import GUARDRAIL, Extraction
+from invoice_agents.approval import Outcome, Route, policy_route, resolve, vp_reason
 from invoice_agents.config import Settings
 from invoice_agents.ingestion import load_document
 from invoice_agents.inventory import Inventory
@@ -77,6 +77,7 @@ class InvoiceState(TypedDict, total=False):
     extract_attempts: int
     report: ValidationReport
     route: Route
+    route_reason: str | None
     draft: ApprovalDraft
     tool_calls: list[ToolCall]
     critique: Critique
@@ -100,6 +101,7 @@ class Deps:
         return Policy(
             approval_threshold=self.settings.approval_threshold,
             near_threshold_ratio=self.settings.near_threshold_ratio,
+            vp_required=frozenset(self.settings.vp_required_findings),
         )
 
 
@@ -201,14 +203,16 @@ def build_graph(
         ]
         deps.seen.add(invoice)
         route = policy_route(invoice, report, deps.policy)
+        reason = vp_reason(invoice, report, deps.policy) if route == "human" else None
         return {
             "report": report,
             "route": route,
+            "route_reason": reason,
             "trace": _event(
                 "validate",
                 f"{_count(len(report.errors), 'error')},"
                 f" {_count(len(report.warnings), 'warning')};"
-                f" policy route: {route}.",
+                f" policy route: {route}" + (f" ({reason})." if reason else "."),
             ),
         }
 
@@ -224,8 +228,14 @@ def build_graph(
         draft = result.draft
         rounds = state.get("review_rounds", 0) + 1
         trace: list[TraceEvent] = [
-            {"stage": "approve", "message": call.describe(), "tool": call.name}
-            for call in result.tool_calls
+            {
+                "stage": "approve",
+                "message": f"Sent the decision back. {step.result}"
+                if step.name == GUARDRAIL
+                else step.describe(),
+                "tool": step.name,
+            }
+            for step in result.steps
         ]
         trace += _event(
             "approve", f"Draft {rounds}: {draft.decision}. {draft.rationale}"

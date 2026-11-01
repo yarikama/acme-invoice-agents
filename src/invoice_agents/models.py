@@ -90,6 +90,11 @@ Decision = Literal["approve", "reject", "escalate"]
 class ApprovalDraft(BaseModel):
     decision: Decision
     rationale: str = Field(description="Why, citing the findings that drove it")
+    addressed: list[str] = Field(
+        default_factory=list,
+        description="The code of every finding this decision accounts for,"
+        " e.g. NEAR_THRESHOLD",
+    )
 
 
 class ToolCall(BaseModel):

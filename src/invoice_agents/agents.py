@@ -13,6 +13,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, Field, ValidationError
 
+from invoice_agents.guardrails import lint_decision
 from invoice_agents.models import (
     ApprovalDraft,
     Critique,
@@ -32,12 +33,23 @@ class Extraction(BaseModel):
     )
 
 
+GUARDRAIL = "guardrail"
+
+
 @dataclass(frozen=True)
 class Review:
-    """An approval draft and the tool calls the approver made to reach it."""
+    """An approval draft and the steps the approver took to reach it.
+
+    Steps are tool calls in order, plus a `guardrail` step each time a
+    submitted decision failed the linter and went back to the model.
+    """
 
     draft: ApprovalDraft
-    tool_calls: list[ToolCall] = field(default_factory=list)
+    steps: list[ToolCall] = field(default_factory=list)
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        return [s for s in self.steps if s.name != GUARDRAIL]
 
 
 class SubmitDecision(ApprovalDraft):
@@ -126,7 +138,9 @@ Validation findings:
 {findings}
 {critique}
 Decide approve, reject or escalate. Then call SubmitDecision once, with a
-rationale that cites the findings and what your tool calls showed."""
+rationale that cites the findings and what your tool calls showed, and with
+the code of every error and warning finding in `addressed`. Code checks the
+decision before accepting it and will send it back if anything is missing."""
 
 CRITIQUE_PROMPT = """You audit approval decisions. Find what the draft got wrong.
 
@@ -203,7 +217,7 @@ class LLMApprover:
             critique=critique_text,
         )
         messages: list[BaseMessage] = [HumanMessage(prompt)]
-        calls: list[ToolCall] = []
+        steps: list[ToolCall] = []
         agent = self.llm.bind_tools(
             [*tools.as_langchain(), SubmitDecision], tool_choice="any"
         )
@@ -217,26 +231,43 @@ class LLMApprover:
             for tc in reply.tool_calls:
                 # Every call gets an answer, or the next request is invalid.
                 if tc["name"] == SUBMIT:
-                    try:
-                        draft = ApprovalDraft.model_validate(tc["args"])
-                        result = "Decision recorded."
-                    except ValidationError as exc:
-                        result = f"Invalid decision, try again: {exc}"
+                    result, draft = self._check(invoice, report, tc["args"], steps)
                 else:
                     call = tools.run(tc["name"], tc["args"])
-                    calls.append(call)
+                    steps.append(call)
                     result = call.result
                 messages.append(ToolMessage(result, tool_call_id=tc["id"] or ""))
             if draft is not None:
-                return Review(draft, calls)
+                return Review(draft, steps)
 
         # Out of steps: decide with what has been gathered so far.
         final = self.llm.bind_tools([SubmitDecision], tool_choice=SUBMIT)
         reply = cast(AIMessage, await final.ainvoke(messages))
         for tc in reply.tool_calls:
             if tc["name"] == SUBMIT:
-                return Review(ApprovalDraft.model_validate(tc["args"]), calls)
+                # Accepted as is: the policy route still overrides it in code.
+                return Review(ApprovalDraft.model_validate(tc["args"]), steps)
         raise ValueError("The approver did not submit a decision.")
+
+    @staticmethod
+    def _check(
+        invoice: Invoice,
+        report: ValidationReport,
+        args: dict[str, Any],
+        steps: list[ToolCall],
+    ) -> tuple[str, ApprovalDraft | None]:
+        """Validate and lint a submitted decision: (reply to the model, draft)."""
+        try:
+            draft = ApprovalDraft.model_validate(args)
+        except ValidationError as exc:
+            return f"Invalid decision, try again: {exc}", None
+        calls = [s for s in steps if s.name != GUARDRAIL]
+        problems = lint_decision(invoice, report, draft, calls)
+        if not problems:
+            return "Decision recorded.", draft
+        text = " ".join(problems)
+        steps.append(ToolCall(name=GUARDRAIL, args={}, result=text))
+        return f"Decision not accepted. Fix this and submit again: {text}", None
 
 
 class LLMCritic:
@@ -280,18 +311,25 @@ class RuleApprover:
         critique: list[str],
         tools: ReviewTools,
     ) -> Review:
+        codes = list(dict.fromkeys(f.code for f in report.findings))
         if report.errors:
             titles = "; ".join(dict.fromkeys(f.title for f in report.errors))
             draft = ApprovalDraft(
-                decision="reject", rationale=f"Hard failures: {titles}."
+                decision="reject",
+                rationale=f"Hard failures: {titles}.",
+                addressed=codes,
             )
         elif report.warnings:
             titles = "; ".join(dict.fromkeys(f.title for f in report.warnings))
             draft = ApprovalDraft(
-                decision="escalate", rationale=f"Needs a human look: {titles}."
+                decision="escalate",
+                rationale=f"Needs a human look: {titles}.",
+                addressed=codes,
             )
         else:
-            draft = ApprovalDraft(decision="approve", rationale="Every check passed.")
+            draft = ApprovalDraft(
+                decision="approve", rationale="Every check passed.", addressed=codes
+            )
         return Review(draft)
 
 

@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     approval_threshold: float = 10_000
     # Totals within this fraction below the threshold get a warning.
     near_threshold_ratio: float = 0.95
+    # Finding codes that always send an invoice to a VP, whatever the agents
+    # decide. An empty list lets the approver clear these warnings itself.
+    vp_required_findings: list[str] = [
+        "NEAR_THRESHOLD",
+        "FOREIGN_CURRENCY",
+        "SUPERSEDES",
+    ]
     max_extract_attempts: int = 3
     max_review_rounds: int = 2
     # Model turns the approver gets for tool calls before it must decide.
