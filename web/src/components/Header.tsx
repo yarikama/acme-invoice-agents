@@ -42,20 +42,21 @@ export function Header({ stream, onResetLayout }: { stream: StreamState; onReset
           {/* Only the wide grid can be rearranged, so only it can be reset. */}
           <button
             type="button"
-            className="key key-sm hidden min-[900px]:inline-flex"
+            className="icon-btn hidden min-[900px]:inline-grid"
             onClick={onResetLayout}
-            title="Put every widget back where it started"
+            aria-label="Reset layout"
+            title="Reset layout: put every widget back where it started"
           >
-            <ArrowCounterClockwiseIcon size={16} />
-            Reset layout
+            <ArrowCounterClockwiseIcon size={22} />
           </button>
           <button
             type="button"
-            className="key key-sm"
+            className="icon-btn"
             onClick={toggle}
             aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+            title={dark ? "Light mode" : "Dark mode"}
           >
-            {dark ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+            {dark ? <SunIcon size={22} /> : <MoonIcon size={22} />}
           </button>
         </div>
       </div>
