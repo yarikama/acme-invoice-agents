@@ -54,6 +54,7 @@ class Settings(BaseSettings):
         "PRICE_ABOVE_LIST",
         "INSTRUCTIONS_IN_DOCUMENT",
         "BANK_DETAILS_CHANGED",
+        "LOOKALIKE_VENDOR",
     ]
     max_extract_attempts: int = 3
     max_review_rounds: int = 2
