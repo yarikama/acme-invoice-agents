@@ -20,6 +20,7 @@ dependencies = [
     "uvicorn[standard]>=0.54.0",
     "python-multipart>=0.0.32",
     "aiosqlite>=0.22.1",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]

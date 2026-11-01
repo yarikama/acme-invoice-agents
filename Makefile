@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check db eval run run-all api web web-check clean
+.PHONY: install lint format typecheck test check db eval triage-eval run run-all api web web-check clean
 
 install:
 	uv sync
@@ -26,7 +26,10 @@ db:
 	uv run python -c "from invoice_agents.inventory import Inventory; Inventory('inventory.db').seed()"
 
 eval:
-	uv run python -m invoice_agents.evaluation
+	uv run python -m invoice_agents.evaluation $(ARGS)
+
+triage-eval:
+	uv run python -m invoice_agents.triage_eval $(ARGS)
 
 run:
 	uv run python main.py --invoice_path=$(INVOICE)

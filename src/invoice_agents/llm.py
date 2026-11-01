@@ -18,6 +18,7 @@ from invoice_agents.agents import (
     RuleCritic,
 )
 from invoice_agents.config import Settings
+from invoice_agents.triage import DecisionTriager, Triager
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -27,6 +28,8 @@ class Agents:
     extractor: Extractor
     approver: Approver
     critic: Critic
+    # System 1, asked before the approver; None skips triage.
+    triager: Triager | None = None
 
 
 def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
@@ -61,9 +64,19 @@ def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
     raise ValueError(f"No chat model for provider {settings.llm_provider!r}")
 
 
+def build_triager(settings: Settings) -> Triager | None:
+    if settings.triage_model is None:
+        return None
+    if settings.openrouter_api_key is None:
+        raise ValueError("TRIAGE_MODEL needs OPENROUTER_API_KEY")
+    return DecisionTriager(settings.triage_model, settings.openrouter_api_key)
+
+
 def build_agents(settings: Settings) -> Agents:
     if settings.llm_provider == "offline":
-        return Agents(NoExtractor(), RuleApprover(), RuleCritic())
+        return Agents(
+            NoExtractor(), RuleApprover(), RuleCritic(), build_triager(settings)
+        )
     extract_llm = chat_model(
         settings, settings.extract_model, settings.extract_reasoning
     )
@@ -72,4 +85,5 @@ def build_agents(settings: Settings) -> Agents:
         LLMExtractor(extract_llm),
         LLMApprover(review_llm, max_steps=settings.max_tool_steps),
         LLMCritic(review_llm),
+        build_triager(settings),
     )

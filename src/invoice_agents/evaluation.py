@@ -2,6 +2,7 @@
 
     make eval                         # provider from .env
     LLM_PROVIDER=offline make eval    # rule-based agents, no network
+    make eval ARGS="--triage typesafe/jev-1.14"   # with a System 1 triage step
 
 Each case runs with a fresh inventory and invoice history, so cases don't
 affect each other. A case lists several files when an invoice only makes
@@ -113,6 +114,9 @@ class Result:
     cost_usd: float | None = None
     detail: str = ""
     findings: list[str] = field(default_factory=list)
+    # What triage decided on its own (approve/reject), or None if it passed
+    # the invoice on to the reasoning approver or did not run.
+    fast_path: str | None = None
 
 
 Pricing = dict[str, tuple[float, float]]  # model -> (USD per input, per output token)
@@ -159,15 +163,18 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
         graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
         start = time.perf_counter()
         findings: list[str] = []
+        triage_cost = 0.0
+        state: dict[str, Any] = {}
         with get_usage_metadata_callback() as usage:
             try:
-                state: dict[str, Any] = {}
                 for name in case.files:
                     config: RunnableConfig = {
                         "configurable": {"thread_id": uuid.uuid4().hex}
                     }
                     path = str(settings.samples_dir / name)
                     state = await graph.ainvoke({"path": path}, config)
+                    if "triage" in state:
+                        triage_cost += state["triage"].cost_usd or 0.0
                 outcome, detail = outcome_of(state)
                 if "report" in state:
                     findings = [f.code for f in state["report"].findings]
@@ -178,6 +185,15 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
         seconds = time.perf_counter() - start
 
     used = dict(usage.usage_metadata)
+    llm_cost = cost(used, pricing) if used else None
+    total_cost = (
+        None
+        if llm_cost is None and not triage_cost
+        else (llm_cost or 0.0) + triage_cost
+    )
+    fast = None
+    if "triage" in state and "review_rounds" not in state and "draft" in state:
+        fast = state["draft"].decision
     correct = (
         None
         if outcome == "skipped"
@@ -191,9 +207,10 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
         seconds=round(seconds, 2),
         input_tokens=sum(u["input_tokens"] for u in used.values()),
         output_tokens=sum(u["output_tokens"] for u in used.values()),
-        cost_usd=cost(used, pricing) if used else None,
+        cost_usd=total_cost,
         detail=detail,
         findings=findings,
+        fast_path=fast,
     )
 
 
@@ -226,6 +243,7 @@ def summary(results: list[Result]) -> dict[str, Any]:
         "mean_seconds": round(sum(r.seconds for r in scored) / len(scored), 2)
         if scored
         else None,
+        "fast_paths": sum(1 for r in scored if r.fast_path),
     }
 
 
@@ -265,6 +283,8 @@ def render(results: list[Result], totals: dict[str, Any], console: Console) -> N
             f", ${totals['total_cost_usd']:.4f} total,"
             f" ${totals['cost_per_invoice_usd']:.4f} per invoice"
         )
+    if totals.get("fast_paths"):
+        line += f", {totals['fast_paths']} settled by triage"
     if totals["mean_seconds"] is not None:
         line += f", {totals['mean_seconds']:.1f}s mean"
     console.print(line)
@@ -275,17 +295,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--only", help="Run cases whose file names contain this")
     parser.add_argument("--concurrency", type=int, default=2)
     parser.add_argument(
+        "--triage",
+        metavar="MODEL",
+        help="Decision model for triage, e.g. typesafe/jev-1.14",
+    )
+    parser.add_argument(
         "--out", type=Path, default=Path("eval-results"), help="Folder for JSON"
     )
     args = parser.parse_args(argv)
 
     settings = get_settings()
+    if args.triage:
+        settings = settings.model_copy(update={"triage_model": args.triage})
     cases = [c for c in CASES if not args.only or args.only in c.name]
     pricing = openrouter_pricing() if settings.llm_provider == "openrouter" else {}
     console = Console()
     console.print(
         f"Provider {settings.llm_provider}: extract {settings.extract_model},"
-        f" review {settings.review_model}. {len(cases)} cases."
+        f" review {settings.review_model}"
+        + (f", triage {settings.triage_model}" if settings.triage_model else "")
+        + f". {len(cases)} cases."
     )
 
     results = asyncio.run(run_all(cases, settings, pricing, args.concurrency))
@@ -294,13 +323,15 @@ def main(argv: list[str] | None = None) -> int:
 
     args.out.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    report = args.out / f"{settings.llm_provider}-{stamp}.json"
+    label = settings.llm_provider + ("-triage" if settings.triage_model else "")
+    report = args.out / f"{label}-{stamp}.json"
     report.write_text(
         json.dumps(
             {
                 "provider": settings.llm_provider,
                 "extract_model": settings.extract_model,
                 "review_model": settings.review_model,
+                "triage_model": settings.triage_model,
                 "summary": totals,
                 "results": [asdict(r) for r in results],
             },

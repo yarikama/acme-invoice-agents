@@ -14,6 +14,8 @@ export interface Segment {
 const NODE_SEGMENT: Record<string, Segment["key"]> = {
   ingest: "ingest",
   validate: "validate",
+  // System 1 triage drafts the decision when it settles an invoice itself.
+  triage: "draft",
   review: "draft",
   critique: "critique",
   human_review: "vp",
@@ -90,6 +92,8 @@ export function pipeline(run: RunView): Segment[] {
   // Reached in a finished run but never visited: e.g. no VP for small invoices.
   if (run.status === "paid" || run.status === "rejected") {
     if (states.vp === "off") states.vp = "skip";
+    // Triage settled it, so there was no draft to critique.
+    if (states.draft === "done" && states.critique === "off") states.critique = "skip";
   }
   if (run.status === "running") {
     const active = activeSegment(run.events);
@@ -133,6 +137,8 @@ export function traceLines(run: RunView, llm: boolean): TraceLine[] {
 
 function voiceOf(node: string, message: string, llm: boolean): TraceVoice {
   if (node === "human_review") return "human";
+  // A decision model, whatever the approver's provider.
+  if (node === "triage") return "model";
   if (node === "ingest") return message.includes("LLM") ? "model" : "code";
   // The approver and critic are models only when an LLM is configured.
   if (node === "review" || node === "critique") return llm ? "model" : "code";
