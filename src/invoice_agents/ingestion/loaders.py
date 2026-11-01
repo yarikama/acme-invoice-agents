@@ -16,6 +16,7 @@ from typing import Any
 
 import pdfplumber
 from defusedxml import ElementTree
+from pydantic import ValidationError
 
 from invoice_agents.ingestion.dates import normalize_date
 from invoice_agents.ingestion.ocr import Ocr, docling_text
@@ -35,6 +36,9 @@ class Document:
     invoice: Invoice | None = None
     # The text came from OCR: a scan or a photo rather than a text layer.
     ocr: bool = False
+    # Why code could not read it: a structured file that didn't parse (the
+    # extraction agent reads its text instead), or a file with no text.
+    problem: str | None = None
 
 
 IMAGES = {SourceFormat.PNG, SourceFormat.JPG, SourceFormat.JPEG}
@@ -55,19 +59,62 @@ def load_document(path: str | Path, ocr: Ocr = docling_text) -> Document:
     if fmt in IMAGES:
         return Document(path, fmt, ocr(path), ocr=True)
     if fmt is SourceFormat.PDF:
-        text = _pdf_text(path)
+        try:
+            text = _pdf_text(path)
+        except Exception as exc:
+            # Not a PDF after all, or a damaged one: nothing to read or OCR.
+            return Document(
+                path, fmt, "", problem=f"The PDF could not be opened ({exc})."
+            )
         if len(text) < MIN_PDF_TEXT:
             return Document(path, fmt, ocr(path), ocr=True)
         return Document(path, fmt, text)
 
-    text = path.read_text(encoding="utf-8")
+    text = _decode(path.read_bytes())
+    if not text.strip():
+        return Document(path, fmt, text, problem="The file is empty.")
     parsers = {
         SourceFormat.JSON: _from_json,
         SourceFormat.CSV: _from_csv,
         SourceFormat.XML: _from_xml,
     }
     parser = parsers.get(fmt)
-    return Document(path, fmt, text, parser(text) if parser else None)
+    if parser is None:
+        return Document(path, fmt, text)
+    try:
+        return Document(path, fmt, text, parser(text))
+    except Exception as exc:
+        # A structured file in a layout the parser doesn't know. Its text
+        # still says what the invoice is, so the extraction agent reads it.
+        name = fmt.value.upper()
+        return Document(
+            path, fmt, text, problem=f"Could not read the {name} in code: {_why(exc)}."
+        )
+
+
+def _decode(raw: bytes) -> str:
+    """UTF-8, or Windows-1252 for files saved by older tools; never fails."""
+    try:
+        return raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return raw.decode("cp1252", errors="replace")
+
+
+def _why(exc: Exception) -> str:
+    """What was wrong with a structured file, in a sentence fragment."""
+    if isinstance(exc, json.JSONDecodeError):
+        return f"not valid JSON ({exc.msg}, line {exc.lineno})"
+    if isinstance(exc, ElementTree.ParseError):
+        return f"not valid XML ({exc})"
+    if isinstance(exc, KeyError):
+        return f"no {exc.args[0]!r} field"
+    if isinstance(exc, ValidationError):
+        first = exc.errors()[0]
+        where = ".".join(str(p) for p in first["loc"])
+        return f"{where}: {first['msg'].lower()}"
+    if isinstance(exc, ValueError) and str(exc):
+        return str(exc)
+    return "the layout is not one this reader knows"
 
 
 def _pdf_text(path: Path) -> str:
