@@ -46,11 +46,11 @@ export default function App() {
   return (
     <div className="min-h-dvh">
       <Header stream={stream} provider={provider} onResetLayout={onResetLayout} />
-      <main className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6">
+      <main className="flex w-full flex-col gap-6 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="display m-0 text-4xl">Invoice inbox</h1>
-            <p className="m-0 mt-1 text-ink-2">
+            <h1 className="display m-0 text-[clamp(44px,5.2vw,76px)] leading-[1.02]">Invoice inbox</h1>
+            <p className="m-0 mt-2 text-lg text-ink-2">
               {!loaded && runs.length === 0
                 ? "Loading invoices…"
                 : runs.length === 0

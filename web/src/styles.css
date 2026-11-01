@@ -237,7 +237,19 @@
     background: #111111;
     color: var(--color-signal);
   }
-  .card-signal .key-go {
+  /* On the orange, controls are flat single fills: no highlight, no shadow. */
+  .card-signal .key {
+    background: rgb(255 255 255 / 0.92);
+    box-shadow: none;
+  }
+  .card-signal .key:hover:not(:disabled) {
+    background: #ffffff;
+  }
+  .card-signal .key:active:not(:disabled) {
+    box-shadow: none;
+  }
+  .card-signal .key-go,
+  .card-signal .key-go:hover:not(:disabled) {
     background: #111111;
     color: #ffffff;
   }
