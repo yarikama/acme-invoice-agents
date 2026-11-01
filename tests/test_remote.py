@@ -38,6 +38,7 @@ class FakeApi:
     def __init__(self) -> None:
         self.decisions: list[dict[str, Any]] = []
         self.uploads: list[str] = []
+        self.auth: list[str | None] = []
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -93,6 +94,7 @@ class FakeApi:
             )
         if path == "/api/runs/r1/decision":
             self.decisions.append(json.loads(request.content))
+            self.auth.append(request.headers.get("authorization"))
             return httpx.Response(202, json={"id": "r1"})
         if path == "/api/runs/r1":
             return httpx.Response(
@@ -119,6 +121,7 @@ async def test_remote_runner_streams_the_run_and_answers_the_vp() -> None:
 
     assert 'filename="invoice_1014.xml"' in fake.uploads[0]
     assert fake.decisions == [{"approved": True, "note": "--vp approve"}]
+    assert fake.auth == [None]
     assert result["status"] == "paid" and result["run_id"] == "r1"
     assert result["file"] == "invoice_1014.xml"
 
@@ -273,3 +276,13 @@ def test_spawn_and_stop_a_real_process(tmp_path: Path) -> None:
 
     remote.stop([Stubborn()])  # type: ignore[list-item]
     assert Stubborn.killed
+
+
+async def test_a_vp_token_goes_with_the_decision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("VP_TOKEN", "s3cret")
+    fake = FakeApi()
+    async with client(fake) as c:
+        await remote.Api("http://api", c).decide("r1", False, "no")
+    assert fake.auth == ["Bearer s3cret"]

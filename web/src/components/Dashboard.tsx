@@ -57,6 +57,7 @@ export function Dashboard({
   selected,
   onSelect,
   llm,
+  vpAuth = false,
   layout,
   onLayout,
 }: {
@@ -68,6 +69,8 @@ export function Dashboard({
   selected: RunView | null;
   onSelect: (id: string) => void;
   llm: boolean;
+  /** VP decisions need a token. */
+  vpAuth?: boolean;
   layout: Layout;
   onLayout: (layout: Layout) => void;
 }) {
@@ -203,7 +206,7 @@ export function Dashboard({
     decision: (d) => (
       <Widget id="decision" title="VP decision" icon={SECTION_ICON.decision} signal={waiting} draggable={d}>
         {waiting && selected && s ? (
-          <DecisionPanel runId={selected.id} summary={s} />
+          <DecisionPanel runId={selected.id} summary={s} needsToken={vpAuth} />
         ) : (
           <Muted>
             {selected ? "Nothing to decide: this invoice isn't waiting for a VP." : "Nothing selected."}

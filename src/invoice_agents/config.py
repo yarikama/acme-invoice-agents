@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     record_to: Path | None = None
     xai_api_key: SecretStr | None = None
     openrouter_api_key: SecretStr | None = None
+    # Who may approve or reject paused invoices: name -> bearer token, as JSON,
+    # e.g. VP_TOKENS='{"Dana Whitfield": "..."}'. Unset, anyone who can reach
+    # the API can decide, which is only fit for a local demo.
+    vp_tokens: dict[str, SecretStr] = {}
     extract_model: str = "grok-4.3"
     review_model: str = "grok-4.7"
     # Cap output, reasoning included: without it the provider reserves the
