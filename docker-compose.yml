@@ -1,0 +1,55 @@
+# The whole system with one command:  docker compose up
+#   console and API  http://localhost:8000
+#   the CLI          docker compose run --rm cli --invoice_path=data/invoices/invoice_1001.txt
+# Replay by default (no API key). For live Grok, put LLM_PROVIDER and the key
+# in .env: it is read at run time and never copied into the image.
+
+services:
+  redis:
+    # The assistant's conversation, shared by the CLI and the console.
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 10
+
+  api:
+    build: .
+    image: acme-invoice-agents
+    ports: ["8000:8000"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - state:/state
+      # Drop invoices here on the host; `docker compose run --rm cli --watch`
+      # processes them.
+      - ./data/inbox:/app/data/inbox
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  cli:
+    image: acme-invoice-agents
+    profiles: ["cli"]
+    # On the API's network, so localhost:8000 is the API and the console.
+    network_mode: service:api
+    entrypoint: ["python", "main.py"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      ACME_API_URL: http://localhost:8000
+      ACME_WEB_URL: http://localhost:8000
+    volumes:
+      - state:/state
+      - ./data/inbox:/app/data/inbox
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  state:

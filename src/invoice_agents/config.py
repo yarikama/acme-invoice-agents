@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     # The folder --watch and /watch treat as the AP mailbox.
     inbox_dir: Path = Path("data/inbox")
     uploads_dir: Path = Path("uploads")
+    # The console, built (npm run build): the API serves it when it exists,
+    # so one server is enough, without Node (the Docker image does this).
+    web_dist: Path = Path("web/dist")
     max_upload_bytes: int = 5 * 1024 * 1024
     cors_origins: list[str] = ["http://localhost:5173"]
     approval_threshold: float = 10_000

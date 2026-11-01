@@ -1,4 +1,4 @@
-.PHONY: install lint format typecheck test check db eval triage-eval run run-all api web web-check clean
+.PHONY: docker-up docker-down docker-run install lint format typecheck test check db eval triage-eval run run-all api web web-check clean
 
 install:
 	uv sync
@@ -49,3 +49,15 @@ api:
 
 clean:
 	rm -rf .pytest_cache .ruff_cache inventory.db checkpoints.db uploads
+
+# The whole system in Docker: API and console on :8000, Redis for the chat.
+docker-up:
+	docker compose up --build -d
+	@echo "Console and API: http://localhost:8000"
+
+docker-down:
+	docker compose down
+
+# e.g. make docker-run ARGS="--invoice_path=data/invoices/invoice_1001.txt"
+docker-run:
+	docker compose run --rm cli $(ARGS)

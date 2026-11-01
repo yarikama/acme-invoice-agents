@@ -439,3 +439,23 @@ async def test_the_web_console_shares_the_assistant(client, monkeypatch):
         "what happened to it?",
         "It was paid.",
     ]
+
+
+def test_the_built_console_is_served_after_the_api(tmp_path: Path) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from invoice_agents.api.app import mount_console
+
+    target = FastAPI()
+
+    @target.get("/api/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    assert not mount_console(target, tmp_path)  # nothing built: nothing served
+    (tmp_path / "index.html").write_text("<title>Acme AP Console</title>")
+    assert mount_console(target, tmp_path)
+    client = TestClient(target)
+    assert "Acme AP Console" in client.get("/").text
+    assert client.get("/api/health").json() == {"status": "ok"}

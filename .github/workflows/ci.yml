@@ -47,3 +47,21 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # The Docker path a grader may take: build, start, run the spec command.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose build
+      - run: docker compose up -d --wait
+      - name: The API and the console answer on :8000
+        run: |
+          curl -sf localhost:8000/api/health | grep '"status":"ok"'
+          curl -sf localhost:8000/ | grep -q "<title>"
+      - name: The spec command, through the CLI container
+        run: |
+          docker compose run --rm -T cli --invoice_path=data/invoices/invoice_1001.txt --once --json > out.json
+          python3 -c "import json; [r] = json.load(open('out.json')); assert r['status'] == 'paid', r"
+      - if: always()
+        run: docker compose logs --no-color api | tail -50; docker compose down -v

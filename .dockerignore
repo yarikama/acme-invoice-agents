@@ -1,0 +1,24 @@
+# Never in the image: secrets, local state, caches, build output.
+.env
+.env.*
+!.env.example
+.git
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+*.db
+*.db-*
+uploads
+logs
+.acme-logs
+eval-results
+web/node_modules
+web/dist
+data/inbox/*
+!data/inbox/.gitkeep
+docs/plan.md
+OVERNIGHT.md
+.claude
