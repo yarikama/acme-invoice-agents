@@ -13,7 +13,17 @@ from tests.conftest import INVOICES
 
 
 @pytest.fixture
-async def client(tmp_path, monkeypatch) -> AsyncIterator[AsyncClient]:
+def vp_tokens() -> str | None:
+    """VP_TOKENS for the API under test; a test overrides it to require them."""
+    return None
+
+
+@pytest.fixture
+async def client(tmp_path, monkeypatch, vp_tokens) -> AsyncIterator[AsyncClient]:
+    if vp_tokens is None:
+        monkeypatch.delenv("VP_TOKENS", raising=False)
+    else:
+        monkeypatch.setenv("VP_TOKENS", vp_tokens)
     monkeypatch.setenv("LLM_PROVIDER", "offline")
     monkeypatch.setenv("DB_PATH", str(tmp_path / "inventory.db"))
     monkeypatch.setenv("CHECKPOINT_PATH", str(tmp_path / "checkpoints.db"))
@@ -189,3 +199,42 @@ async def test_global_stream_carries_every_run_in_order(client):
     # Progress steps must not overwrite the run's status.
     assert all(e["status"] == "running" for e in seen if e["type"] == "progress")
     assert {e["step"] for e in seen if e["type"] == "progress"} >= {"start"}
+
+
+async def test_open_decisions_say_so(client):
+    assert (await client.get("/api/health")).json()["vp_auth"] is False
+
+
+@pytest.mark.parametrize(
+    "vp_tokens", ['{"Dana Whitfield": "s3cret", "Lee Park": "other"}']
+)
+async def test_only_a_vp_token_can_decide(client):
+    assert (await client.get("/api/health")).json()["vp_auth"] is True
+    run = (await client.post("/api/runs", json={"sample": "invoice_1014.xml"})).json()
+    await settle(run["id"])
+    url = f"/api/runs/{run['id']}/decision"
+    # The client may claim to be anyone; the token decides who it is.
+    body = {"approved": False, "note": "Wrong rate", "by": "The CEO"}
+
+    missing = await client.post(url, json=body)
+    assert missing.status_code == 401
+    assert missing.headers["www-authenticate"] == "Bearer"
+    for bad in ("Bearer nope", "Basic s3cret", "s3cret", "Bearer "):
+        assert (
+            await client.post(url, json=body, headers={"Authorization": bad})
+        ).status_code == 401
+    # Nothing was decided by the failed attempts.
+    assert manager().get(run["id"]).status == "awaiting_vp"
+
+    ok = await client.post(url, json=body, headers={"Authorization": "Bearer s3cret"})
+    assert ok.status_code == 202
+    await settle(run["id"])
+    detail = (await client.get(f"/api/runs/{run['id']}")).json()
+    assert detail["status"] == "rejected"
+    messages = [t["message"] for t in detail["summary"]["trace"]]
+    assert "VP rejected (Dana Whitfield). Note: Wrong rate" in messages
+    assert detail["summary"]["reason"].startswith(
+        "Rejected by the VP (Dana Whitfield)."
+    )
+    decision = next(e for e in detail["events"] if e["type"] == "decision")
+    assert decision["by"] == "Dana Whitfield"

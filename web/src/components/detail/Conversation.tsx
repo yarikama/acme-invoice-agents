@@ -176,7 +176,7 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "human":
       return (
-        <TurnFrame node="human_review" voice="human" name="VP" role="human" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame node="human_review" voice="human" name={turn.by ?? "VP"} role="human" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           <div className="flex flex-wrap items-center gap-2">
             <span className={`pill ${turn.approved ? "pill-approve" : "pill-reject"}`}>{turn.approved ? "Approved" : "Rejected"}</span>
             {turn.note && <span className="text-sm">{turn.note}</span>}

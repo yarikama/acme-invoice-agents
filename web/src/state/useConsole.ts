@@ -14,13 +14,21 @@ export function useConsole() {
   const [state, dispatch] = useReducer(runsReducer, initialRuns);
   const [stream, setStream] = useState<StreamState>("connecting");
   const [provider, setProvider] = useState<string | null>(null);
+  // The API takes VP decisions only with a token.
+  const [vpAuth, setVpAuth] = useState(false);
   // False until the first run list arrives, so the page doesn't claim to be empty.
   const [loaded, setLoaded] = useState(false);
 
   const snapshot = useCallback((runs: RunOverview[]) => dispatch({ type: "snapshot", runs }), []);
 
   useEffect(() => {
-    api.health().then((h) => setProvider(h.llm_provider), () => setProvider(null));
+    api.health().then(
+      (h) => {
+        setProvider(h.llm_provider);
+        setVpAuth(Boolean(h.vp_auth));
+      },
+      () => setProvider(null),
+    );
     api
       .runs()
       .then(snapshot, () => {})
@@ -38,5 +46,5 @@ export function useConsole() {
     return () => source.close();
   }, [snapshot]);
 
-  return { state, stream, provider, snapshot, loaded };
+  return { state, stream, provider, vpAuth, snapshot, loaded };
 }

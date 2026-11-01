@@ -1,7 +1,7 @@
 import { CheckCircleIcon, HourglassMediumIcon, type Icon, ProhibitIcon } from "@phosphor-icons/react";
 import { type ReactNode, useState } from "react";
 
-import { api } from "../../api/client";
+import { api, ApiError } from "../../api/client";
 import type { Decision, Summary } from "../../api/types";
 import { money } from "../../lib/format";
 import { sentences } from "../../lib/text";
@@ -38,9 +38,42 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+const TOKEN_KEY = "acme.vpToken";
+
+/** A VP token, kept for this tab only, so closing it signs the VP out. */
+function storedToken(): string {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function storeToken(token: string): void {
+  try {
+    if (token) sessionStorage.setItem(TOKEN_KEY, token);
+    else sessionStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // Private windows may refuse storage; the token then lasts for this card.
+  }
+}
+
 /** The VP's approve/reject form for a run paused at human_review. */
-export function DecisionPanel({ runId, summary }: { runId: string; summary: Summary }) {
+export function DecisionPanel({
+  runId,
+  summary,
+  needsToken = false,
+}: {
+  runId: string;
+  summary: Summary;
+  /** The API takes decisions only with a VP token (VP_TOKENS is set). */
+  needsToken?: boolean;
+}) {
   const [note, setNote] = useState("");
+  const [token, setToken] = useState(storedToken);
+  // Also shown when the API turns a decision down for want of a token.
+  const [refused, setRefused] = useState(false);
+  const askToken = needsToken || refused;
   const [sending, setSending] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inv = summary.invoice;
@@ -50,8 +83,13 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
     setSending(approved ? "approve" : "reject");
     setError(null);
     try {
-      await api.decide(runId, approved, note.trim());
+      await api.decide(runId, approved, note.trim(), token.trim() || undefined);
+      storeToken(token.trim());
     } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        setRefused(true);
+        storeToken("");
+      }
       setError(e instanceof Error ? e.message : String(e));
       setSending(null);
     }
@@ -97,6 +135,18 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
           </Sheet>
         )}
       </div>
+      {askToken && (
+        <label className="flex flex-none flex-col gap-1">
+          <span className="cap">your VP token (the log records your name)</span>
+          <input
+            className="key min-h-10 px-3 text-sm shadow-none active:translate-y-0"
+            type="password"
+            autoComplete="current-password"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+          />
+        </label>
+      )}
       <label className="flex flex-none flex-col gap-1">
         <span className="cap">note for the audit log (optional)</span>
         <input

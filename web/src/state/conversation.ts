@@ -51,7 +51,7 @@ export type Turn = Base &
         rationale: string;
       }
     | { kind: "critic"; agrees: boolean; issues: string; outcome: string | null }
-    | { kind: "human"; approved: boolean; note: string }
+    | { kind: "human"; approved: boolean; by: string | null; note: string }
   );
 
 const DECISION = "(approve|reject|escalate)";
@@ -129,8 +129,14 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
     else if (line.node === "triage") out.push({ ...timed(line), kind: "triage", text: line.text, ...parseTriage(line.text) });
     else if (line.node === "critique") out.push({ ...timed(line), kind: "critic", ...parseCritique(line.text) });
     else if (line.node === "human_review") {
-      const m = /^VP (approved|rejected)\.\s*(?:Note:\s*)?([\s\S]*)$/.exec(line.text);
-      out.push({ ...timed(line), kind: "human", approved: m?.[1] === "approved", note: m?.[2]?.trim() ?? "" });
+      const m = /^VP (approved|rejected)(?: \(([^)]*)\))?\.\s*(?:Note:\s*)?([\s\S]*)$/.exec(line.text);
+      out.push({
+        ...timed(line),
+        kind: "human",
+        approved: m?.[1] === "approved",
+        by: m?.[2] ?? null,
+        note: m?.[3]?.trim() ?? "",
+      });
     } else out.push({ ...timed(line), kind: "step", node: line.node, text: line.text });
   }
   const tail = lines.at(-1);

@@ -217,7 +217,11 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
                 )
             )
         elif node == "human_review":
-            m = re.match(r"^VP (approved|rejected)\.\s*(?:Note:\s*)?(.*)$", msg, re.S)
+            m = re.match(
+                r"^VP (approved|rejected)(?: \(([^)]*)\))?\.\s*(?:Note:\s*)?(.*)$",
+                msg,
+                re.S,
+            )
             out.append(
                 Turn(
                     "human",
@@ -225,7 +229,8 @@ def turns(events: list[dict[str, Any]], started: float | None) -> list[Turn]:
                     timed(at),
                     {
                         "approved": bool(m and m[1] == "approved"),
-                        "note": (m[2].strip() if m else ""),
+                        "by": m[2] if m else None,
+                        "note": (m[3].strip() if m else ""),
                     },
                 )
             )
@@ -381,7 +386,8 @@ def render_turn(t: Turn) -> RenderableType:
         if d.get("issues"):
             body.append(Text(d["issues"]))
     elif t.kind == "human":
-        head = _header("human_review", "VP", "human", "human", t.took, t.usage)
+        name = d.get("by") or "VP"
+        head = _header("human_review", name, "human", "human", t.took, t.usage)
         line = _pill(
             "Approved" if d["approved"] else "Rejected",
             DECISION_STYLE["approve" if d["approved"] else "reject"],

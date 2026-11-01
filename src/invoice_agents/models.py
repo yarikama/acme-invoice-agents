@@ -120,6 +120,9 @@ class Critique(BaseModel):
 class HumanDecision(BaseModel):
     approved: bool
     note: str = ""
+    # Who decided, as the server authenticated them; None when VP_TOKENS is
+    # unset (a local demo). Anything a client sends here is overwritten.
+    by: str | None = None
 
 
 class PaymentResult(BaseModel):

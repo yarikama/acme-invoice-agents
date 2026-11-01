@@ -104,7 +104,7 @@ def test_turns_handle_odd_lines() -> None:
     ]
     assert got[1].data == {"text": "something else"}
     assert got[4].data["issues"] == "ignores X." and not got[4].data["agrees"]
-    assert got[5].data == {"approved": False, "note": "no"}
+    assert got[5].data == {"approved": False, "by": None, "note": "no"}
     # Timing starts at the first stamped line; the turn before it has no time.
     assert got[0].took is None and got[1].took == 0
 

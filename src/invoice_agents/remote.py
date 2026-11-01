@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -74,9 +75,12 @@ class Api:
                     return
 
     async def decide(self, run_id: str, approved: bool, note: str) -> None:
+        # A VP's token, when the API requires one (VP_TOKENS on the server).
+        token = os.environ.get("VP_TOKEN")
         r = await self.client.post(
             f"{self.base}/api/runs/{run_id}/decision",
             json={"approved": approved, "note": note},
+            headers={"Authorization": f"Bearer {token}"} if token else None,
             timeout=30,
         )
         r.raise_for_status()
