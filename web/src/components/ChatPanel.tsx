@@ -44,7 +44,7 @@ export function ChatPanel() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const end = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLOListElement>(null);
   // The messages for the poll, which runs outside render.
   const held = useRef<ChatMessage[]>([]);
   useEffect(() => {
@@ -68,8 +68,11 @@ export function ChatPanel() {
     return () => clearInterval(timer);
   }, [poll]);
 
+  // Keep the newest message in view by scrolling the list itself: scrolling
+  // an element into view would move the whole page to this panel on load.
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "nearest" });
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages.length, sending]);
 
   const send = async (e: FormEvent) => {
@@ -91,7 +94,11 @@ export function ChatPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
-      <ol className="m-0 flex min-h-0 flex-1 list-none flex-col gap-3 overflow-y-auto p-0 pr-3" aria-live="polite">
+      <ol
+        ref={list}
+        className="m-0 flex min-h-0 flex-1 list-none flex-col gap-3 overflow-y-auto p-0 pr-3"
+        aria-live="polite"
+      >
         {messages.length === 0 && (
           <li className="text-sm text-ink-2">
             Ask in plain words: "run invoice 1004", "what's waiting for a VP?", "why was 1009 rejected?". The terminal
@@ -109,7 +116,6 @@ export function ChatPanel() {
             <span className="shimmer">Thinking…</span>
           </li>
         )}
-        <div ref={end} />
       </ol>
       {!shared && (
         <p className="m-0 text-xs text-ink-2">
