@@ -15,7 +15,9 @@ export function PixelIcon({ node, size = 14, className = "" }: { node: string; s
       className={`flex-none ${className}`}
     >
       {rows.flatMap((row, y) =>
-        [...row].map((c, x) => (c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="currentColor" /> : null)),
+        [...row].map((c, x) =>
+          c === "#" ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="currentColor" /> : null,
+        ),
       )}
     </svg>
   );

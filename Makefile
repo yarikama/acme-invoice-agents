@@ -12,6 +12,7 @@ lint:
 format:
 	uv run ruff format .
 	uv run ruff check --fix .
+	cd web && npm run format
 
 typecheck:
 	uv run pyright
@@ -41,7 +42,7 @@ web:
 	cd web && npm run dev
 
 web-check:
-	cd web && npm run lint && npm run typecheck && npm test && npm run build
+	cd web && npm run format:check && npm run lint && npm run typecheck && npm test && npm run build
 
 api:
 	uv run uvicorn invoice_agents.api.app:app --reload --port 8000

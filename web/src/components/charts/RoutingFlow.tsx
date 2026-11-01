@@ -1,12 +1,6 @@
 import { useState } from "react";
 
-import {
-  DECIDER_LABEL,
-  type FlowPath,
-  OUTCOME_LABEL,
-  type Route,
-  VALIDATION_LABEL,
-} from "../../state/routing";
+import { DECIDER_LABEL, type FlowPath, OUTCOME_LABEL, type Route, VALIDATION_LABEL } from "../../state/routing";
 import { useWidth } from "../../state/useWidth";
 import { Tip } from "./Tip";
 
@@ -60,7 +54,8 @@ export function RoutingFlow({ paths, total }: { paths: FlowPath[]; total: number
   // Stack each node's bands by the whole path, so bands cross only where routes do.
   const rank = (p: FlowPath) => p.steps.map((k, ci) => nodes[`${ci}:${k}`]!.idx);
   const sorted = [...paths].sort((a, b) => {
-    const A = rank(a), B = rank(b);
+    const A = rank(a),
+      B = rank(b);
     for (let i = 0; i < A.length; i++) if (A[i] !== B[i]) return A[i]! - B[i]!;
     return 0;
   });
@@ -82,7 +77,14 @@ export function RoutingFlow({ paths, total }: { paths: FlowPath[]; total: number
 
   return (
     <div ref={ref} className="relative">
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="How invoices were routed" className={hot ? "flow-dim" : undefined}>
+      <svg
+        width={W}
+        height={H}
+        viewBox={`0 0 ${W} ${H}`}
+        role="img"
+        aria-label="How invoices were routed"
+        className={hot ? "flow-dim" : undefined}
+      >
         {COLUMNS.map((c, i) => (
           <text key={c.title} x={colX[i]} y={14} className="chart-stage">
             {c.title}
@@ -93,10 +95,15 @@ export function RoutingFlow({ paths, total }: { paths: FlowPath[]; total: number
           const gap = Math.min(1, t / 4);
           let d = "";
           for (let ci = 0; ci < COLUMNS.length - 1; ci++) {
-            const n0 = nodes[`${ci}:${p.steps[ci]}`]!, n1 = nodes[`${ci + 1}:${p.steps[ci + 1]}`]!;
-            const h0 = p.routes.length * (n0.h / n0.count), h1 = p.routes.length * (n1.h / n1.count);
-            const x0 = colX[ci]! + NODE_W, x1 = colX[ci + 1]!, mx = (x0 + x1) / 2;
-            const y0 = slot[`${p.key}#${ci}`]! + gap, y1 = slot[`${p.key}#${ci + 1}`]! + gap;
+            const n0 = nodes[`${ci}:${p.steps[ci]}`]!,
+              n1 = nodes[`${ci + 1}:${p.steps[ci + 1]}`]!;
+            const h0 = p.routes.length * (n0.h / n0.count),
+              h1 = p.routes.length * (n1.h / n1.count);
+            const x0 = colX[ci]! + NODE_W,
+              x1 = colX[ci + 1]!,
+              mx = (x0 + x1) / 2;
+            const y0 = slot[`${p.key}#${ci}`]! + gap,
+              y1 = slot[`${p.key}#${ci + 1}`]! + gap;
             d += `M${x0},${y0} C${mx},${y0} ${mx},${y1} ${x1},${y1} L${x1},${y1 + h1 - gap * 2} C${mx},${y1 + h1 - gap * 2} ${mx},${y0 + h0 - gap * 2} ${x0},${y0 + h0 - gap * 2} Z `;
           }
           return (

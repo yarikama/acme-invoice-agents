@@ -222,7 +222,9 @@
 
   /* Cards: rounded panels with a hairline edge. */
   .card {
-    background: var(--grain-soft) 0 0 / 200px 200px, var(--glass);
+    background:
+      var(--grain-soft) 0 0 / 200px 200px,
+      var(--glass);
     border: 0;
     border-radius: var(--r-lg);
     box-shadow:
@@ -240,7 +242,9 @@
     --raised: rgb(255 255 255 / 0.1);
     --pale: rgb(255 255 255 / 0.1);
     --glass-hi: rgb(255 255 255 / 0.08);
-    background: var(--grain-soft) 0 0 / 200px 200px, rgb(24 24 23 / 0.9);
+    background:
+      var(--grain-soft) 0 0 / 200px 200px,
+      rgb(24 24 23 / 0.9);
     color: var(--ink);
     -webkit-backdrop-filter: blur(12px) saturate(1.4);
     backdrop-filter: blur(12px) saturate(1.4);
@@ -270,7 +274,9 @@
     --ink-2: rgb(17 17 17 / 0.74);
     --raised: rgb(255 255 255 / 0.55);
     --glass-hi: rgb(255 255 255 / 0.35);
-    background: var(--grain-soft) 0 0 / 200px 200px, var(--color-signal);
+    background:
+      var(--grain-soft) 0 0 / 200px 200px,
+      var(--color-signal);
     color: var(--ink);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.35),
@@ -490,7 +496,9 @@
   /* While a card moves, frosting every card on every frame is what makes
      dragging stutter. Panels go solid until the card is dropped. */
   .grid-moving .card:not(.card-signal) {
-    background: var(--grain-soft) 0 0 / 200px 200px, var(--panel);
+    background:
+      var(--grain-soft) 0 0 / 200px 200px,
+      var(--panel);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
@@ -511,7 +519,9 @@
     background: none;
     color: var(--ink-2);
     cursor: pointer;
-    transition: color 120ms ease-out, background 120ms ease-out;
+    transition:
+      color 120ms ease-out,
+      background 120ms ease-out;
   }
   .icon-btn:hover {
     color: var(--ink);
@@ -629,7 +639,11 @@
     animation: pulse 1.2s ease-in-out infinite;
   }
   .led-skip {
-    background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--ink) 18%, transparent) 0 6px, transparent 6px 10px);
+    background: repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--ink) 18%, transparent) 0 6px,
+      transparent 6px 10px
+    );
   }
   .led-off {
     background: color-mix(in srgb, var(--ink) 12%, transparent);

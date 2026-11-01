@@ -1,9 +1,4 @@
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
+import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from "@tanstack/react-table";
 import { useMemo } from "react";
 
 import { money } from "../lib/format";
@@ -42,7 +37,8 @@ export function InboxTable({
             >
               <span className="mono text-xs text-ink-2">{inv?.invoice_number ?? row.original.source}</span>
               <span className="v text-base font-medium underline-offset-[3px]">
-                {inv?.vendor ?? (inv ? "No vendor" : row.original.status === "failed" ? "Not extracted" : "Not extracted yet")}
+                {inv?.vendor ??
+                  (inv ? "No vendor" : row.original.status === "failed" ? "Not extracted" : "Not extracted yet")}
               </span>
             </button>
           );
@@ -52,7 +48,9 @@ export function InboxTable({
         id: "format",
         header: "format",
         cell: ({ row }) => (
-          <span className="tag tag-soft">{(row.original.summary?.source_format ?? row.original.source.split(".").pop() ?? "").toUpperCase()}</span>
+          <span className="tag tag-soft">
+            {(row.original.summary?.source_format ?? row.original.source.split(".").pop() ?? "").toUpperCase()}
+          </span>
         ),
       }),
       col.display({
@@ -60,7 +58,9 @@ export function InboxTable({
         header: () => <span className="block text-right">amount</span>,
         cell: ({ row }) => {
           const inv = row.original.summary?.invoice;
-          return <span className="block text-right whitespace-nowrap">{inv ? money(inv.total, inv.currency) : ""}</span>;
+          return (
+            <span className="block text-right whitespace-nowrap">{inv ? money(inv.total, inv.currency) : ""}</span>
+          );
         },
       }),
       col.display({
@@ -104,7 +104,10 @@ export function InboxTable({
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className={`group ${row.id === selectedId ? "bg-raised" : "odd:bg-[var(--tile)] hover:bg-raised"}`}>
+            <tr
+              key={row.id}
+              className={`group ${row.id === selectedId ? "bg-raised" : "odd:bg-[var(--tile)] hover:bg-raised"}`}
+            >
               {row.getVisibleCells().map((cell, i) => (
                 <td
                   key={cell.id}

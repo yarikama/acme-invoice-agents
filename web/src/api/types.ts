@@ -92,7 +92,7 @@ export type RunEvent = EventBase &
     | { type: "started" }
     | { type: "progress"; stage: string; step: string }
     // `tool` is set when the line records a tool call the approver made.
-  | { type: "trace"; node: string; stage: string; message: string; tool?: string; usage?: StepUsage }
+    | { type: "trace"; node: string; stage: string; message: string; tool?: string; usage?: StepUsage }
     | { type: "awaiting_vp"; request: unknown; summary: Summary }
     | { type: "decision"; approved: boolean; note: string }
     | { type: "done"; summary: Summary }

@@ -157,11 +157,23 @@ export function DecisionPanel({
         />
       </label>
       <div className="grid flex-none grid-cols-1 gap-2 sm:grid-cols-2">
-        <button type="button" className="key key-big key-go min-h-16" disabled={sending !== null} onClick={() => decide(true)}>
+        <button
+          type="button"
+          className="key key-big key-go min-h-16"
+          disabled={sending !== null}
+          onClick={() => decide(true)}
+        >
           <span className="text-lg font-medium">{sending === "approve" ? "Approving…" : "Approve and pay"}</span>
-          <span className="mono text-xs">{inv ? `${money(inv.total, inv.currency)} via mock_payment` : "via mock_payment"}</span>
+          <span className="mono text-xs">
+            {inv ? `${money(inv.total, inv.currency)} via mock_payment` : "via mock_payment"}
+          </span>
         </button>
-        <button type="button" className="key key-big min-h-16" disabled={sending !== null} onClick={() => decide(false)}>
+        <button
+          type="button"
+          className="key key-big min-h-16"
+          disabled={sending !== null}
+          onClick={() => decide(false)}
+        >
           <span className="text-lg font-medium">{sending === "reject" ? "Rejecting…" : "Reject"}</span>
           <span className="mono text-xs">logs your reason, no payment</span>
         </button>

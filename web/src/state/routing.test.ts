@@ -27,14 +27,29 @@ function run(status: RunView["status"], s: Summary | null, events: RunEvent[] = 
 describe("routeOf", () => {
   it("reads validation, who decided and the outcome", () => {
     const triaged = run("paid", summary([]), [
-      ev({ type: "trace", node: "triage", stage: "triage", message: "m says approve (99% sure), suspicion 2%. Code confirmed every check passed, so the reasoning approver was skipped. Outcome: pay." }, "2026-11-01T00:00:01Z"),
+      ev(
+        {
+          type: "trace",
+          node: "triage",
+          stage: "triage",
+          message:
+            "m says approve (99% sure), suspicion 2%. Code confirmed every check passed, so the reasoning approver was skipped. Outcome: pay.",
+        },
+        "2026-11-01T00:00:01Z",
+      ),
     ]);
     expect(routeOf(triaged)).toMatchObject({ validation: "clean", decider: "triage", outcome: "paid", label: "INV-1" });
 
-    const vp = run("rejected", summary(["warning", "info"]), [ev({ type: "decision", approved: false, note: "" }, "2026-11-01T00:00:02Z")]);
+    const vp = run("rejected", summary(["warning", "info"]), [
+      ev({ type: "decision", approved: false, note: "" }, "2026-11-01T00:00:02Z"),
+    ]);
     expect(routeOf(vp)).toMatchObject({ validation: "warnings", decider: "vp", outcome: "rejected" });
 
-    expect(routeOf(run("awaiting_vp", summary(["error"])))).toMatchObject({ validation: "errors", decider: "approver", outcome: "vp" });
+    expect(routeOf(run("awaiting_vp", summary(["error"])))).toMatchObject({
+      validation: "errors",
+      decider: "approver",
+      outcome: "vp",
+    });
   });
 
   it("skips runs that have not settled", () => {
@@ -60,8 +75,24 @@ describe("flowPaths", () => {
 
 describe("settledTimeline", () => {
   it("times each settled run from the first start, in order", () => {
-    const a = run("paid", summary([]), [ev({ type: "started" }, "2026-11-01T00:00:00Z"), ev({ type: "done", summary: summary([]) }, "2026-11-01T00:00:30Z")], "a");
-    const b = run("awaiting_vp", summary(["warning"]), [ev({ type: "started" }, "2026-11-01T00:00:10Z"), ev({ type: "awaiting_vp", request: null, summary: summary([]) }, "2026-11-01T00:00:20Z")], "b");
+    const a = run(
+      "paid",
+      summary([]),
+      [
+        ev({ type: "started" }, "2026-11-01T00:00:00Z"),
+        ev({ type: "done", summary: summary([]) }, "2026-11-01T00:00:30Z"),
+      ],
+      "a",
+    );
+    const b = run(
+      "awaiting_vp",
+      summary(["warning"]),
+      [
+        ev({ type: "started" }, "2026-11-01T00:00:10Z"),
+        ev({ type: "awaiting_vp", request: null, summary: summary([]) }, "2026-11-01T00:00:20Z"),
+      ],
+      "b",
+    );
     const c = run("running", null, [ev({ type: "started" }, "2026-11-01T00:00:40Z")], "c");
     expect(settledTimeline([a, b, c]).map((s) => [s.route.id, s.at])).toEqual([
       ["b", 20],

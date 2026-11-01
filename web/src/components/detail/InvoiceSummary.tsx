@@ -3,7 +3,8 @@ import type { RunView } from "../../state/runs";
 
 function closing(run: RunView): string {
   const s = run.summary;
-  if (run.status === "paid" && s?.payment) return `Paid ${money(s.payment.amount, s.payment.currency)} through mock_payment.`;
+  if (run.status === "paid" && s?.payment)
+    return `Paid ${money(s.payment.amount, s.payment.currency)} through mock_payment.`;
   if (run.status === "rejected") return s?.reason ?? "Rejected.";
   if (run.status === "failed") return run.error ?? "The run failed.";
   if (run.status === "awaiting_vp") {

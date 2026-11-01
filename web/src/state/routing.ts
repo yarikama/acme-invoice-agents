@@ -38,7 +38,13 @@ export function routeOf(run: RunView): Route | null {
   const s = run.summary;
   if (!s) return null;
   const outcome: Outcome | null =
-    run.status === "paid" ? "paid" : run.status === "rejected" ? "rejected" : run.status === "awaiting_vp" ? "vp" : null;
+    run.status === "paid"
+      ? "paid"
+      : run.status === "rejected"
+        ? "rejected"
+        : run.status === "awaiting_vp"
+          ? "vp"
+          : null;
   if (!outcome) return null;
   const validation: Validation = s.findings.some((f) => f.severity === "error")
     ? "errors"

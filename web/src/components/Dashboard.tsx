@@ -208,9 +208,7 @@ export function Dashboard({
         {waiting && selected && s ? (
           <DecisionPanel runId={selected.id} summary={s} needsToken={vpAuth} />
         ) : (
-          <Muted>
-            {selected ? "Nothing to decide: this invoice isn't waiting for a VP." : "Nothing selected."}
-          </Muted>
+          <Muted>{selected ? "Nothing to decide: this invoice isn't waiting for a VP." : "Nothing selected."}</Muted>
         )}
       </Widget>
     ),
