@@ -118,3 +118,60 @@ def test_openrouter_pricing(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert evaluation.openrouter_pricing() == {"x-ai/grok-4.7": (0.000002, 0.000006)}
+
+
+def test_every_attack_has_a_case() -> None:
+    attacks = INVOICES.parent / "adversarial"
+    covered = {name for case in evaluation.ADVERSARIAL for name in case.files}
+    assert covered == {p.name for p in attacks.iterdir() if p.is_file()}
+    assert all(c.folder == "adversarial" for c in evaluation.ADVERSARIAL)
+
+
+def test_repeat_reports_how_consistent_each_case_was(
+    offline: Settings, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        evaluation.main(
+            [
+                "--set",
+                "adversarial",
+                "--only",
+                "json",
+                "--repeat",
+                "2",
+                "--out",
+                str(tmp_path),
+            ]
+        )
+        == 0
+    )
+
+    [report] = tmp_path.glob("offline-adversarial-*.json")
+    data = json.loads(report.read_text())
+    assert data["set"] == "adversarial"
+    assert data["summary"]["repeat"] == 2
+    assert data["summary"]["consistent_cases"] == data["summary"]["cases"] == 2
+    assert sorted({r["attempt"] for r in data["results"]}) == [1, 2]
+    out = capsys.readouterr().out
+    assert "2/2" in out and "gave the same outcome all 2 times" in out
+
+
+def test_consistency_names_flaky_cases() -> None:
+    def result(outcome: evaluation.Outcome, attempt: int) -> evaluation.Result:
+        return evaluation.Result(
+            "a.json", "pay", outcome, outcome == "pay", 1.0, attempt=attempt
+        )
+
+    assert evaluation.consistency([result("pay", 1)]) == {}
+    flaky = evaluation.consistency([result("pay", 1), result("human", 2)])
+    assert flaky == {
+        "repeat": 2,
+        "consistent_cases": 0,
+        "cases": 1,
+        "flaky": ["a.json"],
+    }
+
+
+def test_sets() -> None:
+    assert evaluation.cases_in("samples") == evaluation.CASES
+    assert evaluation.cases_in("all") == evaluation.CASES + evaluation.ADVERSARIAL

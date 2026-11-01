@@ -11,8 +11,14 @@ from __future__ import annotations
 
 from invoice_agents.models import ApprovalDraft, Invoice, ToolCall, ValidationReport
 
-STOCK_CODES = {"UNKNOWN_ITEM", "OUT_OF_STOCK", "STOCK_EXCEEDED", "STOCK_DEPLETED"}
-HISTORY_CODES = {"DUPLICATE", "SUPERSEDES"}
+STOCK_CODES = {
+    "UNKNOWN_ITEM",
+    "OUT_OF_STOCK",
+    "STOCK_EXCEEDED",
+    "STOCK_DEPLETED",
+    "PRICE_ABOVE_LIST",
+}
+HISTORY_CODES = {"DUPLICATE", "SUPERSEDES", "SPLIT_BELOW_THRESHOLD"}
 
 
 def lint_decision(

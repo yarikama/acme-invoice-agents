@@ -1,0 +1,14 @@
+{
+  "invoice_number": "INV-2301",
+  "vendor": {"name": "Meridian Supply Co.", "address": "400 Commerce Street, Dallas, TX 75202"},
+  "date": "2026-02-10",
+  "due_date": "2026-03-12",
+  "line_items": [
+    {"item": "GadgetX", "quantity": 3, "unit_price": 2400.00}
+  ],
+  "subtotal": 7200.00,
+  "tax_amount": 0.00,
+  "total": 7200.00,
+  "currency": "USD",
+  "payment_terms": "Net 30"
+}
