@@ -1,6 +1,8 @@
 import { type Filter, matches, SEGMENTS } from "../lib/filters";
+import { STATUS_ICON } from "../lib/icons";
 import { money } from "../lib/format";
 import type { RunView } from "../state/runs";
+import { Badge } from "./Badge";
 
 // Totals only add up within one currency, so other currencies are counted, not summed.
 function Total({ runs }: { runs: RunView[] }) {
@@ -32,7 +34,7 @@ export function StatusBank({
     <div
       role="group"
       aria-label="Filter invoices by status"
-      className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-px border border-seam bg-seam"
+      className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3"
     >
       {SEGMENTS.map((seg) => {
         const members = runs.filter((r) => matches(seg.key, r.status));
@@ -43,13 +45,13 @@ export function StatusBank({
             type="button"
             aria-pressed={selected}
             onClick={() => onFilter(seg.key)}
-            className={`flex min-h-28 min-w-0 cursor-pointer flex-col gap-1 border-0 px-6 py-4 text-left text-ink hover:bg-raised ${
-              selected ? "bracketed bg-raised" : "bg-panel"
+            className={`card flex min-h-28 min-w-0 cursor-pointer flex-col gap-1 px-5 py-4 text-left font-[inherit] text-ink hover:bg-raised ${
+              selected ? "card-on" : ""
             }`}
           >
-            <span className="bk" aria-hidden="true" />
-            <span className="flex items-center gap-2 text-sm font-medium">
-              <span className={`lt ${seg.light}`} aria-hidden="true" />
+            <span className="flex items-center gap-2.5 text-sm font-medium">
+              {/* Orange only when something is actually waiting for a person. */}
+              <Badge icon={STATUS_ICON[seg.key]} signal={seg.key === "awaiting_vp" && members.length > 0} />
               {seg.label}
             </span>
             <span className="text-4xl font-light">{members.length}</span>

@@ -1,3 +1,4 @@
+import { STAGE_ICON } from "../../lib/icons";
 import type { Segment } from "../../state/pipeline";
 
 const LED_CLASS: Record<Segment["state"], string> = {
@@ -14,13 +15,19 @@ const LED_CLASS: Record<Segment["state"], string> = {
 export function Pipeline({ segments }: { segments: Segment[] }) {
   return (
     <ol aria-label="Pipeline stages" className="m-0 grid list-none grid-cols-3 gap-2 p-0 sm:grid-cols-6">
-      {segments.map((s) => (
-        <li key={s.key} className="flex min-w-0 flex-col gap-1">
-          <span className={`led ${LED_CLASS[s.state]}`} aria-hidden="true" />
-          <span className="cap mt-1 text-ink">{s.label}</span>
-          <span className="text-[13px] font-semibold">{s.word}</span>
-        </li>
-      ))}
+      {segments.map((s) => {
+        const Glyph = STAGE_ICON[s.key];
+        return (
+          <li key={s.key} className="flex min-w-0 flex-col gap-1">
+            <span className={`led ${LED_CLASS[s.state]}`} aria-hidden="true" />
+            <span className="cap mt-1 flex items-center gap-1.5 text-ink">
+              <Glyph size={14} weight="bold" aria-hidden="true" />
+              {s.label}
+            </span>
+            <span className="text-[13px] font-semibold">{s.word}</span>
+          </li>
+        );
+      })}
     </ol>
   );
 }

@@ -2,13 +2,13 @@ import type { Status } from "../api/types";
 
 export type Filter = "all" | "awaiting_vp" | "active" | "paid" | "rejected" | "failed";
 
-export const SEGMENTS: { key: Filter; label: string; light: string; statuses: Status[] }[] = [
-  { key: "all", label: "All", light: "lt-queued", statuses: [] },
-  { key: "awaiting_vp", label: "Awaiting VP", light: "lt-awaiting_vp", statuses: ["awaiting_vp"] },
-  { key: "active", label: "In progress", light: "lt-running", statuses: ["queued", "running"] },
-  { key: "paid", label: "Paid", light: "lt-paid", statuses: ["paid"] },
-  { key: "rejected", label: "Rejected", light: "lt-rejected", statuses: ["rejected"] },
-  { key: "failed", label: "Failed", light: "lt-failed", statuses: ["failed"] },
+export const SEGMENTS: { key: Filter; label: string; statuses: Status[] }[] = [
+  { key: "all", label: "All", statuses: [] },
+  { key: "awaiting_vp", label: "Awaiting VP", statuses: ["awaiting_vp"] },
+  { key: "active", label: "In progress", statuses: ["queued", "running"] },
+  { key: "paid", label: "Paid", statuses: ["paid"] },
+  { key: "rejected", label: "Rejected", statuses: ["rejected"] },
+  { key: "failed", label: "Failed", statuses: ["failed"] },
 ];
 
 export function matches(filter: Filter, status: Status): boolean {

@@ -8,6 +8,8 @@ import { DetailPanel } from "./components/detail/DetailPanel";
 import type { RunOverview } from "./api/types";
 import { type Filter, matches } from "./lib/filters";
 import { useConsole } from "./state/useConsole";
+import { Badge } from "./components/Badge";
+import { SECTION_ICON } from "./lib/icons";
 
 export default function App() {
   const { state, stream, provider, snapshot, loaded } = useConsole();
@@ -56,10 +58,11 @@ export default function App() {
 
         <StatusBank runs={runs} filter={filter} onFilter={setFilter} />
 
-        <div className="grid grid-cols-1 gap-px bg-seam lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
-          <section aria-labelledby="inbox-h" className="min-w-0 bg-panel">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
+          <section aria-labelledby="inbox-h" className="card min-w-0 overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-2 px-6 pt-6 pb-2">
-              <h2 id="inbox-h" className="m-0 text-base font-medium">
+              <h2 id="inbox-h" className="m-0 flex items-center gap-3 text-base font-medium">
+                <Badge icon={SECTION_ICON.invoices} />
                 Invoices
               </h2>
               <span className="cap">

@@ -2,6 +2,7 @@ import { MoonIcon, SunIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import type { StreamState } from "../state/useConsole";
+import { Logo } from "./Logo";
 
 const STREAM_WORD: Record<StreamState, string> = {
   connecting: "connecting",
@@ -29,7 +30,8 @@ export function Header({ stream, provider }: { stream: StreamState; provider: st
   return (
     <header className="border-b border-seam bg-panel">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-center gap-2">
+          <Logo size={22} />
           <span className="text-base font-medium">Acme AP</span>
           <span className="cap">console</span>
         </div>

@@ -1,5 +1,7 @@
 import type { Finding, Invoice } from "../../api/types";
 import { money } from "../../lib/format";
+import { SECTION_ICON } from "../../lib/icons";
+import { Heading } from "../Badge";
 
 const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -13,9 +15,11 @@ export function LineItems({ invoice, findings }: { invoice: Invoice; findings: F
   const cur = invoice.currency;
   return (
     <section aria-labelledby="lines-h" className="bg-panel p-6">
-      <h3 id="lines-h" className="m-0 mb-4 text-base font-medium">
-        Line items
-      </h3>
+      <div className="mb-4">
+        <Heading id="lines-h" icon={SECTION_ICON.lineItems}>
+          Line items
+        </Heading>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] border-collapse text-sm">
           <thead>

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api } from "../../api/client";
 import type { Summary } from "../../api/types";
 import { money } from "../../lib/format";
+import { GavelIcon } from "@phosphor-icons/react";
 
 /** Shown at the top of the detail pane while a run waits for the VP. */
 export function DecisionPanel({ runId, summary }: { runId: string; summary: Summary }) {
@@ -26,7 +27,8 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
   return (
     <section aria-labelledby="decision-h" className="bg-panel">
       <div className="flex flex-wrap items-center justify-between gap-2 bg-signal px-6 py-3 text-[#111111]">
-        <h3 id="decision-h" className="m-0 text-base font-medium">
+        <h3 id="decision-h" className="m-0 flex items-center gap-2 text-base font-medium">
+          <GavelIcon size={18} weight="bold" aria-hidden="true" />
           VP decision required
         </h3>
         <span className="mono text-xs">paused at human_review</span>
