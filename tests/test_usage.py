@@ -9,9 +9,8 @@ from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.memory import InMemorySaver
 
-from invoice_agents import usage
+from invoice_agents import llm, usage
 from invoice_agents.agents import Review, RuleCritic
-from invoice_agents.api import app as api
 from invoice_agents.config import Settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.llm import Agents
@@ -127,13 +126,13 @@ async def test_overlapping_runs_do_not_mix_usage(inventory: Any) -> None:
     assert (tokens(a), tokens(b)) == (111, 999)
 
 
-def test_api_loads_prices_only_for_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert api.load_pricing(Settings(llm_provider="offline")) == {}
-    monkeypatch.setattr(api, "openrouter_pricing", lambda: {"m": (1.0, 2.0)})
-    assert api.load_pricing(Settings(llm_provider="openrouter")) == {"m": (1.0, 2.0)}
+def test_prices_load_only_for_openrouter(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert llm.load_pricing(Settings(llm_provider="offline")) == {}
+    monkeypatch.setattr(llm, "openrouter_pricing", lambda: {"m": (1.0, 2.0)})
+    assert llm.load_pricing(Settings(llm_provider="openrouter")) == {"m": (1.0, 2.0)}
 
     def offline() -> usage.Pricing:
         raise OSError("no network")
 
-    monkeypatch.setattr(api, "openrouter_pricing", offline)
-    assert api.load_pricing(Settings(llm_provider="openrouter")) == {}
+    monkeypatch.setattr(llm, "openrouter_pricing", offline)
+    assert llm.load_pricing(Settings(llm_provider="openrouter")) == {}

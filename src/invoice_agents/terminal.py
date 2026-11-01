@@ -860,7 +860,37 @@ def vp_card(summary: dict[str, Any]) -> Panel:
     )
 
 
-def batch_summary(results: list[dict[str, Any]], seconds: float) -> RenderableType:
+def impact_line(results: list[dict[str, Any]], replayed: bool = False) -> Text:
+    """The batch against the manual process in the brief: time per invoice,
+    money held back, and what the models cost."""
+    times = sorted(r["seconds"] for r in results if r.get("seconds") is not None)
+    rejected = [r for r in results if r.get("status") == "rejected"]
+    held = sum(
+        (r.get("invoice") or {}).get("total") or 0
+        for r in rejected
+        if (r.get("invoice") or {}).get("currency", "USD") == "USD"
+        and ((r.get("invoice") or {}).get("total") or 0) > 0
+    )
+    used = [t["usage"] for r in results for t in r.get("trace", []) if t.get("usage")]
+    costs = [u.get("cost_usd") for u in used]
+    line = Text()
+    if times:
+        median = times[len(times) // 2]
+        line.append(f"{_took(median)} per invoice", style="bold")
+        note = "replayed answers return at once" if replayed else "median"
+        line.append(f" ({note}; was 5 days by hand)\n", style="#a6a69f")
+    line.append(money(held, "USD"), style="bold")
+    line.append(f" stopped before paying ({len(rejected)} rejected)", style="#a6a69f")
+    if used and None not in costs:
+        per = sum(c or 0.0 for c in costs) / max(len(results), 1)
+        line.append(f"\n${per:.3f}" if per < 1 else f"\n${per:.2f}", style="bold")
+        line.append(" model cost per invoice", style="#a6a69f")
+    return line
+
+
+def batch_summary(
+    results: list[dict[str, Any]], seconds: float, replayed: bool = False
+) -> RenderableType:
     """Totals and where the invoices went, as a text bar chart."""
     counts = Counter(r.get("status", "failed") for r in results)
     total = len(results)
@@ -892,7 +922,7 @@ def batch_summary(results: list[dict[str, Any]], seconds: float) -> RenderableTy
         f"   {alone} settled with no person, {to_vp} sent to a VP", style="#a6a69f"
     )
     return Panel(
-        Group(head, Text(), table),
+        Group(head, Text(), table, Text(), impact_line(results, replayed)),
         title=Text(" Batch ", style="bold"),
         title_align="left",
         border_style="#3a3a37",

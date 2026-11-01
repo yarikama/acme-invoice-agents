@@ -69,6 +69,7 @@ export default function App() {
           selected={selected}
           onSelect={onSelect}
           llm={provider !== null && provider !== "offline"}
+          replayed={provider === "replay"}
           vpAuth={vpAuth}
           layout={layout}
           onLayout={onLayout}
