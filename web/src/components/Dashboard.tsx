@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import ReactGridLayout, { type Layout, useContainerWidth } from "react-grid-layout";
 
 import { plural } from "../lib/format";
@@ -48,6 +48,10 @@ export function Dashboard({
   onLayout: (layout: Layout) => void;
 }) {
   const { width, containerRef, mounted } = useContainerWidth();
+  // True while a card is dragged or resized; panels drop their frosting meanwhile.
+  const [moving, setMoving] = useState(false);
+  const start = () => setMoving(true);
+  const stop = () => setMoving(false);
   const grid = mounted && width >= GRID_MIN_WIDTH;
 
   const s = selected?.summary;
@@ -146,8 +150,13 @@ export function Dashboard({
           layout={layout}
           gridConfig={{ cols: COLS, rowHeight: ROW_HEIGHT, margin: [GAP, GAP], containerPadding: [0, 0] }}
           dragConfig={{ enabled: true, handle: ".widget-handle" }}
-          resizeConfig={{ enabled: true, handles: ["se"] }}
+          resizeConfig={{ enabled: true, handles: ["e", "w", "s", "se", "sw"] }}
           onLayoutChange={onLayout}
+          onDragStart={start}
+          onDragStop={stop}
+          onResizeStart={start}
+          onResizeStop={stop}
+          className={moving ? "grid-moving" : undefined}
         >
           {WIDGETS.map((id) => (
             <div key={id}>{widgets[id](true)}</div>

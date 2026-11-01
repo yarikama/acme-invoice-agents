@@ -346,11 +346,13 @@
     opacity: 0.18;
     border-radius: var(--r-lg);
   }
+  /* Resize from the left, right and bottom edges and the two bottom corners
+     (the top edge is the drag handle). Edges are invisible strips that show
+     a small grip on hover. */
   .react-grid-item > .react-resizable-handle {
-    width: 18px;
-    height: 18px;
-    right: 4px;
-    bottom: 4px;
+    z-index: 2;
+    margin: 0;
+    transform: none;
     background: none;
     opacity: 0;
     transition: opacity 120ms ease-out;
@@ -360,13 +362,115 @@
     opacity: 1;
   }
   .react-grid-item > .react-resizable-handle::after {
-    right: 4px;
-    bottom: 4px;
-    width: 8px;
-    height: 8px;
-    border-right: 2px solid var(--ink-2);
+    inset: auto;
+    width: auto;
+    height: auto;
+    margin: 0;
+    border: 0;
+    border-radius: 999px;
+    background: var(--ink-2);
+    opacity: 0.6;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-se,
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-sw {
+    top: auto;
+    bottom: 0;
+    width: 22px;
+    height: 22px;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-se {
+    right: 0;
+    left: auto;
+    cursor: nwse-resize;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-sw {
+    left: 0;
+    right: auto;
+    cursor: nesw-resize;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-se::after,
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-sw::after {
+    bottom: 6px;
+    width: 9px;
+    height: 9px;
+    background: none;
     border-bottom: 2px solid var(--ink-2);
-    border-bottom-right-radius: 4px;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-se::after {
+    right: 6px;
+    border-right: 2px solid var(--ink-2);
+    border-radius: 0 0 5px 0;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-sw::after {
+    left: 6px;
+    border-left: 2px solid var(--ink-2);
+    border-radius: 0 0 0 5px;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-e,
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+    top: 28px;
+    bottom: 28px;
+    width: 12px;
+    height: auto;
+    cursor: ew-resize;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-e {
+    right: 0;
+    left: auto;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-w {
+    left: 0;
+    right: auto;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-e::after,
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-w::after {
+    top: 50%;
+    width: 4px;
+    height: 36px;
+    margin-top: -18px;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-e::after {
+    right: 4px;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-w::after {
+    left: 4px;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-s {
+    top: auto;
+    bottom: 0;
+    left: 28px;
+    right: 28px;
+    width: auto;
+    height: 12px;
+    cursor: ns-resize;
+  }
+  .react-grid-item > .react-resizable-handle.react-resizable-handle-s::after {
+    left: 50%;
+    bottom: 4px;
+    width: 36px;
+    height: 4px;
+    margin-left: -18px;
+  }
+
+  /* Cards making way for a dragged card slide quickly, so the grid keeps up. */
+  .react-grid-item.cssTransforms {
+    transition-duration: 120ms;
+  }
+  .react-grid-item.react-draggable-dragging,
+  .react-grid-item.resizing {
+    transition: none;
+  }
+
+  /* While a card moves, frosting every card on every frame is what makes
+     dragging stutter. Panels go solid until the card is dropped. */
+  .grid-moving .card:not(.card-signal) {
+    background: var(--grain-soft) 0 0 / 200px 200px, var(--panel);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .grid-moving .card-signal {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   /* Icon badges: one icon per category, in a small rounded box. */
