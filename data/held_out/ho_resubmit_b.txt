@@ -1,0 +1,17 @@
+INVOICE  (COPY - PLEASE PROCESS)
+
+Invoice Number: INV-3101-A
+Vendor: Granite Peak Components
+Date: 2026-02-09
+Due Date: 2026-03-11
+
+Item                Qty     Unit Price      Amount
+--------------------------------------------------
+WidgetA              8       $250.00       $2,000.00
+WidgetB              2       $500.00       $1,000.00
+--------------------------------------------------
+                              Subtotal:    $3,000.00
+                              Tax (0%):       $0.00
+                              Total:       $3,000.00
+
+Payment Terms: Net 30
