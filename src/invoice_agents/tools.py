@@ -34,11 +34,17 @@ class ReviewTools:
     """The approver's tools, bound to this run's inventory and history."""
 
     def __init__(
-        self, inventory: Inventory, seen: SeenInvoices, current: Invoice
+        self,
+        inventory: Inventory,
+        seen: SeenInvoices,
+        current: Invoice,
+        on_step: Callable[[ToolCall], None] | None = None,
     ) -> None:
         self.inventory = inventory
         self.seen = seen
         self.current = current
+        # Told about each step as it happens, so the run can stream it live.
+        self.on_step = on_step
         # Built on first use, once: schemas come from the signatures.
         self._tools: dict[str, BaseTool] | None = None
         self._funcs: dict[str, Callable[..., str]] = {
@@ -105,7 +111,14 @@ class ReviewTools:
                 result = str(tool.invoke(args))
             except (TypeError, ValueError) as exc:
                 result = f"Bad arguments for {name}: {exc}"
-        return ToolCall(name=name, args=args, result=result)
+        return self.note(ToolCall(name=name, args=args, result=result))
+
+    def note(self, step: ToolCall) -> ToolCall:
+        """Pass a finished step (a tool call, or a decision sent back by the
+        guardrail) to whoever is watching the run."""
+        if self.on_step is not None:
+            self.on_step(step)
+        return step
 
     def _others(self) -> list[Invoice]:
         """Processed invoices except this one (it is recorded before review)."""

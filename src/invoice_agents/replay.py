@@ -256,7 +256,9 @@ class ReplayApprover:
             step = ToolCall.model_validate(raw)
             # The model's choice of call is replayed; code answers it again.
             steps.append(
-                step if step.name == GUARDRAIL else tools.run(step.name, step.args)
+                tools.note(step)
+                if step.name == GUARDRAIL
+                else tools.run(step.name, step.args)
             )
         return Review(ApprovalDraft.model_validate(hit["draft"]), steps)
 

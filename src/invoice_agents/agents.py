@@ -286,7 +286,10 @@ class LLMApprover:
             for tc in reply.tool_calls:
                 # Every call gets an answer, or the next request is invalid.
                 if tc["name"] == SUBMIT:
+                    before = len(steps)
                     result, draft = self._check(invoice, report, tc["args"], steps)
+                    for sent_back in steps[before:]:
+                        tools.note(sent_back)
                 else:
                     call = tools.run(tc["name"], tc["args"])
                     steps.append(call)

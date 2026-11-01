@@ -94,6 +94,10 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
   const out: Turn[] = [];
   let tools: ToolUse[] = [];
   let sendbacks: string[] = [];
+  // The line that opened the approver's turn. Tool calls stream in before
+  // the draft, so the turn keeps this key as it grows: React updates it in
+  // place instead of mounting it again (and replaying its entrance) per call.
+  let opened: number | undefined;
   let last = startedAt;
   const timed = (line: TraceLine): Base => {
     const ms = line.at !== undefined && last !== undefined ? Math.max(0, line.at - last) : undefined;
@@ -103,25 +107,31 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
   // Tool calls and send-backs arrive just before the draft they led to.
   const flush = (line: TraceLine) => {
     if (tools.length || sendbacks.length) {
-      out.push({ ...timed(line), kind: "approver", tools, sendbacks, round: null, decision: null, rationale: "" });
+      const key = opened ?? line.seq;
+      out.push({ ...timed(line), key, kind: "approver", tools, sendbacks, round: null, decision: null, rationale: "" });
       tools = [];
       sendbacks = [];
+      opened = undefined;
     }
   };
 
   for (const line of lines) {
     if (line.node === "tool") {
+      opened ??= line.seq;
       tools.push(splitToolLine(line.text));
       continue;
     }
     if (line.node === "guardrail") {
+      opened ??= line.seq;
       sendbacks.push(line.text.replace(/^Sent the decision back\.\s*/, ""));
       continue;
     }
     if (line.node === "review") {
-      out.push({ ...timed(line), kind: "approver", tools, sendbacks, ...parseDraft(line.text) });
+      const key = opened ?? line.seq;
+      out.push({ ...timed(line), key, kind: "approver", tools, sendbacks, ...parseDraft(line.text) });
       tools = [];
       sendbacks = [];
+      opened = undefined;
       continue;
     }
     flush(line);

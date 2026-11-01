@@ -8,7 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from invoice_agents.api.app import app, lifespan
 from invoice_agents.api.runs import RunManager
-from invoice_agents.config import get_settings
+from invoice_agents.config import Settings, get_settings
 from tests.conftest import INVOICES
 
 
@@ -269,3 +269,34 @@ async def test_only_a_vp_token_can_decide(client):
     )
     decision = next(e for e in detail["events"] if e["type"] == "decision")
     assert decision["by"] == "Dana Whitfield"
+
+
+async def test_a_tool_call_reaches_the_stream_once_before_the_draft(
+    inventory, tmp_path
+):
+    """Tool calls are sent as they finish, not with the draft, and only once."""
+    from langgraph.checkpoint.memory import InMemorySaver
+
+    from invoice_agents.graph import Deps, build_graph, checkpoint_serde
+    from invoice_agents.llm import Agents
+    from tests.test_graph import (
+        INV_1001,
+        RecordingCritic,
+        StubExtractor,
+        ToolUsingApprover,
+    )
+
+    agents = Agents(StubExtractor(INV_1001), ToolUsingApprover(), RecordingCritic())
+    settings = Settings(_env_file=None, llm_provider="offline")  # pyright: ignore[reportCallIssue]
+    deps = Deps(agents=agents, inventory=inventory, settings=settings)
+    graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
+    runs = RunManager(graph)
+    run = runs.start(INVOICES / "invoice_1001.txt", "invoice_1001.txt")
+    await run.settled.wait()
+
+    lines = [e["message"] for e in run.events if e["type"] == "trace"]
+    tool = [m for m in lines if m.startswith("check_inventory")]
+    assert len(tool) == 1
+    assert lines.index(tool[0]) < next(
+        i for i, m in enumerate(lines) if m.startswith("Draft 1")
+    )
