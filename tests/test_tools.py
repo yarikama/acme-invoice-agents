@@ -106,3 +106,14 @@ def test_run_coerces_arguments_the_model_sent_as_strings(tools: ReviewTools) -> 
     assert tools.run(
         "convert_to_usd", {"amount": "lots", "currency": "GBP"}
     ).result.startswith("Bad arguments for convert_to_usd:")
+
+
+def test_run_reports_arguments_the_tool_does_not_take(tools: ReviewTools) -> None:
+    call = tools.run("check_inventory", {"item": "WidgetA", "qty": 5})
+    assert call.result == "Bad arguments for check_inventory: unexpected qty."
+
+
+def test_tools_are_built_once(tools: ReviewTools) -> None:
+    first = tools.as_langchain()
+    tools.run("check_inventory", {"item": "WidgetA"})
+    assert [id(t) for t in tools.as_langchain()] == [id(t) for t in first]

@@ -39,6 +39,8 @@ class ReviewTools:
         self.inventory = inventory
         self.seen = seen
         self.current = current
+        # Built on first use, once: schemas come from the signatures.
+        self._tools: dict[str, BaseTool] | None = None
         self._funcs: dict[str, Callable[..., str]] = {
             "check_inventory": self.check_inventory,
             "vendor_history": self.vendor_history,
@@ -81,17 +83,23 @@ class ReviewTools:
         )
 
     def as_langchain(self) -> list[BaseTool]:
-        return [
-            StructuredTool.from_function(func=f, name=name)
-            for name, f in self._funcs.items()
-        ]
+        if self._tools is None:
+            self._tools = {
+                name: StructuredTool.from_function(func=f, name=name)
+                for name, f in self._funcs.items()
+            }
+        return list(self._tools.values())
 
     def run(self, name: str, args: dict[str, Any]) -> ToolCall:
         """Run a tool the model called. LangChain validates and coerces the
         arguments against the signature, so "100" arrives as 100.0."""
         tool = next((t for t in self.as_langchain() if t.name == name), None)
+        extra = sorted(set(args) - set(tool.args)) if tool else []
         if tool is None:
             result = f"Unknown tool {name!r}."
+        elif extra:
+            # The schema would drop them silently; tell the model instead.
+            result = f"Bad arguments for {name}: unexpected {', '.join(extra)}."
         else:
             try:
                 result = str(tool.invoke(args))
