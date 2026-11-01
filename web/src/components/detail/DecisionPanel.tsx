@@ -1,5 +1,5 @@
 import { CheckCircleIcon, HourglassMediumIcon, type Icon, ProhibitIcon } from "@phosphor-icons/react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import { api, ApiError } from "../../api/client";
 import type { Decision, Summary } from "../../api/types";
@@ -39,6 +39,8 @@ function capitalize(s: string): string {
 }
 
 const TOKEN_KEY = "acme.vpToken";
+// Paying at least this much (in the invoice's currency) takes a second click.
+const CONFIRM_ABOVE = 10_000;
 
 /** A VP token, kept for this tab only, so closing it signs the VP out. */
 function storedToken(): string {
@@ -76,10 +78,25 @@ export function DecisionPanel({
   const askToken = needsToken || refused;
   const [sending, setSending] = useState<"approve" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // A large payment is confirmed with a second click on the same button.
+  const [confirming, setConfirming] = useState(false);
+  const noteInput = useRef<HTMLInputElement>(null);
   const inv = summary.invoice;
   const reasons = summary.findings.filter((f) => f.severity !== "info");
+  const big = (inv?.total ?? 0) >= CONFIRM_ABOVE;
 
   const decide = async (approved: boolean) => {
+    if (approved && big && !confirming) {
+      setConfirming(true);
+      return;
+    }
+    if (!approved && !note.trim()) {
+      // The reason goes to the vendor and the audit log.
+      setError("Say why you are rejecting it: write the reason in the note.");
+      noteInput.current?.focus();
+      return;
+    }
+    setConfirming(false);
     setSending(approved ? "approve" : "reject");
     setError(null);
     try {
@@ -148,11 +165,15 @@ export function DecisionPanel({
         </label>
       )}
       <label className="flex flex-none flex-col gap-1">
-        <span className="cap">note for the audit log (optional)</span>
+        <span className="cap">note for the audit log (required to reject)</span>
         <input
+          ref={noteInput}
           className="key min-h-10 px-3 text-sm shadow-none active:translate-y-0"
           value={note}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(e) => {
+            setNote(e.target.value);
+            if (error && e.target.value.trim()) setError(null);
+          }}
           maxLength={500}
         />
       </label>
@@ -163,7 +184,9 @@ export function DecisionPanel({
           disabled={sending !== null}
           onClick={() => decide(true)}
         >
-          <span className="text-lg font-medium">{sending === "approve" ? "Approving…" : "Approve and pay"}</span>
+          <span className="text-lg font-medium">
+            {sending === "approve" ? "Approving…" : confirming ? "Click again to pay" : "Approve and pay"}
+          </span>
           <span className="mono text-xs">
             {inv ? `${money(inv.total, inv.currency)} via mock_payment` : "via mock_payment"}
           </span>
@@ -172,7 +195,10 @@ export function DecisionPanel({
           type="button"
           className="key key-big min-h-16"
           disabled={sending !== null}
-          onClick={() => decide(false)}
+          onClick={() => {
+            setConfirming(false);
+            void decide(false);
+          }}
         >
           <span className="text-lg font-medium">{sending === "reject" ? "Rejecting…" : "Reject"}</span>
           <span className="mono text-xs">logs your reason, no payment</span>

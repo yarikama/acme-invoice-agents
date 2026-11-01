@@ -300,3 +300,14 @@ async def test_a_tool_call_reaches_the_stream_once_before_the_draft(
     assert lines.index(tool[0]) < next(
         i for i, m in enumerate(lines) if m.startswith("Draft 1")
     )
+
+
+async def test_a_rejection_needs_a_reason(client):
+    run = (await client.post("/api/runs", json={"sample": "invoice_1014.xml"})).json()
+    await settle(run["id"])
+    resp = await client.post(
+        f"/api/runs/{run['id']}/decision", json={"approved": False, "note": "  "}
+    )
+    assert resp.status_code == 422
+    assert "needs a reason" in resp.json()["detail"]
+    assert manager().get(run["id"]).status == "awaiting_vp"

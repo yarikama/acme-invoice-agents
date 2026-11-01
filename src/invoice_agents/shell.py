@@ -91,7 +91,7 @@ COMMANDS = [
     ),
     Command("runs", "/runs", "Recent runs and where each one ended."),
     Command("approve", "/approve <run> [note]", "Approve a run waiting for the VP."),
-    Command("reject", "/reject <run> [note]", "Reject a run waiting for the VP."),
+    Command("reject", "/reject <run> <reason>", "Reject a run waiting for the VP."),
     Command("vp", "/vp [ask|approve|reject]", "How to answer when a run needs the VP."),
     Command("serve", "/serve", "Start the API and the web console."),
     Command("open", "/open", "Open the web console in the browser."),
@@ -488,7 +488,8 @@ class Shell:
 
     def decide(self, args: list[str], *, approved: bool) -> None:
         verb = "approve" if approved else "reject"
-        if not args:
+        # A rejection goes to the vendor and the audit log: it needs a reason.
+        if not args or (not approved and len(args) < 2):
             self._usage(verb)
             return
         self._connect()

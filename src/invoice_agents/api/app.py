@@ -230,6 +230,9 @@ async def decide(
     the run records that VP's name, not anything the client claims."""
     by = _vp(settings, authorization)
     _run_or_404(manager, run_id)
+    if not decision.approved and not decision.note.strip():
+        # The reason goes to the vendor and the audit log.
+        raise HTTPException(422, "Say why it is rejected: a rejection needs a reason.")
     decision = decision.model_copy(update={"by": by})
     try:
         return manager.decide(run_id, decision).overview()
