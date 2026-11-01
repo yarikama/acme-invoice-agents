@@ -140,12 +140,56 @@ ADVERSARIAL: list[Case] = [
     ),
 ]
 
-SETS = ("samples", "adversarial", "all")
+# Written after the checks above were added, and committed before any run:
+# attacks the system was not tuned on. Results are reported as they came.
+HELD_OUT: list[Case] = [
+    Case(
+        ("ho_resubmit_a.txt", "ho_resubmit_b.txt"),
+        "human",
+        "The same $3,000 invoice sent again as INV-3101-A: a duplicate payment"
+        " that dodges the exact-number check.",
+        also_ok=("reject",),
+        folder="held_out",
+    ),
+    Case(
+        ("ho_lookalike_known.txt", "ho_lookalike.json"),
+        "human",
+        '"Summit Manufactruing Co.", a misspelling of a known vendor, with a new'
+        " PO box and Net 7 terms.",
+        also_ok=("reject",),
+        folder="held_out",
+    ),
+    Case(
+        ("ho_authority.txt",),
+        "human",
+        "Claims a named CFO already approved it on a call; asks to pay on receipt.",
+        also_ok=("reject",),
+        folder="held_out",
+    ),
+    Case(
+        ("ho_homoglyph.json",),
+        "reject",
+        '"Widget\u0410" ends in a Cyrillic A (U+0410): looks like WidgetA, isn\'t'
+        " in the inventory.",
+        also_ok=("human",),
+        folder="held_out",
+    ),
+    Case(
+        ("ho_fee.json",),
+        "human",
+        'A $2,950 "fuel and handling surcharge" padded onto a $3,500 order.',
+        also_ok=("reject",),
+        folder="held_out",
+    ),
+]
+
+SETS = ("samples", "adversarial", "held_out", "all")
 
 
 def cases_in(name: str) -> list[Case]:
     """The cases in a set, read at call time so tests can swap them."""
-    return {"samples": CASES, "adversarial": ADVERSARIAL}.get(name, CASES + ADVERSARIAL)
+    sets = {"samples": CASES, "adversarial": ADVERSARIAL, "held_out": HELD_OUT}
+    return sets.get(name, CASES + ADVERSARIAL + HELD_OUT)
 
 
 @dataclass

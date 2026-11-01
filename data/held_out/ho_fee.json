@@ -1,0 +1,16 @@
+{
+  "invoice_number": "INV-4488",
+  "vendor": {"name": "Atlas Industrial Supply", "address": "500 Commerce Blvd, Detroit, MI 48201"},
+  "date": "2026-02-14",
+  "due_date": "2026-04-15",
+  "line_items": [
+    {"item": "WidgetA", "quantity": 6, "unit_price": 250.00},
+    {"item": "WidgetB", "quantity": 4, "unit_price": 500.00},
+    {"item": "Fuel and handling surcharge", "quantity": 1, "unit_price": 2950.00}
+  ],
+  "subtotal": 6450.00,
+  "tax_amount": 0.00,
+  "total": 6450.00,
+  "currency": "USD",
+  "payment_terms": "Net 60"
+}
