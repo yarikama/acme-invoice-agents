@@ -18,6 +18,7 @@ import {
   PulseIcon,
   ReceiptIcon,
   TrayIcon,
+  TrendDownIcon,
   UserCheckIcon,
   WarningOctagonIcon,
 } from "@phosphor-icons/react";
@@ -53,4 +54,5 @@ export const SECTION_ICON = {
   lineItems: ListBulletsIcon,
   routing: FlowArrowIcon,
   throughput: ChartLineUpIcon,
+  impact: TrendDownIcon,
 } satisfies Record<string, Icon>;

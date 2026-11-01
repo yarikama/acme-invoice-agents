@@ -24,6 +24,7 @@ import { Findings } from "./detail/Findings";
 import { InvoiceSummary } from "./detail/InvoiceSummary";
 import { LineItems } from "./detail/LineItems";
 import { InboxTable } from "./InboxTable";
+import { ImpactBank } from "./ImpactBank";
 import { StatusBank } from "./StatusBank";
 import { StatusLight } from "./StatusLight";
 import { Widget } from "./Widget";
@@ -58,6 +59,7 @@ export function Dashboard({
   selected,
   onSelect,
   llm,
+  replayed = false,
   vpAuth = false,
   layout,
   onLayout,
@@ -70,6 +72,8 @@ export function Dashboard({
   selected: RunView | null;
   onSelect: (id: string) => void;
   llm: boolean;
+  /** Answers come from a recording, so they return at once. */
+  replayed?: boolean;
   /** VP decisions need a token. */
   vpAuth?: boolean;
   layout: Layout;
@@ -96,6 +100,17 @@ export function Dashboard({
     overview: (d) => (
       <Widget id="overview" title="Overview" icon={STATUS_ICON.all} draggable={d}>
         <StatusBank runs={runs} filter={filter} onFilter={onFilter} />
+      </Widget>
+    ),
+    impact: (d) => (
+      <Widget
+        id="impact"
+        title="Impact"
+        icon={SECTION_ICON.impact}
+        draggable={d}
+        aside={<span className="cap whitespace-nowrap">against the manual process</span>}
+      >
+        <ImpactBank runs={runs} replayed={replayed} />
       </Widget>
     ),
     routing: (d) => (

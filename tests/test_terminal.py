@@ -6,6 +6,7 @@ from invoice_agents.terminal import (
     RunView,
     banner,
     batch_summary,
+    impact_line,
     lights,
     money,
     render_turn,
@@ -506,3 +507,26 @@ def test_a_step_that_called_a_model_is_labelled_with_it() -> None:
     [parsed] = turns([code], 1.0)
     assert "Ingest  grok-4.3" in text(render_turn(read))
     assert "Ingest  code" in text(render_turn(parsed))
+
+
+def test_the_batch_is_measured_against_the_manual_process() -> None:
+    usage = {"input_tokens": 100, "output_tokens": 10, "cost_usd": 0.02}
+    results = [
+        {"status": "paid", "seconds": 4.0, "trace": [{"message": "x", "usage": usage}]},
+        {
+            "status": "rejected",
+            "seconds": 9.0,
+            "invoice": {"total": 5000.0, "currency": "USD"},
+            "trace": [{"message": "y", "usage": usage}],
+        },
+        {
+            "status": "rejected",
+            "seconds": 6.0,
+            "invoice": {"total": 300.0, "currency": "EUR"},  # not summed as dollars
+        },
+    ]
+    out = text(impact_line(results))
+    assert "6.0s per invoice (median; was 5 days by hand)" in out
+    assert "$5,000.00 stopped before paying (2 rejected)" in out
+    assert "$0.013 model cost per invoice" in out
+    assert "replayed answers return at once" in text(impact_line(results, True))

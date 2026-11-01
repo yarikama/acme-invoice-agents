@@ -28,6 +28,7 @@ from invoice_agents.replay import (
     ReplayExtractor,
 )
 from invoice_agents.triage import DecisionTriager, Triager
+from invoice_agents.usage import Pricing, openrouter_pricing
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
@@ -119,3 +120,21 @@ def build_agents(settings: Settings) -> Agents:
         RecordingCritic(agents.critic, recording),
         agents.triager,
     )
+
+
+def load_pricing(settings: Settings) -> Pricing:
+    """OpenRouter's model prices, for each step's cost. Without them the
+    console still shows tokens, so a failed fetch is not fatal."""
+    if settings.llm_provider == "replay":
+        # The prices when the recording was made.
+        return Recording.shared(settings.replay_path).pricing
+    if settings.llm_provider != "openrouter":
+        return {}
+    try:
+        pricing = openrouter_pricing()
+    except (OSError, ValueError):
+        return {}
+    if settings.record_to is not None:
+        # Recording through the API keeps the prices with it, as the eval does.
+        Recording.shared(settings.record_to).pricing = pricing
+    return pricing
