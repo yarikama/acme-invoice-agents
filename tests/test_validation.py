@@ -282,6 +282,26 @@ def test_a_vendor_name_a_letter_off_a_known_one_is_flagged(inventory):
     assert "LOOKALIKE_VENDOR" not in codes(validate(swapped, inventory))
 
 
+def test_an_impostor_stays_flagged_on_its_next_invoice(inventory):
+    seen = SeenInvoices()
+    items = [("WidgetA", 1, 250)]
+    seen.add(make(items, 250, vendor="Summit Manufacturing Co."))
+    first = make(items, 250, invoice_number="INV-A", vendor="Summit Manufactruing Co.")
+    assert "LOOKALIKE_VENDOR" in codes(validate(first, inventory, seen))
+    seen.add(first)  # recorded, even though it was flagged
+
+    second = make(items, 250, invoice_number="INV-B", vendor="Summit Manufactruing Co")
+    [finding] = [
+        f
+        for f in validate(second, inventory, seen).findings
+        if f.code == "LOOKALIKE_VENDOR"
+    ]
+    assert "'Summit Manufacturing Co.'" in finding.detail
+    # The real vendor is still fine.
+    real = make(items, 250, invoice_number="INV-C", vendor="Summit Manufacturing Co.")
+    assert "LOOKALIKE_VENDOR" not in codes(validate(real, inventory, seen))
+
+
 def test_no_sample_vendor_looks_like_another(inventory):
     seen = SeenInvoices()
     flagged = []
