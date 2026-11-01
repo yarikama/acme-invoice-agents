@@ -72,9 +72,13 @@ def load_pricing(settings: Settings) -> Pricing:
     if settings.llm_provider != "openrouter":
         return {}
     try:
-        return openrouter_pricing()
+        pricing = openrouter_pricing()
     except (OSError, ValueError):
         return {}
+    if settings.record_to is not None:
+        # Recording through the API keeps the prices with it, as the eval does.
+        Recording.shared(settings.record_to).pricing = pricing
+    return pricing
 
 
 app = FastAPI(title="Acme Invoice Agents", lifespan=lifespan)

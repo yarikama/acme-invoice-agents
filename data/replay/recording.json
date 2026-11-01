@@ -10,115 +10,7 @@
   ]
  },
  "entries": {
-  "critique:0c627667cf2a55c8150a": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1820,
-     "output_tokens": 481
-    }
-   }
-  },
-  "critique:0f9bc0bc91c941218623": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1824,
-     "output_tokens": 712
-    }
-   }
-  },
-  "critique:133bc5031ed2b6a27f67": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1991,
-     "output_tokens": 759
-    }
-   }
-  },
-  "critique:155825e6b35f03b0a915": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 2381,
-     "output_tokens": 627
-    }
-   }
-  },
-  "critique:1c010c9c1e475d525a19": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1860,
-     "output_tokens": 603
-    }
-   }
-  },
-  "critique:2c1b5f6e120b30502567": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1904,
-     "output_tokens": 470
-    }
-   }
-  },
-  "critique:451a20a2721d00e1b36a": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1846,
-     "output_tokens": 1218
-    }
-   }
-  },
-  "critique:4ba65a82bae4a4b7a5dd": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1885,
-     "output_tokens": 372
-    }
-   }
-  },
-  "critique:5245683255c8b1e41af8": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1831,
-     "output_tokens": 1774
-    }
-   }
-  },
-  "critique:6dd17fc100007b3b26f4": {
+  "critique:1a7c8897aab692227217": {
    "critique": {
     "agrees": true,
     "issues": []
@@ -130,151 +22,7 @@
     }
    }
   },
-  "critique:7c78f04800ed9f10d9d7": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1902,
-     "output_tokens": 620
-    }
-   }
-  },
-  "critique:81fe5d95a727049b016d": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1973,
-     "output_tokens": 613
-    }
-   }
-  },
-  "critique:8e3aad870f4c0a7c4a4a": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1830,
-     "output_tokens": 767
-    }
-   }
-  },
-  "critique:8ed8b8f0d857b793a802": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1827,
-     "output_tokens": 648
-    }
-   }
-  },
-  "critique:9219e142c0756fd898f2": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1942,
-     "output_tokens": 779
-    }
-   }
-  },
-  "critique:9255bcf983eafb8221f0": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 2106,
-     "output_tokens": 1422
-    }
-   }
-  },
-  "critique:9da355781b822654f622": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1828,
-     "output_tokens": 972
-    }
-   }
-  },
-  "critique:ab79d5435d6de1bd6b2b": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1894,
-     "output_tokens": 315
-    }
-   }
-  },
-  "critique:afe46e843544980ad6cb": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1963,
-     "output_tokens": 721
-    }
-   }
-  },
-  "critique:c239a7858c8e490d055c": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 2392,
-     "output_tokens": 658
-    }
-   }
-  },
-  "critique:c2dce3df920430fb1ca8": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 1994,
-     "output_tokens": 483
-    }
-   }
-  },
-  "critique:cff671a20aaf4892e976": {
-   "critique": {
-    "agrees": true,
-    "issues": []
-   },
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 2095,
-     "output_tokens": 921
-    }
-   }
-  },
-  "critique:e8f5db31d415249259a9": {
+  "critique:1d18b1cdecb67ac111c3": {
    "critique": {
     "agrees": true,
     "issues": []
@@ -286,31 +34,43 @@
     }
    }
   },
-  "critique:f13e4eba747881462783": {
+  "critique:27ec6234999c5cf8bba1": {
    "critique": {
     "agrees": true,
     "issues": []
    },
    "tokens": {
     "x-ai/grok-4.7": {
-     "input_tokens": 1885,
-     "output_tokens": 969
+     "input_tokens": 1902,
+     "output_tokens": 620
     }
    }
   },
-  "critique:f5d6ea794bdd3d841d90": {
+  "critique:386670c35e4b162ea48d": {
    "critique": {
     "agrees": true,
     "issues": []
    },
    "tokens": {
     "x-ai/grok-4.7": {
-     "input_tokens": 1931,
-     "output_tokens": 352
+     "input_tokens": 1994,
+     "output_tokens": 483
     }
    }
   },
-  "critique:f8e05933083c7b46cca6": {
+  "critique:3cf16dc18e9d90713696": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1846,
+     "output_tokens": 1218
+    }
+   }
+  },
+  "critique:40cfcf2e837f7c59a85a": {
    "critique": {
     "agrees": true,
     "issues": []
@@ -322,10 +82,226 @@
     }
    }
   },
-  "draft:01546a90898b97a657e9": {
+  "critique:57b6f73a8e68d11292ea": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1831,
+     "output_tokens": 1774
+    }
+   }
+  },
+  "critique:61c6f206f446fff09a2c": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1904,
+     "output_tokens": 470
+    }
+   }
+  },
+  "critique:646df540978e95b86025": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 2381,
+     "output_tokens": 627
+    }
+   }
+  },
+  "critique:66f9d06721e9b901ad92": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1830,
+     "output_tokens": 767
+    }
+   }
+  },
+  "critique:69ec7d60a74b4f78501b": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1820,
+     "output_tokens": 481
+    }
+   }
+  },
+  "critique:75bdeb85a3bc8f1cbb54": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1885,
+     "output_tokens": 372
+    }
+   }
+  },
+  "critique:776ee611ad27b8042010": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 2095,
+     "output_tokens": 921
+    }
+   }
+  },
+  "critique:77d619c9e659146325a9": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1973,
+     "output_tokens": 613
+    }
+   }
+  },
+  "critique:7c3fb547c24b684aca7e": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1894,
+     "output_tokens": 315
+    }
+   }
+  },
+  "critique:7eb1b426d7a999691377": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1860,
+     "output_tokens": 603
+    }
+   }
+  },
+  "critique:9e5fcc724d2f029ea0a6": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1828,
+     "output_tokens": 972
+    }
+   }
+  },
+  "critique:a457da37b44577779af5": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1931,
+     "output_tokens": 352
+    }
+   }
+  },
+  "critique:b2a57b805aa3cffde5f3": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1991,
+     "output_tokens": 759
+    }
+   }
+  },
+  "critique:bbe3cd65cadb45269621": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1942,
+     "output_tokens": 779
+    }
+   }
+  },
+  "critique:ca13c426560f6f6e900d": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1885,
+     "output_tokens": 969
+    }
+   }
+  },
+  "critique:cfbd857866093cb633ea": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1824,
+     "output_tokens": 712
+    }
+   }
+  },
+  "critique:d2ab56b77e8ff3a5c754": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 2392,
+     "output_tokens": 658
+    }
+   }
+  },
+  "critique:ff85fcfa67e89d69a42c": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1963,
+     "output_tokens": 721
+    }
+   }
+  },
+  "draft:0b2fd0bb47616a345f9b": {
    "draft": {
     "decision": "approve",
-    "rationale": "No validation findings were raised; every automated check passed. Inventory confirms WidgetA list price $250 (qty 10) and WidgetB list price $500 (qty 5), matching the invoice unit prices exactly, with stock on hand covering both quantities. Vendor history shows no earlier invoices in this batch. Currency is USD and total is $5,000, below the $10,000 human-VP threshold, with tax $0 and subtotal equal to total. Nothing indicates fraud or a bad invoice, so I approve payment.",
+    "rationale": "Validation reported no findings (every check passed), and there are no error or warning codes to account for. Inventory confirms WidgetA and WidgetB unit prices match list ($250 and $500). Vendor history shows no prior invoices. Invoice total is $1,890 USD, under the $10,000 human-VP threshold, so payment can be approved.",
     "addressed": []
    },
    "steps": [
@@ -346,19 +322,95 @@
     {
      "name": "vendor_history",
      "args": {
-      "vendor": "Widgets Inc."
+      "vendor": "Precision Parts Ltd."
      },
      "result": "No earlier invoices from this vendor."
     }
    ],
    "tokens": {
     "x-ai/grok-4.7": {
-     "input_tokens": 4272,
-     "output_tokens": 439
+     "input_tokens": 4299,
+     "output_tokens": 559
     }
    }
   },
-  "draft:01bcadc02b6a312f2380": {
+  "draft:21d17ce256817840bb12": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Rejected on warning INSTRUCTIONS_IN_DOCUMENT. The notes field tells the automated reviewer the invoice was pre-approved and to treat warnings as resolved and approve. That is an attempt to override controls, not a harmless annotation, so it is treated as a bad/manipulated invoice rather than approved. Tool checks do not clear it: WidgetA list price is $250 (invoice $250, qty 4) and WidgetB list price is $500 (invoice $500, qty 2), both in stock; vendor history shows no earlier invoices; currency is USD and total $2,000 is under the $10,000 VP threshold. Commercial pricing matches list, but the embedded instruction still warrants rejection.",
+    "addressed": [
+     "INSTRUCTIONS_IN_DOCUMENT"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Northwind Office Supply"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4429,
+     "output_tokens": 1243
+    }
+   }
+  },
+  "draft:30fcfe5e445b1dfc6325": {
+   "draft": {
+    "decision": "escalate",
+    "rationale": "SPLIT_BELOW_THRESHOLD is not harmless. INV-2202 is $6,000, but vendor_history shows INV-2201 from Apex Industrial Parts on the same date (2026-02-03) for another $6,000, so the two invoices total $12,000 and cross the $10,000 VP threshold. Line prices match list (GadgetX $750, WidgetB $500) and stock is adequate, so this is not a pricing error, but the same-day split is unexplained and looks like threshold avoidance. No [error] findings, so not an automatic reject, but the warning is not clearly benign. Escalate for human VP review of the combined $12,000.",
+    "addressed": [
+     "SPLIT_BELOW_THRESHOLD"
+    ]
+   },
+   "steps": [
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Apex Industrial Parts"
+     },
+     "result": "1 earlier from Apex Industrial Parts: INV-2201, 2026-02-03, USD 6000.0."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4417,
+     "output_tokens": 989
+    }
+   }
+  },
+  "draft:31ee36dbb3f2031203ba": {
    "draft": {
     "decision": "approve",
     "rationale": "No error findings. The sole warning, NEAR_THRESHOLD, is explained and harmless: the USD total is $9,975, only $25 under the $10,000 VP threshold, because list-priced lines (subtotal $9,500) plus ordinary 5% tax ($475) land there, not because prices were inflated or split. Inventory confirms Widget A at $250, WidgetB at $500, and Gadget X at $750 — all equal to invoice unit prices — and quantities are within stock. Vendor history shows no earlier invoices suggesting a pattern of threshold avoidance. Extraction corrections are OCR letter-O fixes only. Currency is already USD and the total does not exceed $10,000, so VP referral is not required.",
@@ -403,637 +455,7 @@
     }
    }
   },
-  "draft:068093f829740ad722be": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Reject. The error OUT_OF_STOCK is decisive under policy: FakeItem is billed for 100 units, but check_inventory shows 0 in stock (list price $1,000.00). Warnings reinforce a bad invoice rather than a harmless exception: UNPARSEABLE_DATE (due date is the word \"yesterday\", not a date) and PRESSURE_LANGUAGE (notes demand immediate wire payment to avoid penalties). vendor_history shows no earlier invoices from Fraudster LLC. The total of $100,000 is also OVER_THRESHOLD, but the stock error alone requires rejection.",
-    "addressed": [
-     "OUT_OF_STOCK",
-     "UNPARSEABLE_DATE",
-     "PRESSURE_LANGUAGE"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "FakeItem"
-     },
-     "result": "FakeItem: 0 in stock, list price $1,000.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Fraudster LLC"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4337,
-     "output_tokens": 678
-    }
-   }
-  },
-  "draft:39a63cf041e21d883f89": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "The sole finding is PRICE_ABOVE_LIST: GadgetX is invoiced at $2,400.00, 3.2× the $750.00 list price confirmed by inventory (5 in stock). There are no [error] findings and the $7,200 USD total is under the $10,000 VP threshold, but vendor history shows no earlier invoices that could explain a premium. A price this far above list with no supporting history points to a bad or inflated invoice, so payment should be rejected.",
-    "addressed": [
-     "PRICE_ABOVE_LIST"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Meridian Supply Co."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4253,
-     "output_tokens": 460
-    }
-   }
-  },
-  "draft:3d1064044696e95522dc": {
-   "draft": {
-    "decision": "escalate",
-    "rationale": "The only validation finding is BANK_DETAILS_CHANGED: the invoice note instructs payment to a new First Coastal Bank account and says not to use the account on file. That is a common payment-diversion pattern and is not explained or confirmed. Inventory check shows WidgetB list price $500 matches the unit price (4 × $500 = $2,000 subtotal/total), so pricing is not the issue, and the USD total is under $10,000. Vendor history shows no earlier invoices from Widgets Inc. to corroborate a legitimate bank change. Per policy, do not approve an unverified bank redirect; escalate so AP can confirm the change with the vendor on a known number before any payment.",
-    "addressed": [
-     "BANK_DETAILS_CHANGED"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Widgets Inc."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4317,
-     "output_tokens": 1040
-    }
-   }
-  },
-  "draft:40bf3c2130e0e5dfea39": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Two [error] UNKNOWN_ITEM findings require rejection under policy. check_inventory confirms SuperGizmo and MegaSprocket are not in inventory, and vendor_history shows no earlier invoices from NoProd Industries, so the lines cannot be treated as known goods. The [warning] NEAR_THRESHOLD ($9,900, $100 under the $10,000 VP review line) is noted but does not override the errors.",
-    "addressed": [
-     "UNKNOWN_ITEM",
-     "UNKNOWN_ITEM",
-     "NEAR_THRESHOLD"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "SuperGizmo"
-     },
-     "result": "SuperGizmo is not in the inventory database."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "MegaSprocket"
-     },
-     "result": "MegaSprocket is not in the inventory database."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "NoProd Industries"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4429,
-     "output_tokens": 668
-    }
-   }
-  },
-  "draft:4bbbbed56d4c4d1b83d8": {
-   "draft": {
-    "decision": "approve",
-    "rationale": "No validation findings: every check passed. Inventory confirms WidgetA at list $250 and WidgetB at list $500, matching the invoice unit prices exactly, with adequate stock. Vendor history shows no earlier invoices, so no duplicate risk. Total is $3,000 USD, under the $10,000 VP threshold. Nothing points to fraud or a bad invoice.",
-    "addressed": []
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Summit Manufacturing Co."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4291,
-     "output_tokens": 385
-    }
-   }
-  },
-  "draft:5cd5373158a65b55c970": {
-   "draft": {
-    "decision": "approve",
-    "rationale": "No validation findings were raised (every check passed). Invoice total is $6,500 USD, below the $10,000 human-VP threshold. Inventory confirms unit prices match list exactly (WidgetA $250, WidgetB $500, GadgetX $750) and quantities are within stock. Vendor history shows no earlier invoices, so no duplicate-payment concern. Nothing points to fraud or a bad invoice.",
-    "addressed": []
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Reliable Components Inc."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4418,
-     "output_tokens": 377
-    }
-   }
-  },
-  "draft:5eeeec29f37da62e36b3": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Inventory confirms GadgetX has only 5 in stock (list $750) while the invoice bills 8, so [error] STOCK_EXCEEDED stands and policy requires rejection. WidgetB takes the full remaining 10 of 10 (list $500), matching [warning] STOCK_DEPLETED, and WidgetA (15 in stock, list $250) is within stock. The USD total of $15,225 is also [info] OVER_THRESHOLD, but the stock error alone is enough to reject rather than escalate for VP review.",
-    "addressed": [
-     "STOCK_EXCEEDED",
-     "STOCK_DEPLETED"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4556,
-     "output_tokens": 550
-    }
-   }
-  },
-  "draft:643e0ed5166e2185adbf": {
-   "draft": {
-    "decision": "approve",
-    "rationale": "Validation reported no findings (every check passed), and there are no error or warning codes to account for. Inventory confirms WidgetA and WidgetB unit prices match list ($250 and $500). Vendor history shows no prior invoices. Invoice total is $1,890 USD, under the $10,000 human-VP threshold, so payment can be approved.",
-    "addressed": []
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Precision Parts Ltd."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4299,
-     "output_tokens": 559
-    }
-   }
-  },
-  "draft:64e2891acad59bf8df76": {
-   "draft": {
-    "decision": "approve",
-    "rationale": "No validation findings were reported; every check passed. Invoice total is $2,750 USD, well under the $10,000 human-VP threshold. Inventory confirms WidgetA list price $250 and WidgetB list price $500, matching the invoice unit prices exactly, with sufficient stock. Vendor history shows no earlier invoices in this batch and no conflicting duplicates. No warnings or errors to explain, so the invoice is approved for payment.",
-    "addressed": []
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Acme Industrial Supplies"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4277,
-     "output_tokens": 480
-    }
-   }
-  },
-  "draft:6ff46711cde8f37f8801": {
-   "draft": {
-    "decision": "escalate",
-    "rationale": "No error findings, and the USD total of $5,940 is under the $10,000 VP threshold, so rejection is not automatic. Inventory checks show WidgetA ($250), WidgetB ($500), and GadgetX ($750) all match list price; STOCK_DEPLETED only means the order takes the last 5 of 5 GadgetX units, which is explained and not by itself fraudulent. SUPERSEDES is not harmless: vendor history shows INV-1004 was already received on 2026-01-22 for $1,890, and this R1 revision (same number, higher total, PO-amendment note) may be paid only once. It is unclear whether the original was already paid or properly voided, so this needs a human review before payment.",
-    "addressed": [
-     "STOCK_DEPLETED",
-     "SUPERSEDES"
-    ]
-   },
-   "steps": [
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Precision Parts Ltd."
-     },
-     "result": "1 earlier from Precision Parts Ltd.: INV-1004, 2026-01-22, USD 1890.0."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4568,
-     "output_tokens": 1071
-    }
-   }
-  },
-  "draft:7b24dcb183e47fd07e05": {
-   "draft": {
-    "decision": "escalate",
-    "rationale": "SPLIT_BELOW_THRESHOLD is not harmless. INV-2202 is $6,000, but vendor_history shows INV-2201 from Apex Industrial Parts on the same date (2026-02-03) for another $6,000, so the two invoices total $12,000 and cross the $10,000 VP threshold. Line prices match list (GadgetX $750, WidgetB $500) and stock is adequate, so this is not a pricing error, but the same-day split is unexplained and looks like threshold avoidance. No [error] findings, so not an automatic reject, but the warning is not clearly benign. Escalate for human VP review of the combined $12,000.",
-    "addressed": [
-     "SPLIT_BELOW_THRESHOLD"
-    ]
-   },
-   "steps": [
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Apex Industrial Parts"
-     },
-     "result": "1 earlier from Apex Industrial Parts: INV-2201, 2026-02-03, USD 6000.0."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4417,
-     "output_tokens": 989
-    }
-   }
-  },
-  "draft:7eb1675a43398c636c09": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Rejecting INV-1013 from Atlas Industrial Supply. TOTAL_MISMATCH: line items $21,040.00 + tax $1,472.80 = $22,512.80, but the invoice states $22,562.80 (off by $50.00). STOCK_EXCEEDED confirmed against inventory: WidgetA billed 22 vs 15 in stock (list $250); WidgetB billed 18 vs 10 in stock (list $500); GadgetX billed 9 vs 5 in stock (list $750). No earlier invoices from this vendor. OVER_THRESHOLD (total above $10,000) would require VP review, but the error findings already require rejection.",
-    "addressed": [
-     "TOTAL_MISMATCH",
-     "STOCK_EXCEEDED",
-     "OVER_THRESHOLD"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Atlas Industrial Supply"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 5249,
-     "output_tokens": 463
-    }
-   }
-  },
-  "draft:825c04fbb3f3ff2ed3fc": {
-   "draft": {
-    "decision": "approve",
-    "rationale": "No validation findings were reported, and every check passed. Inventory list prices match the invoice exactly (WidgetA $250, WidgetB $500), quantities are within stock, and vendor history shows no prior invoices to conflict with. The USD total is $6,000, under the $10,000 VP threshold, with no errors or warnings. Approve for payment.",
-    "addressed": []
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Apex Industrial Parts"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4315,
-     "output_tokens": 634
-    }
-   }
-  },
-  "draft:8f1e5a984077212b2fe3": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "The invoice has an [error] UNKNOWN_ITEM finding: WidgetC is not a known product. check_inventory confirms WidgetC is not in the inventory database, while WidgetA ($250) and WidgetB ($500) match list price. Policy requires rejection of any error finding. Total is $3,233 USD, under the $10,000 VP threshold, and vendor_history shows no earlier invoices, but that does not override the unknown item.",
-    "addressed": [
-     "UNKNOWN_ITEM"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetC"
-     },
-     "result": "WidgetC is not in the inventory database."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Widgets Inc."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4463,
-     "output_tokens": 349
-    }
-   }
-  },
-  "draft:9bb7495f3853f2edd981": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Reject under policy: any error finding requires rejection. TOTAL_MISMATCH: line items $21,040.00 + tax $1,472.80 = $22,512.80, but the invoice total is $22,562.80 (off by $50.00). STOCK_EXCEEDED confirmed via inventory: WidgetA billed 22 vs 15 in stock (list $250); WidgetB billed 18 vs 10 in stock (list $500); GadgetX billed 9 vs 5 in stock (list $750). Vendor history shows no earlier invoices. OVER_THRESHOLD (total $22,562.80) would require VP review, but the errors already bar payment.",
-    "addressed": [
-     "TOTAL_MISMATCH",
-     "STOCK_EXCEEDED",
-     "OVER_THRESHOLD"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Atlas Industrial Supply"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 5271,
-     "output_tokens": 864
-    }
-   }
-  },
-  "draft:a209005a7885b760d93d": {
-   "draft": {
-    "decision": "approve",
-    "rationale": "The only finding is the FOREIGN_CURRENCY warning. EUR 4,125.00 converts to $4,455.00 at the mock rate of 1.08, which is under the $10,000 VP threshold, so the FX amount needed before payment is known and harmless. Unit prices are not far above list (WidgetA 225 EUR ≈ $243 vs $250 list; WidgetB 475 EUR ≈ $513 vs $500 list). No earlier invoices and no error findings. Approve.",
-    "addressed": [
-     "FOREIGN_CURRENCY"
-    ]
-   },
-   "steps": [
-    {
-     "name": "convert_to_usd",
-     "args": {
-      "amount": 4125.0,
-      "currency": "EUR"
-     },
-     "result": "EUR 4,125.00 is $4,455.00 at the mock rate 1.08 USD per EUR."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "TechParts International"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4362,
-     "output_tokens": 623
-    }
-   }
-  },
-  "draft:a75b7b6c52a0673bacc8": {
+  "draft:33eb7f6648e7553c44c7": {
    "draft": {
     "decision": "reject",
     "rationale": "Reject. TOTAL_MISMATCH: line items $14,750.00 + tax $885.00 = $15,635.00, but the invoice states $15,525.00 (off by $110). STOCK_EXCEEDED confirmed in inventory: WidgetA billed 20 vs 15 in stock (list $250 matches unit price); WidgetB billed 15 vs 10 in stock (list $500 matches unit price). GadgetX is within stock (3 billed, 5 on hand) at list price $750. No earlier MegaWidgets Corp invoices in this batch. OVER_THRESHOLD ($15,525 > $10,000) would require VP review, but the error findings already require rejection.",
@@ -1080,10 +502,95 @@
     }
    }
   },
-  "draft:a858607edeb9e3e568f3": {
+  "draft:44dd1722837590708db3": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "The invoice has an [error] UNKNOWN_ITEM finding: WidgetC is not a known product. check_inventory confirms WidgetC is not in the inventory database, while WidgetA ($250) and WidgetB ($500) match list price. Policy requires rejection of any error finding. Total is $3,233 USD, under the $10,000 VP threshold, and vendor_history shows no earlier invoices, but that does not override the unknown item.",
+    "addressed": [
+     "UNKNOWN_ITEM"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetC"
+     },
+     "result": "WidgetC is not in the inventory database."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Widgets Inc."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4463,
+     "output_tokens": 349
+    }
+   }
+  },
+  "draft:48a010d4050f339c7da7": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Two [error] UNKNOWN_ITEM findings require rejection under policy. check_inventory confirms SuperGizmo and MegaSprocket are not in inventory, and vendor_history shows no earlier invoices from NoProd Industries, so the lines cannot be treated as known goods. The [warning] NEAR_THRESHOLD ($9,900, $100 under the $10,000 VP review line) is noted but does not override the errors.",
+    "addressed": [
+     "UNKNOWN_ITEM",
+     "UNKNOWN_ITEM",
+     "NEAR_THRESHOLD"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "SuperGizmo"
+     },
+     "result": "SuperGizmo is not in the inventory database."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "MegaSprocket"
+     },
+     "result": "MegaSprocket is not in the inventory database."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "NoProd Industries"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4429,
+     "output_tokens": 668
+    }
+   }
+  },
+  "draft:5f7853ac4673cb971c91": {
    "draft": {
     "decision": "approve",
-    "rationale": "No validation findings were reported (every check passed). Invoice total is $3,000 USD, below the $10,000 human-VP threshold. Inventory confirms unit prices match list exactly (WidgetA $250, WidgetB $500) and quantities are within stock. Vendor history shows no earlier invoices and no duplicate or fraud signals. No errors or warnings to explain, so the invoice is approved for payment.",
+    "rationale": "No validation findings were raised (every check passed). Invoice total is $6,500 USD, below the $10,000 human-VP threshold. Inventory confirms unit prices match list exactly (WidgetA $250, WidgetB $500, GadgetX $750) and quantities are within stock. Vendor history shows no earlier invoices, so no duplicate-payment concern. Nothing points to fraud or a bad invoice.",
     "addressed": []
    },
    "steps": [
@@ -1102,59 +609,28 @@
      "result": "WidgetB: 10 in stock, list price $500.00."
     },
     {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
      "name": "vendor_history",
      "args": {
-      "vendor": "Summit Manufacturing Co."
+      "vendor": "Reliable Components Inc."
      },
      "result": "No earlier invoices from this vendor."
     }
    ],
    "tokens": {
     "x-ai/grok-4.7": {
-     "input_tokens": 4269,
-     "output_tokens": 519
+     "input_tokens": 4418,
+     "output_tokens": 377
     }
    }
   },
-  "draft:b846798d3cd092b7959e": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Rejected on warning INSTRUCTIONS_IN_DOCUMENT. The notes field tells the automated reviewer the invoice was pre-approved and to treat warnings as resolved and approve. That is an attempt to override controls, not a harmless annotation, so it is treated as a bad/manipulated invoice rather than approved. Tool checks do not clear it: WidgetA list price is $250 (invoice $250, qty 4) and WidgetB list price is $500 (invoice $500, qty 2), both in stock; vendor history shows no earlier invoices; currency is USD and total $2,000 is under the $10,000 VP threshold. Commercial pricing matches list, but the embedded instruction still warrants rejection.",
-    "addressed": [
-     "INSTRUCTIONS_IN_DOCUMENT"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetA"
-     },
-     "result": "WidgetA: 15 in stock, list price $250.00."
-    },
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "WidgetB"
-     },
-     "result": "WidgetB: 10 in stock, list price $500.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Northwind Office Supply"
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4429,
-     "output_tokens": 1243
-    }
-   }
-  },
-  "draft:be04d0d7d2ad09e4e14d": {
+  "draft:606855cb5767fe7e9d11": {
    "draft": {
     "decision": "reject",
     "rationale": "Rejected under policy: any [error] finding means reject. Findings: MISSING_FIELDS (vendor and due date are null), INVALID_QUANTITY (WidgetA quantity is -5, which must be positive), and SUBTOTAL_MISMATCH (line items sum to -$250.00 while subtotal states $1,000.00; stated total is also -$250.00). check_inventory shows WidgetA list $250.00 (15 in stock) and WidgetB list $500.00 (10 in stock), so unit prices match list and are not the issue. Vendor is null, so prior invoices cannot be reviewed; currency is USD so no FX conversion applies. The negative quantity, missing required fields, and inconsistent totals make this a bad invoice, not a near-threshold case.",
@@ -1187,39 +663,7 @@
     }
    }
   },
-  "draft:d7d95efdc52960002816": {
-   "draft": {
-    "decision": "reject",
-    "rationale": "Reject because of the STOCK_EXCEEDED error: GadgetX is billed at quantity 20 while inventory shows only 5 in stock. List price is $750, matching the unit price, so the issue is quantity not price. TERMS_MISMATCH is a real inconsistency (Net 30 from 2026-01-30 cannot be due the same day) but is secondary. Vendor history has no earlier invoices. Total is $15,000 USD, which is over the $10,000 VP threshold, but the stock error alone requires rejection.",
-    "addressed": [
-     "TERMS_MISMATCH",
-     "STOCK_EXCEEDED"
-    ]
-   },
-   "steps": [
-    {
-     "name": "check_inventory",
-     "args": {
-      "item": "GadgetX"
-     },
-     "result": "GadgetX: 5 in stock, list price $750.00."
-    },
-    {
-     "name": "vendor_history",
-     "args": {
-      "vendor": "Gadgets Co."
-     },
-     "result": "No earlier invoices from this vendor."
-    }
-   ],
-   "tokens": {
-    "x-ai/grok-4.7": {
-     "input_tokens": 4301,
-     "output_tokens": 435
-    }
-   }
-  },
-  "draft:f3afb612bfe27df7961d": {
+  "draft:65f6ff90e3ecc18b5f6b": {
    "draft": {
     "decision": "approve",
     "rationale": "Validation returned no findings (no errors or warnings). Invoice total is $7,185 USD, under the $10,000 human-VP threshold. Inventory list prices match the standard lines exactly (WidgetA $250, WidgetB $500, GadgetX $750). The only premium is WidgetA rush order at $300 (20% over list), which is a stated rush surcharge and was not flagged. No prior invoices from this vendor, so nothing inconsistent in history. Nothing points to fraud or a bad invoice.",
@@ -1259,6 +703,538 @@
     "x-ai/grok-4.7": {
      "input_tokens": 4552,
      "output_tokens": 752
+    }
+   }
+  },
+  "draft:6e80e1887958d0d0f64c": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Reject because of the STOCK_EXCEEDED error: GadgetX is billed at quantity 20 while inventory shows only 5 in stock. List price is $750, matching the unit price, so the issue is quantity not price. TERMS_MISMATCH is a real inconsistency (Net 30 from 2026-01-30 cannot be due the same day) but is secondary. Vendor history has no earlier invoices. Total is $15,000 USD, which is over the $10,000 VP threshold, but the stock error alone requires rejection.",
+    "addressed": [
+     "TERMS_MISMATCH",
+     "STOCK_EXCEEDED"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Gadgets Co."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4301,
+     "output_tokens": 435
+    }
+   }
+  },
+  "draft:8aa76ae3d1ef2c704393": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "No validation findings: every check passed. Inventory confirms WidgetA at list $250 and WidgetB at list $500, matching the invoice unit prices exactly, with adequate stock. Vendor history shows no earlier invoices, so no duplicate risk. Total is $3,000 USD, under the $10,000 VP threshold. Nothing points to fraud or a bad invoice.",
+    "addressed": []
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Summit Manufacturing Co."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4291,
+     "output_tokens": 385
+    }
+   }
+  },
+  "draft:9037dd102b5c6c44d528": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "No validation findings were raised; every automated check passed. Inventory confirms WidgetA list price $250 (qty 10) and WidgetB list price $500 (qty 5), matching the invoice unit prices exactly, with stock on hand covering both quantities. Vendor history shows no earlier invoices in this batch. Currency is USD and total is $5,000, below the $10,000 human-VP threshold, with tax $0 and subtotal equal to total. Nothing indicates fraud or a bad invoice, so I approve payment.",
+    "addressed": []
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Widgets Inc."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4272,
+     "output_tokens": 439
+    }
+   }
+  },
+  "draft:990c66abc22df9319be9": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Reject under policy: any error finding requires rejection. TOTAL_MISMATCH: line items $21,040.00 + tax $1,472.80 = $22,512.80, but the invoice total is $22,562.80 (off by $50.00). STOCK_EXCEEDED confirmed via inventory: WidgetA billed 22 vs 15 in stock (list $250); WidgetB billed 18 vs 10 in stock (list $500); GadgetX billed 9 vs 5 in stock (list $750). Vendor history shows no earlier invoices. OVER_THRESHOLD (total $22,562.80) would require VP review, but the errors already bar payment.",
+    "addressed": [
+     "TOTAL_MISMATCH",
+     "STOCK_EXCEEDED",
+     "OVER_THRESHOLD"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Atlas Industrial Supply"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 5271,
+     "output_tokens": 864
+    }
+   }
+  },
+  "draft:9e2d698c808ef9449255": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "The sole finding is PRICE_ABOVE_LIST: GadgetX is invoiced at $2,400.00, 3.2× the $750.00 list price confirmed by inventory (5 in stock). There are no [error] findings and the $7,200 USD total is under the $10,000 VP threshold, but vendor history shows no earlier invoices that could explain a premium. A price this far above list with no supporting history points to a bad or inflated invoice, so payment should be rejected.",
+    "addressed": [
+     "PRICE_ABOVE_LIST"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Meridian Supply Co."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4253,
+     "output_tokens": 460
+    }
+   }
+  },
+  "draft:a000b70452400c6a2462": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "No validation findings were reported (every check passed). Invoice total is $3,000 USD, below the $10,000 human-VP threshold. Inventory confirms unit prices match list exactly (WidgetA $250, WidgetB $500) and quantities are within stock. Vendor history shows no earlier invoices and no duplicate or fraud signals. No errors or warnings to explain, so the invoice is approved for payment.",
+    "addressed": []
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Summit Manufacturing Co."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4269,
+     "output_tokens": 519
+    }
+   }
+  },
+  "draft:a7c97df4279f3d581701": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "The only finding is the FOREIGN_CURRENCY warning. EUR 4,125.00 converts to $4,455.00 at the mock rate of 1.08, which is under the $10,000 VP threshold, so the FX amount needed before payment is known and harmless. Unit prices are not far above list (WidgetA 225 EUR ≈ $243 vs $250 list; WidgetB 475 EUR ≈ $513 vs $500 list). No earlier invoices and no error findings. Approve.",
+    "addressed": [
+     "FOREIGN_CURRENCY"
+    ]
+   },
+   "steps": [
+    {
+     "name": "convert_to_usd",
+     "args": {
+      "amount": 4125.0,
+      "currency": "EUR"
+     },
+     "result": "EUR 4,125.00 is $4,455.00 at the mock rate 1.08 USD per EUR."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "TechParts International"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4362,
+     "output_tokens": 623
+    }
+   }
+  },
+  "draft:ad9535a44a307ae2777e": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Inventory confirms GadgetX has only 5 in stock (list $750) while the invoice bills 8, so [error] STOCK_EXCEEDED stands and policy requires rejection. WidgetB takes the full remaining 10 of 10 (list $500), matching [warning] STOCK_DEPLETED, and WidgetA (15 in stock, list $250) is within stock. The USD total of $15,225 is also [info] OVER_THRESHOLD, but the stock error alone is enough to reject rather than escalate for VP review.",
+    "addressed": [
+     "STOCK_EXCEEDED",
+     "STOCK_DEPLETED"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4556,
+     "output_tokens": 550
+    }
+   }
+  },
+  "draft:b585ae1a8607092520d7": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Reject. The error OUT_OF_STOCK is decisive under policy: FakeItem is billed for 100 units, but check_inventory shows 0 in stock (list price $1,000.00). Warnings reinforce a bad invoice rather than a harmless exception: UNPARSEABLE_DATE (due date is the word \"yesterday\", not a date) and PRESSURE_LANGUAGE (notes demand immediate wire payment to avoid penalties). vendor_history shows no earlier invoices from Fraudster LLC. The total of $100,000 is also OVER_THRESHOLD, but the stock error alone requires rejection.",
+    "addressed": [
+     "OUT_OF_STOCK",
+     "UNPARSEABLE_DATE",
+     "PRESSURE_LANGUAGE"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "FakeItem"
+     },
+     "result": "FakeItem: 0 in stock, list price $1,000.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Fraudster LLC"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4337,
+     "output_tokens": 678
+    }
+   }
+  },
+  "draft:b91f74b28b0f491ec83d": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "No validation findings were reported; every check passed. Invoice total is $2,750 USD, well under the $10,000 human-VP threshold. Inventory confirms WidgetA list price $250 and WidgetB list price $500, matching the invoice unit prices exactly, with sufficient stock. Vendor history shows no earlier invoices in this batch and no conflicting duplicates. No warnings or errors to explain, so the invoice is approved for payment.",
+    "addressed": []
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Acme Industrial Supplies"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4277,
+     "output_tokens": 480
+    }
+   }
+  },
+  "draft:bfbe988f5d169cd68fda": {
+   "draft": {
+    "decision": "reject",
+    "rationale": "Rejecting INV-1013 from Atlas Industrial Supply. TOTAL_MISMATCH: line items $21,040.00 + tax $1,472.80 = $22,512.80, but the invoice states $22,562.80 (off by $50.00). STOCK_EXCEEDED confirmed against inventory: WidgetA billed 22 vs 15 in stock (list $250); WidgetB billed 18 vs 10 in stock (list $500); GadgetX billed 9 vs 5 in stock (list $750). No earlier invoices from this vendor. OVER_THRESHOLD (total above $10,000) would require VP review, but the error findings already require rejection.",
+    "addressed": [
+     "TOTAL_MISMATCH",
+     "STOCK_EXCEEDED",
+     "OVER_THRESHOLD"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Atlas Industrial Supply"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 5249,
+     "output_tokens": 463
+    }
+   }
+  },
+  "draft:c97d0e982c9cfedcc271": {
+   "draft": {
+    "decision": "escalate",
+    "rationale": "The only validation finding is BANK_DETAILS_CHANGED: the invoice note instructs payment to a new First Coastal Bank account and says not to use the account on file. That is a common payment-diversion pattern and is not explained or confirmed. Inventory check shows WidgetB list price $500 matches the unit price (4 × $500 = $2,000 subtotal/total), so pricing is not the issue, and the USD total is under $10,000. Vendor history shows no earlier invoices from Widgets Inc. to corroborate a legitimate bank change. Per policy, do not approve an unverified bank redirect; escalate so AP can confirm the change with the vendor on a known number before any payment.",
+    "addressed": [
+     "BANK_DETAILS_CHANGED"
+    ]
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Widgets Inc."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4317,
+     "output_tokens": 1040
+    }
+   }
+  },
+  "draft:e801c0136d4a8091289e": {
+   "draft": {
+    "decision": "escalate",
+    "rationale": "No error findings, and the USD total of $5,940 is under the $10,000 VP threshold, so rejection is not automatic. Inventory checks show WidgetA ($250), WidgetB ($500), and GadgetX ($750) all match list price; STOCK_DEPLETED only means the order takes the last 5 of 5 GadgetX units, which is explained and not by itself fraudulent. SUPERSEDES is not harmless: vendor history shows INV-1004 was already received on 2026-01-22 for $1,890, and this R1 revision (same number, higher total, PO-amendment note) may be paid only once. It is unclear whether the original was already paid or properly voided, so this needs a human review before payment.",
+    "addressed": [
+     "STOCK_DEPLETED",
+     "SUPERSEDES"
+    ]
+   },
+   "steps": [
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Precision Parts Ltd."
+     },
+     "result": "1 earlier from Precision Parts Ltd.: INV-1004, 2026-01-22, USD 1890.0."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "GadgetX"
+     },
+     "result": "GadgetX: 5 in stock, list price $750.00."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4568,
+     "output_tokens": 1071
+    }
+   }
+  },
+  "draft:f505346e3a8fa2eae8ad": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "No validation findings were reported, and every check passed. Inventory list prices match the invoice exactly (WidgetA $250, WidgetB $500), quantities are within stock, and vendor history shows no prior invoices to conflict with. The USD total is $6,000, under the $10,000 VP threshold, with no errors or warnings. Approve for payment.",
+    "addressed": []
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Apex Industrial Parts"
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4315,
+     "output_tokens": 634
     }
    }
   },
