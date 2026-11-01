@@ -14,7 +14,8 @@
   --r-sm: 6px;
   --r: 8px;
   --r-lg: 14px;
-  --canvas: #e6e6e3;
+  /* Darker than the panels so the frosted glass stands off the page. */
+  --canvas: #d6d6d1;
   --panel: #f6f6f4;
   --raised: #ffffff;
   --ink: #111111;
