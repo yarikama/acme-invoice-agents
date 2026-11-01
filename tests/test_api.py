@@ -69,6 +69,17 @@ async def test_rejected_run_streams_its_history(client):
     assert types[-1] == "done"
     assert "progress" in types and "trace" in types
     assert [e["id"] for e in events] == list(range(len(events)))
+    # Proxies must not cache or buffer the stream; each event names its type.
+    assert resp.headers["cache-control"] == "no-cache"
+    assert resp.headers["x-accel-buffering"] == "no"
+    first = resp.text.split("\n\n")[0].splitlines()
+    assert "event: started" in first and "id: 0" in first
+
+
+async def test_events_for_an_unknown_run_are_a_404_not_an_empty_stream(client):
+    resp = await client.get("/api/runs/nope/events")
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "No run 'nope'"
 
 
 async def test_last_event_id_skips_what_the_client_has(client):
