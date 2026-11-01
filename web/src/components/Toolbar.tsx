@@ -73,7 +73,7 @@ export function Toolbar({ onStarted }: Props) {
           ref={fileInput}
           type="file"
           className="sr-only"
-          accept=".txt,.csv,.json,.xml,.pdf"
+          accept=".txt,.csv,.json,.xml,.pdf,.png,.jpg,.jpeg"
           aria-label="Invoice file"
           onChange={(e) => {
             const file = e.target.files?.[0];
