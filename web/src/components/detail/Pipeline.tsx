@@ -24,7 +24,7 @@ export function Pipeline({ segments }: { segments: Segment[] }) {
               <Glyph size={14} weight="bold" aria-hidden="true" />
               {s.label}
             </span>
-            <span className="text-[13px] font-semibold">{s.word}</span>
+            <span className="text-sm font-semibold">{s.word}</span>
           </li>
         );
       })}

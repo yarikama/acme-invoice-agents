@@ -13,7 +13,7 @@ export function TraceScreen({ label, lines, live }: { label: string; lines: Trac
 
   return (
     <div className="lcd flex min-h-40 flex-1 flex-col" role="log" aria-label={`Agent trace for ${label}`} tabIndex={0}>
-      <div className="mb-2 flex flex-wrap justify-between gap-x-4 border-b border-[#2c2c2a] pb-2 text-[#a3a39c]">
+      <div className="mb-3 flex flex-wrap justify-between gap-x-4 text-[#a3a39c]">
         <span>trace / {label}</span>
         <span className={live ? "n-human" : undefined}>{live ? "streaming" : "idle"}</span>
       </div>
@@ -38,7 +38,7 @@ export function TraceScreen({ label, lines, live }: { label: string; lines: Trac
         )}
         {lines.length === 0 && !live && <li className="text-[#a3a39c]">No trace yet.</li>}
       </ol>
-      <div className="mt-2 flex flex-wrap gap-x-4 border-t border-[#2c2c2a] pt-2 text-[#a3a39c]">
+      <div className="mt-3 flex flex-wrap gap-x-4 text-[#a3a39c]">
         <span className="n-model">blue: model</span>
         <span className="n-code">green: code</span>
         <span className="n-human">orange: human or live</span>

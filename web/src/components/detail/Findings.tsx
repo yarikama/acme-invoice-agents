@@ -12,7 +12,7 @@ export function Findings({ findings }: { findings: Finding[] }) {
         <li key={`${f.code}-${i}`} className="flex items-start gap-4">
           <span className={`chip chip-${f.severity}`}>{SEVERITY_WORD[f.severity]}</span>
           <span className="flex min-w-0 flex-col">
-            <span className="text-[15px] font-medium">{f.title}</span>
+            <span className="text-base font-medium">{f.title}</span>
             <span className="text-sm text-ink-2">{f.detail}</span>
             <span className="mono text-xs text-ink-2">{f.code}</span>
           </span>
