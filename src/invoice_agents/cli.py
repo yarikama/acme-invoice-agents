@@ -142,6 +142,7 @@ class LocalRunner:
                                     "node": node,
                                     "message": t["message"],
                                     "tool": t.get("tool"),
+                                    "usage": t.get("usage"),
                                 }
                             )
                 state = cast(InvoiceState, (await self.graph.aget_state(config)).values)
