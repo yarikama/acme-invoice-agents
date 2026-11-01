@@ -1,6 +1,6 @@
 from invoice_agents.ingestion import load_document
 from invoice_agents.models import Invoice, LineItem, Severity
-from invoice_agents.validation import SeenInvoices, validate
+from invoice_agents.validation import Policy, SeenInvoices, validate
 from tests.conftest import INVOICES
 
 
@@ -244,3 +244,52 @@ def test_split_needs_the_same_vendor_close_dates_and_a_crossed_threshold(invento
     assert "SPLIT_BELOW_THRESHOLD" not in codes(
         validate(split("R-3", 6000, date="late Feb"), inventory, raw)
     )
+
+
+def test_a_vendor_name_a_letter_off_a_known_one_is_flagged(inventory):
+    seen = SeenInvoices()
+    seen.add(make([("WidgetA", 1, 250)], 250, vendor="Summit Manufacturing Co."))
+    items = [("WidgetA", 1, 250)]
+
+    swapped = make(
+        items, 250, invoice_number="INV-9001", vendor="Summit Manufactruing Co."
+    )
+    [finding] = [
+        f
+        for f in validate(swapped, inventory, seen).findings
+        if f.code == "LOOKALIKE_VENDOR"
+    ]
+    assert finding.severity is Severity.WARNING
+    assert "'Summit Manufacturing Co.'" in finding.detail
+    assert "LOOKALIKE_VENDOR" in Policy().vp_required
+
+    def flagged(vendor: str) -> bool:
+        inv = make(items, 250, invoice_number="INV-9002", vendor=vendor)
+        return "LOOKALIKE_VENDOR" in codes(validate(inv, inventory, seen))
+
+    # The same vendor, written differently, is not an impostor.
+    assert not flagged("Summit Manufacturing Co.")
+    assert not flagged("SUMMIT MANUFACTURING CO")
+    assert not flagged("Summit Manufacturing Company")
+    assert not flagged("Summit Manufacturing Inc.")
+    # Neither is a different vendor, nor the closest pair among the samples.
+    assert not flagged("Atlas Industrial Supply")
+    seen.add(
+        make(items, 250, invoice_number="INV-9003", vendor="Acme Industrial Supplies")
+    )
+    assert not flagged("Atlas Industrial Supply")
+    # Without history there is nothing to compare against.
+    assert "LOOKALIKE_VENDOR" not in codes(validate(swapped, inventory))
+
+
+def test_no_sample_vendor_looks_like_another(inventory):
+    seen = SeenInvoices()
+    flagged = []
+    for path in sorted(INVOICES.iterdir()):
+        doc = load_document(str(path))
+        if doc.invoice is None:
+            continue
+        if "LOOKALIKE_VENDOR" in codes(validate(doc.invoice, inventory, seen)):
+            flagged.append(path.name)
+        seen.add(doc.invoice)
+    assert flagged == []

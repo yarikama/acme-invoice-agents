@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 
 from invoice_agents.ingestion.dates import parse_date
 from invoice_agents.inventory import Inventory, item_key
@@ -37,6 +38,14 @@ PRICE_RATIO = 1.25
 # Invoices from one vendor this many days apart count as one purchase when
 # looking for a total split to stay under the approval threshold.
 SPLIT_WINDOW_DAYS = 3
+# A vendor name this close to a known one, but not the same, may be an
+# impostor. The closest pair among the sample vendors is 0.74; a one-letter
+# typo or swap of a known name scores above 0.9.
+LOOKALIKE_RATIO = 0.88
+# Legal-form words that don't make two vendors different.
+COMPANY_SUFFIXES = re.compile(
+    r"\b(inc|incorporated|llc|ltd|limited|co|company|corp|corporation)\b\.?", re.I
+)
 
 
 @dataclass
@@ -63,6 +72,7 @@ VP_REQUIRED_DEFAULT = frozenset(
         "PRICE_ABOVE_LIST",
         "INSTRUCTIONS_IN_DOCUMENT",
         "BANK_DETAILS_CHANGED",
+        "LOOKALIKE_VENDOR",
     }
 )
 
@@ -100,6 +110,7 @@ def validate(
     if seen is not None:
         findings += _duplicates(invoice, seen)
         findings += _split(invoice, seen, policy)
+        findings += _lookalike_vendor(invoice, seen)
     return ValidationReport(findings=findings)
 
 
@@ -411,6 +422,37 @@ def _split(inv: Invoice, seen: SeenInvoices, policy: Policy) -> list[Finding]:
             "May be split to stay under the threshold",
             f"With {numbers} from the same vendor within {SPLIT_WINDOW_DAYS} days,"
             f" the total is {_usd(combined)}, over {_usd(limit)}.",
+        )
+    ]
+
+
+def _vendor_key(name: str) -> str:
+    return item_key(COMPANY_SUFFIXES.sub("", name))
+
+
+def _lookalike_vendor(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
+    """A name a letter or two off a vendor already paid: "Summit Manufactruing
+    Co." for "Summit Manufacturing Co." is how impostor invoices get paid."""
+    if not inv.vendor:
+        return []
+    key = _vendor_key(inv.vendor)
+    known = {o.vendor for o in seen.invoices if o.vendor and o is not inv}
+    if any(_vendor_key(k) == key for k in known):
+        return []
+    close = [
+        k
+        for k in sorted(known)
+        if SequenceMatcher(None, key, _vendor_key(k)).ratio() >= LOOKALIKE_RATIO
+    ]
+    if not close:
+        return []
+    return [
+        _f(
+            "LOOKALIKE_VENDOR",
+            Severity.WARNING,
+            "Vendor name is close to a known vendor's",
+            f"{inv.vendor!r} is not {close[0]!r}, a vendor already invoiced, but"
+            " differs by a letter or two. Confirm it is a real, separate vendor.",
         )
     ]
 
