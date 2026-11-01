@@ -14,10 +14,15 @@ const col = createColumnHelper<RunView>();
 
 export function InboxTable({
   runs,
+  loaded,
+  filtered,
   selectedId,
   onSelect,
 }: {
   runs: RunView[];
+  loaded: boolean;
+  // True when a status filter hid every run; the page header covers "no runs at all".
+  filtered: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -116,8 +121,23 @@ export function InboxTable({
           ))}
         </tbody>
       </table>
-      {runs.length === 0 && (
-        <p className="m-0 px-6 py-8 text-ink-2">No invoices here yet. Run a sample, or upload one.</p>
+      {runs.length === 0 && !loaded && (
+        // Placeholder rows the shape of real ones while the run list loads.
+        <div aria-busy="true" aria-label="Loading invoices" className="flex flex-col">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex items-center gap-6 border-b border-seam px-6 py-4">
+              <span className="flex flex-1 flex-col gap-2">
+                <span className="h-3 w-20 bg-pale" />
+                <span className="h-3 w-40 bg-pale" />
+              </span>
+              <span className="h-5 w-12 bg-pale" />
+              <span className="h-3 w-20 bg-pale" />
+            </div>
+          ))}
+        </div>
+      )}
+      {runs.length === 0 && loaded && filtered && (
+        <p className="m-0 px-6 py-8 text-ink-2">No invoices with this status.</p>
       )}
     </div>
   );

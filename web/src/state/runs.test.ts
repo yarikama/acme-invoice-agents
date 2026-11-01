@@ -110,7 +110,7 @@ describe("pipeline", () => {
     });
     const state = play([
       ev({ type: "trace", node: "ingest", stage: "ingest", message: "Parsed XML in code." }),
-      ev({ type: "trace", node: "validate", stage: "validate", message: "0 errors, 1 warnings." }),
+      ev({ type: "trace", node: "validate", stage: "validate", message: "0 errors, 1 warning." }),
       ev({ type: "trace", node: "review", stage: "approve", message: "Draft 1: escalate." }),
       ev({ type: "trace", node: "critique", stage: "approve", message: "Critic agrees." }),
       ev({ type: "awaiting_vp", status: "awaiting_vp", request: {}, summary: paused }),
@@ -135,6 +135,22 @@ describe("pipeline", () => {
     ]);
     const states = Object.fromEntries(pipeline(paid.runs.r1!).map((s) => [s.key, s.state]));
     expect(states).toMatchObject({ vp: "skip", pay: "done" });
+  });
+
+  it("calls a validation stop Blocked, not Failed", () => {
+    seq = 0;
+    const rejected = summary({
+      status: "rejected",
+      findings: [{ code: "UNKNOWN_ITEM", severity: "error", title: "Item not in inventory", detail: "" }],
+    });
+    const state = play([
+      ev({ type: "trace", node: "ingest", stage: "ingest", message: "ok" }),
+      ev({ type: "trace", node: "validate", stage: "validate", message: "1 error, 0 warnings." }),
+      ev({ type: "trace", node: "reject", stage: "pay", message: "Not paid." }),
+      ev({ type: "done", status: "rejected", summary: rejected }),
+    ]);
+    const validate = pipeline(state.runs.r1!).find((s) => s.key === "validate")!;
+    expect(validate).toMatchObject({ state: "block", word: "Blocked" });
   });
 });
 

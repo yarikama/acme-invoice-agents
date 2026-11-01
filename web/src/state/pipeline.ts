@@ -1,7 +1,7 @@
 import type { RunEvent } from "../api/types";
 import type { RunView } from "./runs";
 
-export type LedState = "off" | "run" | "done" | "flag" | "fail" | "wait" | "skip";
+export type LedState = "off" | "run" | "done" | "flag" | "block" | "fail" | "wait" | "skip";
 
 export interface Segment {
   key: "ingest" | "validate" | "draft" | "critique" | "vp" | "pay";
@@ -42,6 +42,8 @@ const WORDS: Record<LedState, string> = {
   run: "Running",
   done: "Done",
   flag: "Flagged",
+  // Validation stopped the invoice. Not "Failed", which means the run itself broke.
+  block: "Blocked",
   fail: "Failed",
   wait: "Waiting",
   skip: "Skipped",
@@ -68,7 +70,7 @@ export function pipeline(run: RunView): Segment[] {
     validate: !reached.has("validate")
       ? "off"
       : findings.some((f) => f.severity === "error")
-        ? "fail"
+        ? "block"
         : findings.some((f) => f.severity === "warning")
           ? "flag"
           : "done",
