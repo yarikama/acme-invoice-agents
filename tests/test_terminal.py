@@ -183,7 +183,9 @@ def test_only_the_status_is_redrawn() -> None:
     assert "convert_to_usd" not in printed  # the approver's turn isn't done
     status = text(view)
     assert "1 tool call so far" in status
-    assert len(status.strip().splitlines()) <= 3
+    # The call that just came back shows live, on one line.
+    assert "⚒ convert_to_usd(4125.0, EUR)  ↳ EUR 4,125.00 is $4,455.00." in status
+    assert len(status.strip().splitlines()) <= 4
 
     for e in EVENTS[first_tool + 1 :]:
         view.add(e)

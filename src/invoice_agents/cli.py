@@ -188,6 +188,10 @@ class LocalRunner:
                     payload, config, stream_mode=["updates", "custom"]
                 ):
                     chunk = cast(dict[str, Any], raw)
+                    if mode == "custom" and "trace" in chunk:
+                        # A tool call, shown the moment it finished.
+                        view.add({"type": "trace", "node": "review", **chunk["trace"]})
+                        continue
                     if mode == "custom":
                         view.add(
                             {
@@ -202,6 +206,8 @@ class LocalRunner:
                             paused = update[0].value
                             continue
                         for t in (update or {}).get("trace", []):
+                            if t.get("streamed"):
+                                continue
                             view.add(
                                 {
                                     "type": "trace",

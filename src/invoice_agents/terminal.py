@@ -567,12 +567,22 @@ class RunView:
         if self.status == "running":
             now = next((s for s in SEGMENTS if states[s] == "run"), None)
             activity = f" {ACTIVITY.get(now or '', 'Working')}…"
+            latest: Text | None = None
             if drawn and _in_progress(drawn[-1]):
-                calls = len(drawn[-1].data["tools"])
-                activity += f" {calls} tool call{'s' * (calls != 1)} so far"
+                tools = drawn[-1].data["tools"]
+                activity += f" {len(tools)} tool call{'s' * (len(tools) != 1)} so far"
+                if tools:
+                    # The call that just came back, as it streams in: one
+                    # line, so the redrawn part stays short.
+                    call, result = tools[-1]
+                    latest = Text(f"  ⚒ {call}", style="#a6a69f", no_wrap=True)
+                    latest.append(f"  ↳ {result}", style="#7c7c75")
+                    latest.overflow = "ellipsis"
             row = Table.grid()
             row.add_row(self._spinner, Text(activity, style="italic #a6a69f"))
             parts.append(Padding(row, (0, 0, 0, 2)))
+            if latest is not None:
+                parts.append(Padding(latest, (0, 0, 0, 2)))
         return Group(*parts)
 
 
