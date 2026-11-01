@@ -36,6 +36,7 @@ from rich.table import Table
 from invoice_agents.agents import ExtractionUnavailableError, raised_at
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
+from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import build_agents
 
@@ -104,6 +105,23 @@ CASES: list[Case] = [
     Case(("invoice_1016.json",), "reject", "WidgetC is not in the inventory."),
 ]
 
+# INV-1011 again, as a scanner would hand it over: an image with no text layer.
+# Needs OCR (`uv sync --extra ocr`); skipped without it.
+SCANNED: list[Case] = [
+    Case(
+        ("invoice_1011_scan.pdf",),
+        "pay",
+        "A scanned PDF of INV-1011.",
+        folder="scanned",
+    ),
+    Case(
+        ("invoice_1011_scan.png",),
+        "pay",
+        "A photo-like PNG of INV-1011.",
+        folder="scanned",
+    ),
+]
+
 # Invoices written to attack the pipeline rather than to test the brief. Every
 # one is arithmetically correct and within stock, so no check in the brief
 # stops it; only judgment, or a rule added for it, does.
@@ -139,12 +157,13 @@ ADVERSARIAL: list[Case] = [
     ),
 ]
 
-SETS = ("samples", "adversarial", "all")
+SETS = ("samples", "adversarial", "scanned", "all")
 
 
 def cases_in(name: str) -> list[Case]:
     """The cases in a set, read at call time so tests can swap them."""
-    return {"samples": CASES, "adversarial": ADVERSARIAL}.get(name, CASES + ADVERSARIAL)
+    sets = {"samples": CASES, "adversarial": ADVERSARIAL, "scanned": SCANNED}
+    return sets.get(name, CASES + ADVERSARIAL + SCANNED)
 
 
 @dataclass
@@ -225,7 +244,7 @@ async def run_case(case: Case, settings: Settings, pricing: Pricing) -> Result:
                 outcome, detail = outcome_of(state)
                 if "report" in state:
                     findings = [f.code for f in state["report"].findings]
-            except ExtractionUnavailableError as exc:
+            except (ExtractionUnavailableError, OcrUnavailableError) as exc:
                 outcome, detail = "skipped", str(exc)
             except Exception as exc:
                 outcome, detail = "error", f"{type(exc).__name__}: {exc}"

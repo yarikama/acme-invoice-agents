@@ -33,6 +33,7 @@ from invoice_agents import remote
 from invoice_agents.agents import ExtractionUnavailableError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_serde
+from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import build_agents
 from invoice_agents.summary import run_status, summarize
@@ -196,7 +197,7 @@ async def _process_all(
         console.rule(f"[bold]{path.name}", style="#3a3a37")
         try:
             result = await runner.process(path, vp_mode)
-        except ExtractionUnavailableError as exc:
+        except (ExtractionUnavailableError, OcrUnavailableError) as exc:
             result = {"file": path.name, "status": "skipped", "reason": str(exc)}
         except Exception as exc:
             # One bad invoice or API error must not stop the batch.

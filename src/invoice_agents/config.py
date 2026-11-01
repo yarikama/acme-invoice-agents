@@ -49,6 +49,8 @@ class Settings(BaseSettings):
         "INSTRUCTIONS_IN_DOCUMENT",
         "BANK_DETAILS_CHANGED",
     ]
+    # Reads scanned PDFs and photos (needs `uv sync --extra ocr`).
+    ocr_backend: Literal["docling"] = "docling"
     max_extract_attempts: int = 3
     max_review_rounds: int = 2
     # Model turns the approver gets for tool calls before it must decide.

@@ -181,4 +181,7 @@ def test_consistency_names_flaky_cases() -> None:
 
 def test_sets() -> None:
     assert evaluation.cases_in("samples") == evaluation.CASES
-    assert evaluation.cases_in("all") == evaluation.CASES + evaluation.ADVERSARIAL
+    assert evaluation.cases_in("scanned") == evaluation.SCANNED
+    assert evaluation.cases_in("all") == (
+        evaluation.CASES + evaluation.ADVERSARIAL + evaluation.SCANNED
+    )

@@ -14,6 +14,10 @@ class SourceFormat(StrEnum):
     JSON = "json"
     XML = "xml"
     PDF = "pdf"
+    # Photos and scans of an invoice: read with OCR (`uv sync --extra ocr`).
+    PNG = "png"
+    JPG = "jpg"
+    JPEG = "jpeg"
 
 
 class LineItem(BaseModel):
