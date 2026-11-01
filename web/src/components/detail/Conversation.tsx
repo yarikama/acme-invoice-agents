@@ -17,6 +17,16 @@ function shortModel(name: string): string {
     .join(", ");
 }
 
+/** Replay had no recorded answer, so the rule-based approver decided. */
+function rulesFallback(rationale: string): boolean {
+  return rationale.startsWith("Not in the recording");
+}
+
+/** A finished draft with no model usage: the rule-based approver wrote it. */
+function byRules(turn: Extract<Turn, { kind: "approver" }>): boolean {
+  return rulesFallback(turn.rationale) || (turn.decision !== null && !turn.usage);
+}
+
 function seconds(ms: number | undefined): string | null {
   if (ms === undefined) return null;
   return ms < 1000 ? `${Math.max(ms, 1).toFixed(0)}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -64,7 +74,9 @@ function TurnFrame({
         <div className="flex items-baseline gap-2">
           <span className="font-medium">{name}</span>
           <span className={`role role-${voice}`}>
-            {voice === "model" && usage?.model ? shortModel(usage.model) : role}
+            {voice === "model" && usage?.model
+              ? `${shortModel(usage.model)}${usage.replayed ? " · replayed" : ""}`
+              : role}
           </span>
           <span className="mono ml-auto flex gap-3 text-xs text-ink-2">
             {spent && <span>{spent}</span>}
@@ -240,9 +252,9 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       return (
         <TurnFrame
           node="review"
-          voice="model"
+          voice={byRules(turn) ? "code" : "model"}
           name="Approver"
-          role="model"
+          role={rulesFallback(turn.rationale) ? "rules, not in the recording" : byRules(turn) ? "rules" : "model"}
           ms={turn.ms}
           usage={turn.usage}
           fresh={fresh}
@@ -278,9 +290,9 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       return (
         <TurnFrame
           node="critique"
-          voice="model"
+          voice={turn.usage ? "model" : "code"}
           name="Critic"
-          role="model"
+          role={turn.usage ? "model" : "rules"}
           ms={turn.ms}
           usage={turn.usage}
           fresh={fresh}

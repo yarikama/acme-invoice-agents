@@ -217,3 +217,29 @@ def test_a_file_type_it_does_not_read_is_skipped_not_failed(
     [result] = run(capsys, f"--invoice_path={odd}")
     assert result["status"] == "skipped"
     assert "Unsupported file type: .docx" in result["reason"]
+
+
+def test_log_json_writes_each_step_with_its_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import logging
+
+    out = tmp_path / "run.jsonl"
+    app_log = logging.getLogger("invoice_agents")
+    before = list(app_log.handlers)
+    try:
+        [result] = run(
+            capsys,
+            f"--invoice_path={INVOICES / 'invoice_1015.csv'}",
+            f"--log-json={out}",
+        )
+    finally:
+        for handler in app_log.handlers[len(before) :]:
+            handler.close()
+            app_log.removeHandler(handler)
+    lines = [json.loads(line) for line in out.read_text().splitlines()]
+    steps = [line for line in lines if "stage" in line]
+    assert [s["stage"] for s in steps][:2] == ["ingest", "validate"]
+    assert steps[-1]["stage"] == "pay" and result["status"] == "paid"
+    assert len({s["run_id"] for s in steps}) == 1 and steps[0]["run_id"]
+    assert {"at", "level", "logger", "message"} <= set(steps[0])

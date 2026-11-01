@@ -136,3 +136,13 @@ def test_prices_load_only_for_openrouter(monkeypatch: pytest.MonkeyPatch) -> Non
 
     monkeypatch.setattr(llm, "openrouter_pricing", offline)
     assert llm.load_pricing(Settings(llm_provider="openrouter")) == {}
+
+
+def test_a_replayed_answer_is_marked_in_the_step() -> None:
+    tokens: usage.Tokens = {}
+    usage.add(tokens, {"m": {"input_tokens": 5, "output_tokens": 1, "replayed": 1}})
+    usage.add(tokens, {"m": {"input_tokens": 5, "output_tokens": 1}})
+    step = usage.step_usage(tokens, {})
+    assert step is not None and step.get("replayed") is True
+    live = usage.step_usage({"m": {"input_tokens": 1, "output_tokens": 1}}, {})
+    assert live is not None and "replayed" not in live

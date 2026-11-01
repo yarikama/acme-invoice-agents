@@ -106,6 +106,22 @@ def known_files(root: Path = ROOT) -> str:
     return "\n".join(lines) or "(none found)"
 
 
+def within_reach(step: Step, request: str, root: Path = ROOT) -> list[str]:
+    """Paths of a /run or /dir step the assistant may touch: files in the
+    sample folders, or a path the person typed in the request. A path that
+    came from elsewhere (an injected instruction, say) is returned, to drop."""
+    if step.command not in ("run", "dir"):
+        return []
+    folders = [(root / f).resolve() for f in FOLDERS]
+    outside = []
+    for arg in step.args:
+        path = (root / arg).resolve()
+        typed = arg in request
+        if not typed and not any(path.is_relative_to(f) for f in folders):
+            outside.append(arg)
+    return outside
+
+
 def checked(plan: Plan) -> tuple[list[Step], list[str]]:
     """The steps code lets through, and the reason for any it drops."""
     keep: list[Step] = []

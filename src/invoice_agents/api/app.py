@@ -31,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field
 
+from invoice_agents import logs
 from invoice_agents.api.chat import ChatService, ChatUnavailableError
 from invoice_agents.api.runs import RunManager, RunNotFoundError, RunStateError
 from invoice_agents.config import Settings, get_settings
@@ -48,6 +49,13 @@ SUFFIXES = {f".{f.value}" for f in SourceFormat}
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    app_log = logging.getLogger("invoice_agents")
+    if not app_log.handlers:
+        # Under uvicorn nothing shows this app's INFO lines otherwise.
+        app_log.addHandler(logging.StreamHandler())
+        app_log.setLevel(logging.INFO)
+    if settings.log_json is not None:
+        logs.to_json_file(settings.log_json)
     if not settings.vp_tokens:
         log.warning(
             "VP_TOKENS is unset: anyone who can reach this API can approve"
