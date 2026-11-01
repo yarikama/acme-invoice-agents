@@ -8,6 +8,16 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # The assistant's shared memory is tested against a real Redis.
+    services:
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s
+          --health-timeout 2s --health-retries 10
+    env:
+      TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

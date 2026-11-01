@@ -1,4 +1,4 @@
-import type { RunOverview, Sample } from "./types";
+import type { ChatMessage, ChatState, RunOverview, Sample } from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -38,6 +38,10 @@ export const api = {
   },
   /** Forget every run and received invoice, so the samples can run again. */
   reset: () => request<void>("/api/reset", { method: "POST" }),
+  /** The assistant's conversation after message `after`. */
+  chat: (after = -1) => request<ChatState>(`/api/chat?after=${after}`),
+  /** Ask the assistant; returns the messages the request added. */
+  say: (text: string) => request<{ messages: ChatMessage[] }>("/api/chat", json({ text })),
   /** The VP's answer; `token` is a VP's bearer token when the API requires one. */
   decide: (runId: string, approved: boolean, note: string, token?: string) => {
     const init = json({ approved, note });
