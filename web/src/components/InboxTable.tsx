@@ -52,7 +52,7 @@ export function InboxTable({
         id: "format",
         header: "format",
         cell: ({ row }) => (
-          <span className="tag">{(row.original.summary?.source_format ?? row.original.source.split(".").pop() ?? "").toUpperCase()}</span>
+          <span className="tag tag-soft">{(row.original.summary?.source_format ?? row.original.source.split(".").pop() ?? "").toUpperCase()}</span>
         ),
       }),
       col.display({
