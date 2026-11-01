@@ -3,9 +3,8 @@ import { useState } from "react";
 import { api } from "../../api/client";
 import type { Summary } from "../../api/types";
 import { money } from "../../lib/format";
-import { GavelIcon } from "@phosphor-icons/react";
 
-/** Shown at the top of the detail pane while a run waits for the VP. */
+/** The VP's approve/reject form for a run paused at human_review. */
 export function DecisionPanel({ runId, summary }: { runId: string; summary: Summary }) {
   const [note, setNote] = useState("");
   const [sending, setSending] = useState<"approve" | "reject" | null>(null);
@@ -25,15 +24,9 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
   };
 
   return (
-    <section aria-labelledby="decision-h" className="bg-panel">
-      <div className="flex flex-wrap items-center justify-between gap-2 bg-signal px-6 py-3 text-[#111111]">
-        <h3 id="decision-h" className="m-0 flex items-center gap-2 text-base font-medium">
-          <GavelIcon size={18} weight="bold" aria-hidden="true" />
-          VP decision required
-        </h3>
-        <span className="mono text-xs">paused at human_review</span>
-      </div>
-      <div className="flex flex-col gap-4 p-6">
+    // The reasons scroll; the note and the buttons stay in view however small the card is.
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {summary.draft && (
           <p className="m-0">
             <span className="cap mr-2">agent recommends {summary.draft.decision}</span>
@@ -50,32 +43,32 @@ export function DecisionPanel({ runId, summary }: { runId: string; summary: Summ
             ))}
           </ul>
         )}
-        <label className="flex flex-col gap-1">
-          <span className="cap">note for the audit log (optional)</span>
-          <input
-            className="key min-h-10 px-3 text-sm shadow-none active:translate-y-0"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            maxLength={500}
-          />
-        </label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button type="button" className="key key-big key-go" disabled={sending !== null} onClick={() => decide(true)}>
-            <span className="text-lg font-medium">{sending === "approve" ? "Approving…" : "Approve and pay"}</span>
-            <span className="mono text-xs">{inv ? `${money(inv.total, inv.currency)} via mock_payment` : "via mock_payment"}</span>
-          </button>
-          <button type="button" className="key key-big" disabled={sending !== null} onClick={() => decide(false)}>
-            <span className="text-lg font-medium">{sending === "reject" ? "Rejecting…" : "Reject"}</span>
-            <span className="mono text-xs">logs your reason, no payment</span>
-          </button>
-        </div>
-        {error && (
-          <p role="alert" className="m-0 text-sm">
-            <span className="tag mr-2">error</span>
-            {error}
-          </p>
-        )}
       </div>
-    </section>
+      <label className="flex flex-none flex-col gap-1">
+        <span className="cap">note for the audit log (optional)</span>
+        <input
+          className="key min-h-10 px-3 text-sm shadow-none active:translate-y-0"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={500}
+        />
+      </label>
+      <div className="grid flex-none grid-cols-1 gap-2 sm:grid-cols-2">
+        <button type="button" className="key key-big key-go min-h-16" disabled={sending !== null} onClick={() => decide(true)}>
+          <span className="text-lg font-medium">{sending === "approve" ? "Approving…" : "Approve and pay"}</span>
+          <span className="mono text-xs">{inv ? `${money(inv.total, inv.currency)} via mock_payment` : "via mock_payment"}</span>
+        </button>
+        <button type="button" className="key key-big min-h-16" disabled={sending !== null} onClick={() => decide(false)}>
+          <span className="text-lg font-medium">{sending === "reject" ? "Rejecting…" : "Reject"}</span>
+          <span className="mono text-xs">logs your reason, no payment</span>
+        </button>
+      </div>
+      {error && (
+        <p role="alert" className="m-0 text-sm">
+          <span className="tag mr-2">error</span>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

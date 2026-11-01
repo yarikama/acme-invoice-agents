@@ -12,12 +12,12 @@ export function TraceScreen({ label, lines, live }: { label: string; lines: Trac
   }, [lines.length, live]);
 
   return (
-    <div className="lcd" role="log" aria-label={`Agent trace for ${label}`} tabIndex={0}>
+    <div className="lcd flex min-h-40 flex-1 flex-col" role="log" aria-label={`Agent trace for ${label}`} tabIndex={0}>
       <div className="mb-2 flex flex-wrap justify-between gap-x-4 border-b border-[#2c2c2a] pb-2 text-[#a3a39c]">
         <span>trace / {label}</span>
         <span className={live ? "n-human" : undefined}>{live ? "streaming" : "idle"}</span>
       </div>
-      <ol className="m-0 flex max-h-80 list-none flex-col gap-1 overflow-y-auto p-0">
+      <ol className="m-0 flex min-h-0 flex-1 list-none flex-col gap-1 overflow-y-auto p-0">
         {lines.map((l, i) => (
           <li key={l.seq} className="grid grid-cols-[24px_96px_minmax(0,1fr)] gap-2">
             <span className="text-[#8e8e87]">{String(i + 1).padStart(2, "0")}</span>

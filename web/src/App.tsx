@@ -1,20 +1,19 @@
 import { useCallback, useMemo, useState } from "react";
+import type { Layout } from "react-grid-layout";
 
+import { Dashboard } from "./components/Dashboard";
 import { Header } from "./components/Header";
-import { InboxTable } from "./components/InboxTable";
-import { StatusBank } from "./components/StatusBank";
 import { Toolbar } from "./components/Toolbar";
-import { DetailPanel } from "./components/detail/DetailPanel";
 import type { RunOverview } from "./api/types";
 import { type Filter, matches } from "./lib/filters";
+import { clearLayout, DEFAULT_LAYOUT, loadLayout, saveLayout } from "./state/layout";
 import { useConsole } from "./state/useConsole";
-import { Badge } from "./components/Badge";
-import { SECTION_ICON } from "./lib/icons";
 
 export default function App() {
   const { state, stream, provider, snapshot, loaded } = useConsole();
   const [filter, setFilter] = useState<Filter>("all");
   const [picked, setPicked] = useState<string | null>(null);
+  const [layout, setLayout] = useState<Layout>(loadLayout);
 
   const runs = useMemo(() => state.order.map((id) => state.runs[id]!), [state]);
   const visible = useMemo(() => runs.filter((r) => matches(filter, r.status)), [runs, filter]);
@@ -34,11 +33,19 @@ export default function App() {
     [snapshot],
   );
   const onSelect = useCallback((id: string) => setPicked(id), []);
+  const onLayout = useCallback((next: Layout) => {
+    setLayout(next);
+    saveLayout(next);
+  }, []);
+  const onResetLayout = useCallback(() => {
+    clearLayout();
+    setLayout(DEFAULT_LAYOUT);
+  }, []);
   const waiting = runs.filter((r) => r.status === "awaiting_vp").length;
 
   return (
     <div className="min-h-dvh">
-      <Header stream={stream} provider={provider} />
+      <Header stream={stream} provider={provider} onResetLayout={onResetLayout} />
       <main className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -56,29 +63,18 @@ export default function App() {
           <Toolbar onStarted={onStarted} />
         </div>
 
-        <StatusBank runs={runs} filter={filter} onFilter={setFilter} />
-
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,560px)]">
-          <section aria-labelledby="inbox-h" className="card min-w-0 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-6 pt-6 pb-2">
-              <h2 id="inbox-h" className="m-0 flex items-center gap-3 text-base font-medium">
-                <Badge icon={SECTION_ICON.invoices} />
-                Invoices
-              </h2>
-              <span className="cap">
-                showing {visible.length} of {runs.length}
-              </span>
-            </div>
-            <InboxTable
-              runs={visible}
-              loaded={loaded}
-              filtered={runs.length > 0}
-              selectedId={selected?.id ?? null}
-              onSelect={onSelect}
-            />
-          </section>
-          <DetailPanel run={selected} llm={provider !== null && provider !== "offline"} />
-        </div>
+        <Dashboard
+          runs={runs}
+          visible={visible}
+          loaded={loaded}
+          filter={filter}
+          onFilter={setFilter}
+          selected={selected}
+          onSelect={onSelect}
+          llm={provider !== null && provider !== "offline"}
+          layout={layout}
+          onLayout={onLayout}
+        />
       </main>
     </div>
   );
