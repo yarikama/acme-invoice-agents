@@ -34,6 +34,7 @@ from invoice_agents.graph import Deps, build_graph, checkpoint_serde
 from invoice_agents.inventory import SEED, Inventory
 from invoice_agents.llm import build_agents
 from invoice_agents.models import HumanDecision, SourceFormat
+from invoice_agents.replay import Recording
 from invoice_agents.usage import Pricing, openrouter_pricing
 
 KEEPALIVE_SECONDS = 15
@@ -66,6 +67,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 def load_pricing(settings: Settings) -> Pricing:
     """OpenRouter's model prices, for each step's cost. Without them the
     console still shows tokens, so a failed fetch is not fatal."""
+    if settings.llm_provider == "replay":
+        # The prices when the recording was made.
+        return Recording.shared(settings.replay_path).pricing
     if settings.llm_provider != "openrouter":
         return {}
     try:
