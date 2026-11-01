@@ -3,6 +3,7 @@ import type { LayoutItem } from "react-grid-layout";
 // The console's widgets, in the order they stack on narrow screens.
 export const WIDGETS = [
   "overview",
+  "impact",
   "routing",
   "throughput",
   "inbox",
@@ -20,6 +21,7 @@ export const GAP = 16;
 
 const MIN: Record<WidgetId, { minW: number; minH: number }> = {
   overview: { minW: 6, minH: 4 },
+  impact: { minW: 6, minH: 4 },
   routing: { minW: 5, minH: 7 },
   throughput: { minW: 4, minH: 6 },
   inbox: { minW: 4, minH: 5 },
@@ -36,19 +38,20 @@ const MIN: Record<WidgetId, { minW: number; minH: number }> = {
 export const DEFAULT_LAYOUT: LayoutItem[] = (
   [
     { i: "overview", x: 0, y: 0, w: 12, h: 4 },
-    { i: "routing", x: 0, y: 4, w: 7, h: 9 },
-    { i: "throughput", x: 7, y: 4, w: 5, h: 9 },
-    { i: "inbox", x: 0, y: 13, w: 7, h: 7 },
-    { i: "summary", x: 7, y: 13, w: 5, h: 5 },
-    { i: "decision", x: 7, y: 18, w: 5, h: 13 },
-    { i: "stream", x: 0, y: 20, w: 7, h: 24 },
-    { i: "findings", x: 7, y: 31, w: 5, h: 6 },
-    { i: "lines", x: 7, y: 37, w: 5, h: 7 },
+    { i: "impact", x: 0, y: 4, w: 12, h: 5 },
+    { i: "routing", x: 0, y: 9, w: 7, h: 9 },
+    { i: "throughput", x: 7, y: 9, w: 5, h: 9 },
+    { i: "inbox", x: 0, y: 18, w: 7, h: 7 },
+    { i: "summary", x: 7, y: 18, w: 5, h: 5 },
+    { i: "decision", x: 7, y: 23, w: 5, h: 13 },
+    { i: "stream", x: 0, y: 25, w: 7, h: 24 },
+    { i: "findings", x: 7, y: 36, w: 5, h: 6 },
+    { i: "lines", x: 7, y: 42, w: 5, h: 7 },
   ] as const
 ).map((item) => ({ ...item, ...MIN[item.i] }));
 
 // Bump when the default changes, so browsers holding the old default get the new one.
-const KEY = "acme-console-layout-v5";
+const KEY = "acme-console-layout-v6";
 
 function isItem(v: unknown): v is LayoutItem {
   if (typeof v !== "object" || v === null) return false;

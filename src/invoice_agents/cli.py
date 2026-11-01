@@ -46,7 +46,7 @@ from invoice_agents.graph import Deps, InvoiceState, build_graph, checkpoint_ser
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
-from invoice_agents.llm import build_agents
+from invoice_agents.llm import build_agents, load_pricing
 from invoice_agents.payment import MockBank
 from invoice_agents.summary import run_status, summarize
 from invoice_agents.terminal import RunView, banner, batch_summary, result_card, vp_card
@@ -200,6 +200,8 @@ class LocalRunner:
             settings=settings,
             seen=self.ledger,
             bank=MockBank(settings.db_path),
+            # Prices for each step's cost, as the API shows them.
+            pricing=load_pricing(settings),
         )
         self.graph = build_graph(
             deps, checkpointer=InMemorySaver(serde=checkpoint_serde())
@@ -321,6 +323,8 @@ async def _process_all(
     results = []
     for path in paths:
         console.rule(f"[bold]{path.name}", style="#3a3a37")
+        started = time.perf_counter()
+        result: dict[str, Any]
         try:
             result = await runner.process(path, vp_mode)
         except (ExtractionUnavailableError, OcrUnavailableError) as exc:
@@ -333,6 +337,7 @@ async def _process_all(
                 "status": "failed",
                 "reason": f"{type(exc).__name__}: {exc}",
             }
+        result["seconds"] = round(time.perf_counter() - started, 2)
         # A live view can end mid-line when output isn't a terminal.
         console.line()
         console.print(result_card(path.name, result))
@@ -389,7 +394,8 @@ async def process(
     t0 = time.perf_counter()
     results = await _process_all(runner, paths, vp_mode)
     if len(results) > 1:
-        console.print(batch_summary(results, time.perf_counter() - t0))
+        replayed = get_settings().llm_provider == "replay"
+        console.print(batch_summary(results, time.perf_counter() - t0, replayed))
     return results
 
 
