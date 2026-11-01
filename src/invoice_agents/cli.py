@@ -22,6 +22,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import signal
 import sys
 import time
@@ -55,8 +56,9 @@ from invoice_agents.terminal import RunView, banner, batch_summary, result_card,
 
 console = Console(stderr=True)
 
-DEFAULT_API = "http://localhost:8000"
-DEFAULT_WEB = "http://localhost:5173"
+# Where the API and the console are; the Docker setup points these elsewhere.
+DEFAULT_API = os.environ.get("ACME_API_URL", "http://localhost:8000")
+DEFAULT_WEB = os.environ.get("ACME_WEB_URL", "http://localhost:5173")
 
 
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
