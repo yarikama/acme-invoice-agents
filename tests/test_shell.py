@@ -5,9 +5,11 @@ import asyncio
 import io
 import json
 import shutil
+import threading
+import time
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -80,11 +82,11 @@ def test_unknown_input_points_to_help(
     assert sh.handle("/serv")
     assert "Did you mean /serve?" in said(capsys)
     assert sh.handle("hello")
-    assert "Not a command or a file: hello" in said(capsys)
+    assert "Plain-language requests need a live model" in said(capsys)
     assert sh.handle("/[x]")  # markup in what was typed is printed as is
     assert "Unknown command /[x]." in said(capsys)
-    assert sh.handle('/run "unclosed')
-    assert "Can't read that line" in said(capsys)
+    assert sh.handle("what's waiting?")  # an open quote: still a sentence
+    assert "need a live model" in said(capsys)
     assert sh.handle("") and not sh.handle("/quit") and not sh.handle("/exit")
 
 
@@ -285,7 +287,7 @@ def test_ctrl_c_stops_a_run_or_clears_the_line_without_leaving(
 ) -> None:
     lines: list[str | BaseException] = [KeyboardInterrupt(), "/status", EOFError()]
 
-    def fake_input(_prompt: str) -> str:
+    def fake_input(_prompt: str = "") -> str:
         item = lines.pop(0)
         if isinstance(item, BaseException):
             raise item
@@ -300,9 +302,133 @@ def test_ctrl_c_stops_a_run_or_clears_the_line_without_leaving(
     assert "Stopped." in said(capsys) and not lines
 
 
-def test_tab_completion_is_wired_to_readline() -> None:
-    readline = pytest.importorskip("readline")
-    shell._install_completion()
-    completer = readline.get_completer()
-    assert completer is not None
-    assert completer("/zz", 0) is None
+def test_the_menu_opens_for_commands_and_paths_not_sentences() -> None:
+    from prompt_toolkit.completion import CompleteEvent
+    from prompt_toolkit.document import Document
+
+    def menu(text: str, tab: bool = False) -> list[tuple[str, str]]:
+        found = shell.Completer().get_completions(
+            Document(text), CompleteEvent(completion_requested=tab)
+        )
+        return [(c.text, c.display_meta_text) for c in found]
+
+    assert ("/runs ", "Recent runs and where each one ended.") in menu("/r")
+    assert menu("help me with") == []
+    assert menu("help me with", tab=True) == []  # no file starts with "with"
+    assert menu("data/invoices/invoice_101") != []
+
+
+def test_the_input_box_reads_a_line_and_runs_menu_picks(tmp_path: Path) -> None:
+    from prompt_toolkit.application import create_app_session
+    from prompt_toolkit.input import create_pipe_input
+    from prompt_toolkit.output import DummyOutput
+
+    def read(*keys: str) -> str:
+        """Type each group of keys a moment apart, as a person would: the
+        menu fills in the background, so Enter right after Tab beats it."""
+        with (
+            create_pipe_input() as pipe,
+            create_app_session(input=pipe, output=DummyOutput()),
+        ):
+
+            def type_all() -> None:
+                for group in keys:
+                    time.sleep(0.15)
+                    pipe.send_text(group)
+
+            threading.Thread(target=type_all, daemon=True).start()
+            return shell.Prompt(lambda: "status").read()
+
+    assert read("hello there\r") == "hello there"
+    # Enter on a menu item with nothing more to type runs it at once...
+    assert read("/inv", "\t", "\r") == "/inventory "
+    # ...and one that needs an argument waits for it.
+    assert read("/ru", "\t", "\r", "invoice.json\r") == "/run invoice.json"
+    with pytest.raises(EOFError):
+        read("\x04")
+    with pytest.raises(KeyboardInterrupt):
+        read("half typed\x03")
+    assert "replay · local" in str(shell.Prompt(lambda: "replay · local")._hints())
+
+
+def test_a_sentence_goes_to_the_assistant_and_code_filters_its_plan(
+    sh: shell.Shell,
+    offline: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from invoice_agents import assistant
+
+    offline.llm_provider = "openrouter"
+    monkeypatch.setattr(shell, "chat_model", lambda *_a: object())
+    path = INVOICES / "invoice_1015.csv"
+    answer = assistant.Plan(
+        reply="Running it.",
+        steps=[
+            assistant.Step(command="/RUN", args=[str(path)]),
+            assistant.Step(command="approve", args=["abc"]),
+            assistant.Step(command="rm", args=["-rf"]),
+        ],
+    )
+
+    async def planned(_llm: object, request: str) -> tuple[assistant.Plan, Any]:
+        assert request == "please ingest 1015"
+        return answer, {"grok-4.3": {"input_tokens": 1000, "output_tokens": 200}}
+
+    monkeypatch.setattr(assistant, "plan", planned)
+    said(capsys)
+    sh.handle("please ingest 1015")
+    out = said(capsys)
+    assert "1,200 tokens" in out and "Running it." in out
+    assert "Not run: /approve is for a person to type" in out
+    assert "Not run: /rm isn't a command the assistant may use" in out
+    assert "→ /run" in out and "invoice_1015.csv" in out and "INV-1015" in out
+    assert [r["status"] for r in sh.history] == ["paid"]
+
+    async def broken(*_a: object) -> Any:
+        raise ValueError("rate limited")
+
+    monkeypatch.setattr(assistant, "plan", broken)
+    sh.handle("again please")
+    assert "The assistant couldn't answer: rate limited" in said(capsys)
+
+
+async def test_the_assistant_asks_with_a_schema_and_counts_tokens() -> None:
+    from langchain_core.messages import AIMessage
+
+    from invoice_agents import assistant
+
+    seen: list[Any] = []
+    reply = AIMessage(
+        "{}",
+        usage_metadata={"input_tokens": 900, "output_tokens": 40, "total_tokens": 940},
+        response_metadata={"model_name": "x-ai/grok-4.3"},
+    )
+
+    class Model:
+        def with_structured_output(self, schema: Any, **kwargs: Any) -> "Model":
+            seen.append((schema, kwargs))
+            return self
+
+        async def ainvoke(self, prompt: Any) -> dict[str, Any]:
+            seen.append(prompt)
+            plan = assistant.Plan(reply="ok", steps=[])
+            return {"raw": reply, "parsed": plan, "parsing_error": None}
+
+    answer, tokens = await assistant.plan(cast(Any, Model()), "hi")
+    assert answer.reply == "ok"
+    assert tokens == {"x-ai/grok-4.3": {"input_tokens": 900, "output_tokens": 40}}
+    assert seen[0] == (
+        assistant.Plan,
+        {"method": "json_schema", "include_raw": True},
+    )
+    system = seen[1][0][1]
+    assert "invoice_1015.csv" in system and "cannot approve" in system
+
+    class Unparsed(Model):
+        async def ainvoke(self, prompt: Any) -> dict[str, Any]:
+            return {"raw": reply, "parsed": None, "parsing_error": "bad json"}
+
+    with pytest.raises(ValueError, match="bad json"):
+        await assistant.plan(cast(Any, Unparsed()), "hi")
+    assert assistant.known_files(Path("/nonexistent")) == "(none found)"
