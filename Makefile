@@ -17,7 +17,7 @@ typecheck:
 	uv run pyright
 
 test:
-	uv run pytest
+	uv run pytest --cov
 
 # Everything CI runs.
 check: lint typecheck test web-check
