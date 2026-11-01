@@ -49,6 +49,13 @@ class Settings(BaseSettings):
     max_review_rounds: int = 2
     # Model turns the approver gets for tool calls before it must decide.
     max_tool_steps: int = 6
+    # A decision model on OpenRouter's Decisions API (e.g. typesafe/jev-1.14)
+    # that reads each invoice before the reasoning approver. Unset: no triage.
+    triage_model: str | None = None
+    # Triage settles an invoice on its own only when it is at least this sure,
+    # and (to approve) sees at most this much chance that something is off.
+    triage_min_confidence: float = 0.9
+    triage_max_suspicion: float = 0.2
 
 
 @lru_cache

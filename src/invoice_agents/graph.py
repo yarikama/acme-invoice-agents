@@ -1,4 +1,5 @@
-"""The LangGraph workflow: ingest -> validate -> review <-> critique -> pay/reject.
+"""The LangGraph workflow: ingest -> validate -> [triage] -> review <-> critique
+-> pay/reject.
 
 Two loops are edges in the graph: extraction retries with feedback, and the
 approver revises its draft until the critic agrees. Invoices that need a
@@ -38,6 +39,7 @@ from invoice_agents.models import (
 )
 from invoice_agents.payment import mock_payment
 from invoice_agents.tools import ReviewTools
+from invoice_agents.triage import TriageAnswer, TriageError, fast_path
 from invoice_agents.validation import Policy, SeenInvoices, validate
 
 STATE_TYPES = (
@@ -51,6 +53,7 @@ STATE_TYPES = (
     HumanDecision,
     PaymentResult,
     ToolCall,
+    TriageAnswer,
 )
 
 
@@ -78,6 +81,7 @@ class InvoiceState(TypedDict, total=False):
     report: ValidationReport
     route: Route
     route_reason: str | None
+    triage: TriageAnswer
     draft: ApprovalDraft
     tool_calls: list[ToolCall]
     critique: Critique
@@ -216,6 +220,45 @@ def build_graph(
             ),
         }
 
+    def after_validate(state: InvoiceState) -> Literal["triage", "review"]:
+        return "triage" if deps.agents.triager else "review"
+
+    async def triage(state: InvoiceState) -> InvoiceState:
+        """System 1: settle the easy cases without the reasoning approver."""
+        triager = deps.agents.triager
+        assert triager is not None
+        _emit("approve", "triage")
+        report = state["report"]
+        try:
+            answer = await triager.ask(_invoice(state), report)
+        except TriageError as exc:
+            return {"trace": _event("triage", f"{exc} Sending it to the approver.")}
+        update: InvoiceState = {"triage": answer}
+        quick = fast_path(
+            answer,
+            report,
+            settings.triage_min_confidence,
+            settings.triage_max_suspicion,
+        )
+        if quick is None:
+            update["trace"] = _event(
+                "triage", f"{answer.describe()}. Needs the full review."
+            )
+            return update
+        decision, confirmed = quick
+        update["draft"] = ApprovalDraft(
+            decision=decision,
+            rationale=f"Triage: {answer.describe()}; code confirmed {confirmed}.",
+            addressed=list(dict.fromkeys(f.code for f in report.findings)),
+        )
+        update["outcome"] = resolve(decision, state["route"])
+        update["trace"] = _event(
+            "triage",
+            f"{answer.describe()}. Code confirmed {confirmed}, so the reasoning"
+            f" approver was skipped. Outcome: {update['outcome']}.",
+        )
+        return update
+
     async def review(state: InvoiceState) -> InvoiceState:
         _emit("approve", "draft")
         critique = state.get("critique")
@@ -272,6 +315,8 @@ def build_graph(
             return "review"
         return "human_review" if outcome == "human" else outcome
 
+    after_triage = after_critique
+
     def human_review(state: InvoiceState) -> InvoiceState:
         # Nothing with side effects before interrupt(): on resume this node
         # runs again from the top.
@@ -318,6 +363,7 @@ def build_graph(
     graph = StateGraph(InvoiceState)
     graph.add_node("ingest", ingest)
     graph.add_node("validate", validate_node)
+    graph.add_node("triage", triage)
     graph.add_node("review", review)
     graph.add_node("critique", critique_node)
     graph.add_node("human_review", human_review)
@@ -326,7 +372,8 @@ def build_graph(
 
     graph.add_edge(START, "ingest")
     graph.add_conditional_edges("ingest", after_ingest)
-    graph.add_edge("validate", "review")
+    graph.add_conditional_edges("validate", after_validate)
+    graph.add_conditional_edges("triage", after_triage)
     graph.add_edge("review", "critique")
     graph.add_conditional_edges("critique", after_critique)
     graph.add_conditional_edges("human_review", after_human)

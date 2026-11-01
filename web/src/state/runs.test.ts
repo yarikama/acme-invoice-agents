@@ -137,6 +137,20 @@ describe("pipeline", () => {
     expect(states).toMatchObject({ vp: "skip", pay: "done" });
   });
 
+  it("shows a triage-settled run as drafted, with no critique", () => {
+    seq = 0;
+    const state = play([
+      ev({ type: "trace", node: "validate", stage: "validate", message: "0 errors." }),
+      ev({ type: "trace", node: "triage", stage: "triage", message: "jev says approve." }),
+      ev({ type: "trace", node: "pay", stage: "pay", message: "mock_payment returned success." }),
+      ev({ type: "done", status: "paid", summary: summary() }),
+    ]);
+    const states = Object.fromEntries(pipeline(state.runs.r1!).map((s) => [s.key, s.state]));
+    expect(states).toMatchObject({ draft: "done", critique: "skip", pay: "done" });
+    // The decision model is a model even when the approver runs offline.
+    expect(traceLines(state.runs.r1!, false)[1]!.voice).toBe("model");
+  });
+
   it("calls a validation stop Blocked, not Failed", () => {
     seq = 0;
     const rejected = summary({
