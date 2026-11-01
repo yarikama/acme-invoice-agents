@@ -11,9 +11,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import operator
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Literal, NotRequired, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict, cast
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
@@ -36,7 +37,8 @@ from invoice_agents.config import Settings
 from invoice_agents.ingestion import load_document
 from invoice_agents.ingestion.ocr import BACKENDS as OCR_BACKENDS
 from invoice_agents.inventory import Inventory
-from invoice_agents.llm import Agents
+from invoice_agents.ledger import Ledger
+from invoice_agents.llm import Agents, build_agents
 from invoice_agents.models import (
     ApprovalDraft,
     Critique,
@@ -570,3 +572,56 @@ def build_graph(
     graph.add_edge("pay", END)
     graph.add_edge("reject", END)
     return graph.compile(checkpointer=checkpointer)
+
+
+def stored_deps(settings: Settings, pricing: Pricing | None = None) -> Deps:
+    """What the CLI and the API run with: the inventory database, the ledger
+    of received invoices and the bank's payment keys, all in SQLite, so they
+    survive a restart and the two see each other."""
+    inventory = Inventory(settings.db_path)
+    inventory.seed()
+    return Deps(
+        agents=build_agents(settings),
+        inventory=inventory,
+        settings=settings,
+        seen=Ledger(settings.db_path, settings.decisions_log),
+        bank=MockBank(settings.db_path),
+        pricing=pricing or {},
+    )
+
+
+async def run_events(
+    graph: CompiledStateGraph, payload: Any, config: RunnableConfig
+) -> AsyncIterator[dict[str, Any]]:
+    """A run as the events its clients show, in order, for the CLI and the API
+    alike:
+
+    - {"type": "progress", "stage", "step"}: a node started a step;
+    - {"type": "trace", "node", "message", ...}: a trace line, tool calls the
+      moment they finish (custom stream), the rest when their node ends;
+    - {"type": "interrupt", "request"}: the run paused for a VP.
+    """
+    async for mode, raw in graph.astream(
+        payload, config, stream_mode=["updates", "custom"]
+    ):
+        # With a list of stream modes, LangGraph yields (mode, chunk).
+        chunk = cast(dict[str, Any], raw)
+        if mode == "custom":
+            if "trace" in chunk:
+                yield {"type": "trace", "node": "review", **chunk["trace"]}
+            else:
+                # "step", not "status": it can't clobber a run's own status.
+                yield {
+                    "type": "progress",
+                    "stage": chunk["stage"],
+                    "step": chunk["status"],
+                }
+            continue
+        for node, update in chunk.items():
+            if node == "__interrupt__":
+                yield {"type": "interrupt", "request": update[0].value}
+                continue
+            for item in (update or {}).get("trace", []):
+                # Already sent live by the custom stream.
+                if not item.get("streamed"):
+                    yield {"type": "trace", "node": node, **item}

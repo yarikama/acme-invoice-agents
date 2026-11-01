@@ -21,7 +21,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command
 
 from invoice_agents.agents import ExtractionUnavailableError
-from invoice_agents.graph import InvoiceState
+from invoice_agents.graph import InvoiceState, run_events
 from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.models import HumanDecision
 from invoice_agents.payment import MockBank
@@ -305,37 +305,11 @@ class RunManager:
 
         request: dict[str, Any] | None = None
         try:
-            async for mode, chunk in self.graph.astream(
-                payload, run.config, stream_mode=["updates", "custom"]
-            ):
-                # With a list of stream modes, LangGraph yields (mode, chunk).
-                chunk = cast(dict[str, Any], chunk)
-                if mode == "custom" and "trace" in chunk:
-                    # A tool call, sent the moment it finished.
-                    await self._emit(
-                        run, {"type": "trace", "node": "review", **chunk["trace"]}
-                    )
-                    continue
-                if mode == "custom":
-                    # Renamed so it can't clobber the run's own `status`.
-                    await self._emit(
-                        run,
-                        {
-                            "type": "progress",
-                            "stage": chunk["stage"],
-                            "step": chunk["status"],
-                        },
-                    )
-                    continue
-                for node, update in chunk.items():
-                    if node == "__interrupt__":
-                        request = update[0].value
-                        continue
-                    for item in (update or {}).get("trace", []):
-                        if not item.get("streamed"):
-                            await self._emit(
-                                run, {"type": "trace", "node": node, **item}
-                            )
+            async for event in run_events(self.graph, payload, run.config):
+                if event["type"] == "interrupt":
+                    request = event["request"]
+                else:
+                    await self._emit(run, event)
             snapshot = await self.graph.aget_state(run.config)
             state = cast(InvoiceState, snapshot.values)
             run.status = run_status(state, request is not None)

@@ -283,3 +283,30 @@ async def test_a_rename_in_the_document_is_flagged_even_if_extraction_drops_it(
     state = await graph.ainvoke({"path": str(text)}, config())
     [finding] = [f for f in state["report"].findings if f.code == "VENDOR_RENAMED"]
     assert "was formerly FastShip Ltd" in finding.detail
+
+
+async def test_run_events_are_what_the_cli_and_the_api_both_show(inventory):
+    from invoice_agents.graph import run_events
+
+    graph = build_graph(
+        Deps(
+            agents=Agents(StubExtractor(INV_1001), ToolUsingApprover(), RuleCritic()),
+            inventory=inventory,
+            settings=Settings(llm_provider="offline"),
+        ),
+        checkpointer=InMemorySaver(serde=checkpoint_serde()),
+    )
+    events = [
+        e
+        async for e in run_events(
+            graph, {"path": str(INVOICES / "invoice_1014.xml")}, config()
+        )
+    ]
+    kinds = {e["type"] for e in events}
+    assert kinds == {"progress", "trace", "interrupt"}
+    traces = [e for e in events if e["type"] == "trace"]
+    assert [t["node"] for t in traces][:2] == ["ingest", "validate"]
+    # The tool call is sent once, live, not again with the draft.
+    tools = [t for t in traces if t.get("tool")]
+    assert len(tools) == 1 and tools[0]["node"] == "review"
+    assert events[-1]["type"] == "interrupt" and "draft" in events[-1]["request"]
