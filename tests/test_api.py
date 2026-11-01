@@ -1,6 +1,7 @@
 """The HTTP API, run in-process with the offline agents."""
 
 import json
+import sqlite3
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -353,3 +354,11 @@ async def test_reset_forgets_runs_and_received_invoices(client):
 async def test_reset_waits_for_running_work(client):
     manager().runs["busy"] = Run(id="busy", source="x", path=Path("x"), created_at="")
     assert (await client.post("/api/reset")).status_code == 409
+
+
+async def test_inventory_comes_from_the_database(client, tmp_path):
+    with sqlite3.connect(tmp_path / "inventory.db") as conn:
+        conn.execute("UPDATE inventory SET stock = 3 WHERE item = 'WidgetA'")
+    rows = {r["item"]: r for r in (await client.get("/api/inventory")).json()}
+    assert rows["WidgetA"]["stock"] == 3
+    assert rows["GadgetX"]["unit_price"] == 750

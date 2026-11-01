@@ -33,7 +33,7 @@ from pydantic import BaseModel
 from invoice_agents.api.runs import RunManager, RunNotFoundError, RunStateError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import Deps, build_graph, checkpoint_serde
-from invoice_agents.inventory import SEED, Inventory
+from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import build_agents
 from invoice_agents.models import HumanDecision, SourceFormat
@@ -159,8 +159,12 @@ async def samples(settings: SettingsDep) -> list[dict[str, Any]]:
 
 
 @app.get("/api/inventory")
-async def inventory() -> list[dict[str, Any]]:
-    return [{"item": i, "stock": s, "unit_price": p} for i, s, p in SEED]
+async def inventory(settings: SettingsDep) -> list[dict[str, Any]]:
+    """What the validator checks against: the database, not the seed."""
+    records = await asyncio.to_thread(Inventory(settings.db_path).records)
+    return [
+        {"item": r.item, "stock": r.stock, "unit_price": r.unit_price} for r in records
+    ]
 
 
 @app.get("/api/runs")
