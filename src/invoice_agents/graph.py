@@ -365,8 +365,12 @@ def build_graph(
         )
         decision = HumanDecision.model_validate(answer)
         verdict = "approved" if decision.approved else "rejected"
+        who = f" ({decision.by})" if decision.by else ""
         note = f" Note: {decision.note}" if decision.note else ""
-        return {"human": decision, "trace": _event("approve", f"VP {verdict}.{note}")}
+        return {
+            "human": decision,
+            "trace": _event("approve", f"VP {verdict}{who}.{note}"),
+        }
 
     def after_human(state: InvoiceState) -> Literal["pay", "reject"]:
         return "pay" if state["human"].approved else "reject"
@@ -384,7 +388,8 @@ def build_graph(
     async def reject(state: InvoiceState) -> InvoiceState:
         _emit("pay", "skipped")
         if state.get("human") and not state["human"].approved:
-            reason = f"Rejected by the VP. {state['human'].note}".strip()
+            who = f" ({state['human'].by})" if state["human"].by else ""
+            reason = f"Rejected by the VP{who}. {state['human'].note}".strip()
         elif "draft" in state:
             reason = state["draft"].rationale
         else:

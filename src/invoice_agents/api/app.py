@@ -6,7 +6,9 @@ uv run uvicorn invoice_agents.api.app:app --reload
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -37,12 +39,18 @@ from invoice_agents.models import HumanDecision, SourceFormat
 from invoice_agents.replay import Recording
 from invoice_agents.usage import Pricing, openrouter_pricing
 
+log = logging.getLogger("invoice_agents.api")
 SUFFIXES = {f".{f.value}" for f in SourceFormat}
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    if not settings.vp_tokens:
+        log.warning(
+            "VP_TOKENS is unset: anyone who can reach this API can approve"
+            " payments. Fine for a local demo, not for anything else."
+        )
     inventory = Inventory(settings.db_path)
     inventory.seed()
     settings.uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -123,8 +131,13 @@ def _samples(settings: Settings) -> list[Path]:
 
 
 @app.get("/api/health")
-async def health(settings: SettingsDep) -> dict[str, str]:
-    return {"status": "ok", "llm_provider": settings.llm_provider}
+async def health(settings: SettingsDep) -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "llm_provider": settings.llm_provider,
+        # The console asks for a VP token up front when this is true.
+        "vp_auth": bool(settings.vp_tokens),
+    }
 
 
 @app.get("/api/samples")
@@ -188,11 +201,36 @@ async def get_run(run_id: str, manager: ManagerDep) -> dict[str, Any]:
     return {**run.overview(), "summary": run.summary, "events": run.events}
 
 
+def _vp(settings: Settings, authorization: str | None) -> str | None:
+    """The VP a bearer token belongs to; None when no tokens are configured."""
+    if not settings.vp_tokens:
+        return None
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() == "bearer" and token:
+        for name, secret in settings.vp_tokens.items():
+            # Constant time, so a wrong token can't be guessed byte by byte.
+            if hmac.compare_digest(token.encode(), secret.get_secret_value().encode()):
+                return name
+    raise HTTPException(
+        401,
+        "Only a VP can approve or reject: send a VP token.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 @app.post("/api/runs/{run_id}/decision", status_code=202)
 async def decide(
-    run_id: str, decision: HumanDecision, manager: ManagerDep
+    run_id: str,
+    decision: HumanDecision,
+    manager: ManagerDep,
+    settings: SettingsDep,
+    authorization: Annotated[str | None, Header()] = None,
 ) -> dict[str, Any]:
+    """The VP's answer. With VP_TOKENS set, it needs a VP's bearer token, and
+    the run records that VP's name, not anything the client claims."""
+    by = _vp(settings, authorization)
     _run_or_404(manager, run_id)
+    decision = decision.model_copy(update={"by": by})
     try:
         return manager.decide(run_id, decision).overview()
     except RunStateError as exc:

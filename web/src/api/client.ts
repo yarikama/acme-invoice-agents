@@ -25,7 +25,7 @@ const json = (body: unknown): RequestInit => ({
 });
 
 export const api = {
-  health: () => request<{ status: string; llm_provider: string }>("/api/health"),
+  health: () => request<{ status: string; llm_provider: string; vp_auth: boolean }>("/api/health"),
   samples: () => request<Sample[]>("/api/samples"),
   runs: () => request<RunOverview[]>("/api/runs"),
   startSample: (sample: string) => request<RunOverview>("/api/runs", json({ sample })),
@@ -35,6 +35,10 @@ export const api = {
     form.append("file", file);
     return request<RunOverview>("/api/runs/upload", { method: "POST", body: form });
   },
-  decide: (runId: string, approved: boolean, note: string) =>
-    request<RunOverview>(`/api/runs/${runId}/decision`, json({ approved, note })),
+  /** The VP's answer; `token` is a VP's bearer token when the API requires one. */
+  decide: (runId: string, approved: boolean, note: string, token?: string) => {
+    const init = json({ approved, note });
+    if (token) init.headers = { ...init.headers, Authorization: `Bearer ${token}` };
+    return request<RunOverview>(`/api/runs/${runId}/decision`, init);
+  },
 };

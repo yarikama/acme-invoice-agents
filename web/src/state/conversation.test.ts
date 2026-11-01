@@ -69,7 +69,16 @@ describe("turns", () => {
       decision: "approve",
     });
     expect(got.map((t) => t.ms)).toEqual([1_000, 50, 7_950, 3_500, undefined]);
-    expect(got[4]).toMatchObject({ kind: "human", approved: true, note: "ok" });
+    expect(got[4]).toMatchObject({ kind: "human", approved: true, by: null, note: "ok" });
+  });
+
+  it("names the VP who decided, when the API authenticated one", () => {
+    const [named, plain] = turns([
+      line(1, "human_review", "VP rejected (Dana Whitfield). Note: Wrong rate"),
+      line(2, "human_review", "VP approved."),
+    ]);
+    expect(named).toMatchObject({ kind: "human", approved: false, by: "Dana Whitfield", note: "Wrong rate" });
+    expect(plain).toMatchObject({ kind: "human", approved: true, by: null, note: "" });
   });
 
   it("keeps tool calls that never reached a draft", () => {

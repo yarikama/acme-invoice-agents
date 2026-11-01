@@ -10,7 +10,7 @@ import { clearLayout, DEFAULT_LAYOUT, loadLayout, saveLayout } from "./state/lay
 import { useConsole } from "./state/useConsole";
 
 export default function App() {
-  const { state, stream, provider, snapshot, loaded } = useConsole();
+  const { state, stream, provider, vpAuth, snapshot, loaded } = useConsole();
   const [filter, setFilter] = useState<Filter>("all");
   const [picked, setPicked] = useState<string | null>(null);
   const [layout, setLayout] = useState<Layout>(loadLayout);
@@ -72,6 +72,7 @@ export default function App() {
           selected={selected}
           onSelect={onSelect}
           llm={provider !== null && provider !== "offline"}
+          vpAuth={vpAuth}
           layout={layout}
           onLayout={onLayout}
         />
