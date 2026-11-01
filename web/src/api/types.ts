@@ -127,6 +127,26 @@ export type RunEvent = EventBase &
     | { type: "reset" }
   );
 
+/** One message of the assistant's conversation, shared with the terminal. */
+export interface ChatMessage {
+  index: number;
+  role: "user" | "assistant";
+  text: string;
+  // Where it was said: "terminal" or "web".
+  via: string | null;
+  at: string | null;
+  // The console commands the assistant ran for it.
+  commands: string[];
+}
+
+export interface ChatState {
+  messages: ChatMessage[];
+  // A live model is configured, so the assistant can answer.
+  available: boolean;
+  // Redis holds the conversation, so the terminal sees it too.
+  shared: boolean;
+}
+
 export interface Sample {
   name: string;
   format: string;

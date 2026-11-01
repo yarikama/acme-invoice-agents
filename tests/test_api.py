@@ -1,5 +1,6 @@
 """The HTTP API, run in-process with the offline agents."""
 
+import asyncio
 import json
 import sqlite3
 from collections.abc import AsyncIterator
@@ -30,6 +31,7 @@ async def client(tmp_path, monkeypatch, vp_tokens) -> AsyncIterator[AsyncClient]
     monkeypatch.setenv("DB_PATH", str(tmp_path / "inventory.db"))
     monkeypatch.setenv("CHECKPOINT_PATH", str(tmp_path / "checkpoints.db"))
     monkeypatch.setenv("DECISIONS_LOG", str(tmp_path / "decisions.jsonl"))
+    monkeypatch.setenv("REDIS_URL", "")  # never the developer's Redis
     monkeypatch.setenv("UPLOADS_DIR", str(tmp_path / "uploads"))
     monkeypatch.setenv("SAMPLES_DIR", str(INVOICES))
     get_settings.cache_clear()
@@ -376,3 +378,64 @@ async def test_a_rejection_needs_a_reason(client):
     assert resp.status_code == 422
     assert "needs a reason" in resp.json()["detail"]
     assert manager().get(run["id"]).status == "awaiting_vp"
+
+
+async def test_the_web_console_shares_the_assistant(client, monkeypatch):
+    from invoice_agents import assistant
+    from tests.fakes import FakePlanner
+
+    # Offline: the assistant says why it can't help.
+    health = (await client.get("/api/health")).json()
+    assert health["chat"] == {"available": False, "shared": False}
+    resp = await client.post("/api/chat", json={"text": "run 1015"})
+    assert resp.status_code == 503 and "live model" in resp.json()["detail"]
+
+    chat = app.state.chat
+    monkeypatch.setattr(
+        chat,
+        "settings",
+        chat.settings.model_copy(update={"llm_provider": "openrouter"}),
+    )
+    planner = FakePlanner(
+        assistant.Plan(
+            reply="Running 1015 and checking stock.",
+            steps=[
+                assistant.Step(command="run", args=["data/invoices/invoice_1015.csv"]),
+                assistant.Step(command="run", args=["/etc/passwd"]),
+                assistant.Step(command="approve", args=["abc"]),
+                assistant.Step(command="inventory"),
+            ],
+        ),
+        assistant.Plan(reply="It was paid.", steps=[]),
+    )
+    chat._llm_factory = lambda: planner
+    said = (await client.post("/api/chat", json={"text": "run 1015"})).json()
+    texts = [m["text"] for m in said["messages"]]
+    assert texts[:2] == ["run 1015", "Running 1015 and checking stock."]
+    notes = texts[2]
+    assert "/approve is for a person" in notes
+    assert (
+        "Started 1 run." in notes
+        and "Not found in the sample folders: /etc/passwd" in notes
+    )
+    assert "WidgetA 15 in stock" in notes
+    assert said["messages"][0]["via"] == "web"
+
+    [run] = manager().list()
+    assert run.source == "invoice_1015.csv"
+    await settle(run.id)
+    await asyncio.sleep(0.05)  # the outcome is written once the run settles
+    convo = (await client.get("/api/chat")).json()["messages"]
+    assert convo[-1]["text"] == "INV-1015 was paid: Every check passed."
+
+    # The next request sees the earlier turns, whichever console they came from.
+    await client.post("/api/chat", json={"text": "what happened to it?"})
+    history = [m.text for m in planner.prompts[1][1:]]
+    assert (
+        history[0] == "run 1015" and "INV-1015 was paid: Every check passed." in history
+    )
+    after = (await client.get("/api/chat", params={"after": len(convo) - 1})).json()
+    assert [m["text"] for m in after["messages"]] == [
+        "what happened to it?",
+        "It was paid.",
+    ]

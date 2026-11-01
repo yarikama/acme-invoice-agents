@@ -9,6 +9,7 @@ export const WIDGETS = [
   "inbox",
   "summary",
   "decision",
+  "assistant",
   "stream",
   "findings",
   "lines",
@@ -30,6 +31,7 @@ const MIN: Record<WidgetId, { minW: number; minH: number }> = {
   stream: { minW: 4, minH: 7 },
   findings: { minW: 3, minH: 3 },
   lines: { minW: 3, minH: 4 },
+  assistant: { minW: 4, minH: 6 },
 };
 
 // Bento default: the overview and the routing charts across the top; below,
@@ -44,14 +46,15 @@ export const DEFAULT_LAYOUT: LayoutItem[] = (
     { i: "inbox", x: 0, y: 18, w: 7, h: 7 },
     { i: "summary", x: 7, y: 18, w: 5, h: 5 },
     { i: "decision", x: 7, y: 23, w: 5, h: 13 },
-    { i: "stream", x: 0, y: 25, w: 7, h: 24 },
+    { i: "assistant", x: 0, y: 25, w: 7, h: 10 },
+    { i: "stream", x: 0, y: 35, w: 7, h: 24 },
     { i: "findings", x: 7, y: 36, w: 5, h: 6 },
     { i: "lines", x: 7, y: 42, w: 5, h: 7 },
   ] as const
 ).map((item) => ({ ...item, ...MIN[item.i] }));
 
 // Bump when the default changes, so browsers holding the old default get the new one.
-const KEY = "acme-console-layout-v6";
+const KEY = "acme-console-layout-v7";
 
 function isItem(v: unknown): v is LayoutItem {
   if (typeof v !== "object" || v === null) return false;
