@@ -181,7 +181,10 @@ def test_consistency_names_flaky_cases() -> None:
 
 def test_sets() -> None:
     assert evaluation.cases_in("samples") == evaluation.CASES
-    assert evaluation.cases_in("all") == evaluation.CASES + evaluation.ADVERSARIAL
+    assert evaluation.cases_in("held_out") == evaluation.HELD_OUT
+    assert evaluation.cases_in("all") == (
+        evaluation.CASES + evaluation.ADVERSARIAL + evaluation.HELD_OUT
+    )
 
 
 def test_critic_flag_and_objection_count(
