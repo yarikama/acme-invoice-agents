@@ -17,6 +17,16 @@ from tests.conftest import INVOICES
 
 
 @pytest.fixture(autouse=True)
+def no_servers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never reach a real API or console from a test: always run locally."""
+
+    async def down(*_args: object) -> bool:
+        return False
+
+    monkeypatch.setattr(cli.remote, "reachable", down)
+
+
+@pytest.fixture(autouse=True)
 def offline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
     settings = Settings(
         _env_file=None,  # pyright: ignore[reportCallIssue]
@@ -99,7 +109,10 @@ def test_vp_prompt_asks_on_the_terminal(
     monkeypatch.setattr(cli.console, "input", fake_input)
     [result] = run(capsys, f"--invoice_path={INVOICES / 'invoice_1014.xml'}")
 
-    assert prompts == ["  Approve? [y/N] "]
+    expected = ["  Approve and pay? [y/N] "]
+    if answer:
+        expected.append("  Note for the audit log (optional): ")
+    assert prompts == expected
     assert result["status"] == status
 
 
