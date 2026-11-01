@@ -30,6 +30,7 @@ dev = [
     "ruff>=0.14",
     "pyright>=1.1.400",
     "httpx>=0.28.1",
+    "pytest-cov>=7.1.0",
 ]
 
 [build-system]
@@ -59,3 +60,12 @@ pythonVersion = "3.12"
 # LangGraph state is a partial TypedDict by design: each node reads keys that
 # the nodes before it wrote, which the graph's edges guarantee.
 reportTypedDictNotRequiredAccess = false
+
+[tool.coverage.run]
+source = ["invoice_agents"]
+
+[tool.coverage.report]
+# CI fails below this. Run `make test` locally to see what is missing.
+fail_under = 95
+show_missing = true
+skip_covered = true
