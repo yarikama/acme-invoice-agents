@@ -17,8 +17,11 @@
   /* Darker than the panels so the frosted glass stands off the page; a soft
      top-to-bottom fall and a fine grain give the page a frosted surface. */
   --canvas: #c9c9c4;
-  --canvas-top: #d2d2cd;
-  --canvas-bottom: #c3c3bd;
+  /* The backdrop photo shows through this tint; thicker at the top, where
+     the page title sits straight on it. */
+  --tint-rgb: 201 201 196;
+  --tint: 0.55;
+  --tint-top: 0.78;
   --panel: #f6f6f4;
   --raised: #ffffff;
   --ink: #111111;
@@ -29,7 +32,6 @@
   --glass-edge: rgb(17 17 17 / 0.13);
   --glass-hi: rgb(255 255 255 / 0.9);
   --tile: rgb(255 255 255 / 0.55);
-  --wash: rgb(255 255 255 / 0.35);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.035 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: light;
@@ -37,8 +39,9 @@
 
 .dark {
   --canvas: #161615;
-  --canvas-top: #1c1c1b;
-  --canvas-bottom: #101010;
+  --tint-rgb: 22 22 21;
+  --tint: 0.62;
+  --tint-top: 0.84;
   --panel: #1f1f1e;
   --raised: #292927;
   --ink: #edede9;
@@ -49,7 +52,6 @@
   --glass-edge: rgb(255 255 255 / 0.09);
   --glass-hi: rgb(255 255 255 / 0.06);
   --tile: rgb(255 255 255 / 0.04);
-  --wash: rgb(255 255 255 / 0.05);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   --grain-soft: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.025 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
@@ -82,18 +84,33 @@
 @layer base {
   body {
     margin: 0;
-    /* A soft light from the top left, so the frosted panels have something to show. */
-    background:
-      var(--grain) 0 0 / 200px 200px,
-      radial-gradient(70rem 45rem at 0% 0%, var(--wash), transparent 70%),
-      linear-gradient(to bottom, var(--canvas-top), var(--canvas-bottom)),
-      var(--canvas);
-    background-attachment: fixed;
+    background: var(--canvas);
     color: var(--ink);
     font-family: var(--font-sans);
     font-size: 16px;
     line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+  }
+  /* Backdrop: a greyscale avenue (StockSnap, CC0), lightly frosted, under a
+     tint in the canvas colour and a fine grain. Fixed, so panels slide over it. */
+  body::before,
+  body::after {
+    content: "";
+    position: fixed;
+    pointer-events: none;
+  }
+  body::before {
+    inset: -32px;
+    z-index: -2;
+    background: url("./assets/backdrop-avenue.jpg") center / cover no-repeat;
+    filter: blur(8px);
+  }
+  body::after {
+    inset: 0;
+    z-index: -1;
+    background:
+      var(--grain) 0 0 / 200px 200px,
+      linear-gradient(to bottom, rgb(var(--tint-rgb) / var(--tint-top)) 0, rgb(var(--tint-rgb) / var(--tint)) 26rem);
   }
   :focus-visible {
     outline: 2px solid var(--ink);
