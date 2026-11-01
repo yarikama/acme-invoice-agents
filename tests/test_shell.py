@@ -263,16 +263,60 @@ def test_a_console_that_will_not_start_falls_back_to_local(
     assert "/serve to start it" in out
 
 
-def test_when_the_shell_opens() -> None:
+def test_when_the_shell_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     def interactive(*argv: str) -> bool:
         return cli._interactive(cli._parse_args(list(argv)))
 
+    # Off a terminal (a script, CI, this test): a file runs once and exits.
     assert interactive()
     assert interactive("-i", "--dir", "x")
     assert not interactive("--invoice_path", "x")
     assert not interactive("--dir", "x")
     # --serve alone keeps serving without a prompt when stdin isn't a terminal.
     assert not interactive("--serve")
+
+    # At a terminal, a file runs and the console stays, as if typed as /run...
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True, raising=False)
+    assert interactive("--invoice_path", "x")
+    assert interactive("--serve")
+    # ...unless the output is for a program, or asked to exit.
+    assert not interactive("--invoice_path", "x", "--json")
+    assert not interactive("--invoice_path", "x", "--once")
+    with pytest.raises(SystemExit):
+        cli._parse_args(["--once", "-i"])
+
+
+def test_a_hangup_or_kill_ends_the_cli_and_runs_its_cleanup() -> None:
+    import os
+    import signal
+
+    before = signal.getsignal(signal.SIGTERM)
+    cleaned = False
+    with pytest.raises(SystemExit) as stopped, cli._signals_end_the_cli():
+        try:
+            os.kill(os.getpid(), signal.SIGTERM)
+            time.sleep(1)
+        finally:
+            cleaned = True
+    assert stopped.value.code == 128 + signal.SIGTERM and cleaned
+    assert signal.getsignal(signal.SIGTERM) is before
+
+
+def test_closing_stops_the_servers_even_when_the_terminal_is_gone(
+    sh: shell.Shell, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stopped: list[Any] = []
+
+    def gone(*_a: object, **_k: object) -> None:
+        raise OSError(5, "Input/output error")
+
+    sh.started = [cast(Any, "api")]
+    monkeypatch.setattr(shell.console, "print", gone)
+    monkeypatch.setattr(shell.remote, "stop", stopped.append)
+    sh.close()
+    sh.started = []
+    assert stopped == [["api"]]
 
 
 def test_a_missing_file_exits_instead_of_waiting(

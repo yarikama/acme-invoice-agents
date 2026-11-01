@@ -409,11 +409,14 @@ class Shell:
         return True
 
     def close(self) -> None:
+        # Servers first: when the terminal was closed, printing fails, and
+        # that must not leave the API and Vite running.
+        if self.started:
+            with contextlib.suppress(OSError):
+                console.print("  Stopping the API and the web console…")
+        remote.stop(self.started)
         with contextlib.suppress(Exception):
             self.loop.run(self.client.aclose())
-        if self.started:
-            console.print("  Stopping the API and the web console…")
-        remote.stop(self.started)
 
     # --- commands -------------------------------------------------------------
 
