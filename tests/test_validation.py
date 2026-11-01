@@ -61,6 +61,16 @@ def test_unknown_item_1016(inventory):
     assert "UNKNOWN_ITEM" in codes(validate(load("invoice_1016.json"), inventory))
 
 
+def test_notes_in_item_names_count_against_the_same_stock_1010(inventory):
+    # 1010 bills WidgetA twice: 8 plus 4 as "WidgetA (rush order)".
+    lines = [("WidgetA", 8, 250), ("WidgetA (rush order)", 4, 300)]
+    assert validate(make(lines, 3200), inventory).passed
+
+    over = validate(make([*lines, ("WidgetA (spare)", 4, 250)], 4200), inventory)
+    stock = next(f for f in over.findings if f.code == "STOCK_EXCEEDED")
+    assert "WidgetA billed 16" in stock.detail
+
+
 def test_zero_stock_item(inventory):
     report = validate(make([("FakeItem", 100, 1000)], 100_000), inventory)
     assert "OUT_OF_STOCK" in codes(report, Severity.ERROR)

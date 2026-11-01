@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     # Cap output, reasoning included: without it the provider reserves the
     # model's maximum (64K) and small credit limits reject the request.
     max_output_tokens: int = 8000
+    # Retries with backoff on 429s and 5xx; new OpenRouter accounts get 20 RPM.
+    llm_max_retries: int = 8
     extract_reasoning: Literal["low", "medium", "high"] = "low"
     review_reasoning: Literal["low", "medium", "high"] = "medium"
 
