@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { spreadLabels } from "../../lib/labels";
 import { type Outcome, OUTCOME_LABEL, type Settled } from "../../state/routing";
 import { useWidth } from "../../state/useWidth";
 import { Tip } from "./Tip";
@@ -9,6 +10,8 @@ const L = 34;
 const R = 150;
 const T = 10;
 const B = 28;
+// One line of 15px label text, so stacked end labels never touch.
+const LINE = 18;
 
 function clock(s: number): string {
   if (s < 10) return `${s.toFixed(1).replace(/\.0$/, "")}s`;
@@ -42,6 +45,8 @@ export function Throughput({ settled }: { settled: Settled[] }) {
     return `${d} H${x(end)}`;
   };
   const doneBy = (t: number) => settled.filter((s) => s.at <= t);
+  // Lines often end on the same count (two at 0): stack their labels.
+  const labelY = spreadLabels(counts.map(y), LINE, T + 6, H - B);
 
   return (
     <div ref={ref} className="relative">
@@ -62,8 +67,15 @@ export function Throughput({ settled }: { settled: Settled[] }) {
         {SERIES.map((o, i) => (
           <g key={o}>
             <path d={line(o)} className={`flow-line flow-${o}`} />
+            {Math.abs(labelY[i]! - y(counts[i]!)) > 1 && (
+              // A moved label keeps a short leader back to its line's end.
+              <path
+                d={`M${x(end) + 5},${y(counts[i]!)} L${x(end) + 9},${labelY[i]!}`}
+                className={`flow-line flow-leader flow-${o}`}
+              />
+            )}
             <circle cx={x(end)} cy={y(counts[i]!)} r={4} className={`flow-dot flow-${o}`} />
-            <text x={x(end) + 10} y={y(counts[i]!) + 5} className="chart-label">
+            <text x={x(end) + 12} y={labelY[i]! + 5} className="chart-label">
               {OUTCOME_LABEL[o]} {counts[i]}
             </text>
           </g>

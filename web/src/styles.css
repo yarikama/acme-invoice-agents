@@ -863,6 +863,9 @@
     stroke-width: 2;
     stroke-linejoin: round;
   }
+  .flow-leader {
+    stroke-width: 1;
+  }
   .flow-line.flow-paid {
     stroke: var(--flow-paid);
   }
