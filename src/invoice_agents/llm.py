@@ -67,5 +67,7 @@ def build_agents(settings: Settings) -> Agents:
     )
     review_llm = chat_model(settings, settings.review_model, settings.review_reasoning)
     return Agents(
-        LLMExtractor(extract_llm), LLMApprover(review_llm), LLMCritic(review_llm)
+        LLMExtractor(extract_llm),
+        LLMApprover(review_llm, max_steps=settings.max_tool_steps),
+        LLMCritic(review_llm),
     )

@@ -31,7 +31,7 @@ ingest ──▶ validate ──▶ review ──▶ critique ──▶ pay
 
 - **Ingest.** JSON, CSV and XML are parsed in code. TXT and PDF go to the extraction agent, which returns a typed `Invoice`; an empty or partial result is sent back with the problems listed.
 - **Validate.** Deterministic checks, never an LLM: totals and line amounts, quantities summed per item against SQLite stock, unknown items, duplicates and revisions, currency, dates against payment terms, and amounts just under the approval threshold.
-- **Approve.** An approver drafts approve, reject or escalate; a critic checks the draft against the findings and the policy, and the approver revises. Code has the last word: an invoice with an error is rejected and one over $10,000 goes to a human, whatever the agents say.
+- **Approve.** The approver is a tool-calling agent. Before it decides, it can look up an item's stock and list price (`check_inventory`), the vendor's earlier invoices (`vendor_history`), and the USD value of a foreign total (`convert_to_usd`, at fixed mock rates). It submits approve, reject or escalate through a `SubmitDecision` tool, citing what it found. A critic then checks the draft against the findings, the policy and those lookups, and the approver revises if needed. Every tool call shows in the trace. Code has the last word: an invoice with an error is rejected, and one over $10,000 goes to a human, whatever the agents say.
 - **Pay.** `mock_payment` for approved invoices; rejections are logged with the reasoning.
 
 ## API

@@ -168,4 +168,25 @@ describe("traceLines", () => {
     expect(voices).toEqual(["model", "code", "model", "human"]);
     expect(traceLines(state.runs.r1!, false)[2]!.voice).toBe("code");
   });
+
+  it("shows the approver's tool calls as code lines", () => {
+    seq = 0;
+    const state = play([
+      ev({
+        type: "trace",
+        node: "review",
+        stage: "approve",
+        tool: "check_inventory",
+        message: "check_inventory(GadgetX): GadgetX: 5 in stock, list price $750.00.",
+      }),
+      ev({ type: "trace", node: "review", stage: "approve", message: "Draft 1: reject." }),
+    ]);
+    const lines = traceLines(state.runs.r1!, true);
+    expect(lines.map((l) => [l.node, l.voice])).toEqual([
+      ["tool", "code"],
+      ["review", "model"],
+    ]);
+    // Tool lines still light the draft segment of the pipeline.
+    expect(pipeline(state.runs.r1!).find((s) => s.key === "draft")!.state).toBe("done");
+  });
 });

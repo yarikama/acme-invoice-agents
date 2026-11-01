@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import operator
 from dataclasses import dataclass, field
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
@@ -33,9 +33,11 @@ from invoice_agents.models import (
     LineItem,
     PaymentResult,
     Severity,
+    ToolCall,
     ValidationReport,
 )
 from invoice_agents.payment import mock_payment
+from invoice_agents.tools import ReviewTools
 from invoice_agents.validation import Policy, SeenInvoices, validate
 
 STATE_TYPES = (
@@ -48,6 +50,7 @@ STATE_TYPES = (
     Critique,
     HumanDecision,
     PaymentResult,
+    ToolCall,
 )
 
 
@@ -61,6 +64,8 @@ def checkpoint_serde() -> JsonPlusSerializer:
 class TraceEvent(TypedDict):
     stage: str
     message: str
+    # Set on lines that record a tool call, to the tool's name.
+    tool: NotRequired[str]
 
 
 class InvoiceState(TypedDict, total=False):
@@ -73,6 +78,7 @@ class InvoiceState(TypedDict, total=False):
     report: ValidationReport
     route: Route
     draft: ApprovalDraft
+    tool_calls: list[ToolCall]
     critique: Critique
     review_rounds: int
     outcome: Outcome
@@ -210,23 +216,32 @@ def build_graph(
         _emit("approve", "draft")
         critique = state.get("critique")
         issues = critique.issues if critique and not critique.agrees else []
-        draft = await deps.agents.approver.draft(
-            _invoice(state), state["report"], issues
+        invoice = _invoice(state)
+        tools = ReviewTools(deps.inventory, deps.seen, invoice)
+        result = await deps.agents.approver.draft(
+            invoice, state["report"], issues, tools
         )
+        draft = result.draft
         rounds = state.get("review_rounds", 0) + 1
+        trace: list[TraceEvent] = [
+            {"stage": "approve", "message": call.describe(), "tool": call.name}
+            for call in result.tool_calls
+        ]
+        trace += _event(
+            "approve", f"Draft {rounds}: {draft.decision}. {draft.rationale}"
+        )
         return {
             "draft": draft,
+            "tool_calls": result.tool_calls,
             "review_rounds": rounds,
-            "trace": _event(
-                "approve", f"Draft {rounds}: {draft.decision}. {draft.rationale}"
-            ),
+            "trace": trace,
         }
 
     async def critique_node(state: InvoiceState) -> InvoiceState:
         _emit("approve", "critique")
         draft = state["draft"]
         critique = await deps.agents.critic.review(
-            _invoice(state), state["report"], draft
+            _invoice(state), state["report"], draft, state.get("tool_calls", [])
         )
         update: InvoiceState = {"critique": critique}
         if critique.agrees:
