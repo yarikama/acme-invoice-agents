@@ -7,6 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
+from invoice_agents.fx import to_usd
 from invoice_agents.ingestion.dates import parse_date
 from invoice_agents.inventory import Inventory, item_key
 from invoice_agents.models import Finding, Invoice, Severity, ValidationReport
@@ -95,6 +96,7 @@ def validate(
     for check in (
         _required_fields,
         _quantities,
+        _amounts,
         _line_amounts,
         _totals,
         _currency,
@@ -121,6 +123,10 @@ def _f(code: str, severity: Severity, title: str, detail: str) -> Finding:
 def _usd(amount: float) -> str:
     sign = "-" if amount < 0 else ""
     return f"{sign}${abs(amount):,.2f}"
+
+
+def _sentence(text: str) -> str:
+    return text[:1].upper() + text[1:] + "."
 
 
 def _number_key(number: str) -> str:
@@ -163,6 +169,43 @@ def _quantities(inv: Invoice) -> list[Finding]:
         for line in inv.line_items
         if line.quantity <= 0
     ]
+
+
+def _amounts(inv: Invoice) -> list[Finding]:
+    """Money only flows to the vendor: a negative price or a total of zero
+    or less is a credit note or a bad invoice, never a payment."""
+    problems = [
+        f"{line.item} is priced at {_usd(line.unit_price)}"
+        for line in inv.line_items
+        if line.unit_price < 0
+    ]
+    if inv.total is not None and inv.total <= 0:
+        problems.append(f"the total is {_usd(inv.total)}")
+    findings = []
+    if problems:
+        findings.append(
+            _f(
+                "NON_POSITIVE_AMOUNT",
+                Severity.ERROR,
+                "Amount is not positive",
+                _sentence("; ".join(problems)),
+            )
+        )
+    fractional = [
+        f"{line.item} x {line.quantity:g}"
+        for line in inv.line_items
+        if line.quantity > 0 and not float(line.quantity).is_integer()
+    ]
+    if fractional:
+        findings.append(
+            _f(
+                "FRACTIONAL_QUANTITY",
+                Severity.WARNING,
+                "Part of a unit billed",
+                f"Items are counted in whole units: {', '.join(fractional)}.",
+            )
+        )
+    return findings
 
 
 def _line_amounts(inv: Invoice) -> list[Finding]:
@@ -484,11 +527,21 @@ def _lookalike_vendor(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
     ]
 
 
-def _threshold(inv: Invoice, policy: Policy) -> list[Finding]:
+def usd_total(inv: Invoice) -> float | None:
+    """The total in US dollars, which the approval threshold is set in. A
+    currency with no rate counts at face value; it is flagged anyway."""
     if inv.total is None:
+        return None
+    converted = to_usd(inv.total, inv.currency)
+    return inv.total if converted is None else converted
+
+
+def _threshold(inv: Invoice, policy: Policy) -> list[Finding]:
+    total = usd_total(inv)
+    if total is None:
         return []
     limit = policy.approval_threshold
-    if inv.total > limit:
+    if total > limit:
         return [
             _f(
                 "OVER_THRESHOLD",
@@ -497,13 +550,13 @@ def _threshold(inv: Invoice, policy: Policy) -> list[Finding]:
                 "VP review required by policy.",
             )
         ]
-    if inv.total >= limit * policy.near_threshold_ratio:
+    if total >= limit * policy.near_threshold_ratio:
         return [
             _f(
                 "NEAR_THRESHOLD",
                 Severity.WARNING,
                 f"Just under the {_usd(limit)} threshold",
-                f"{_usd(inv.total)} is {_usd(limit - inv.total)} below VP review.",
+                f"{_usd(total)} is {_usd(limit - total)} below VP review.",
             )
         ]
     return []

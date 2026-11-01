@@ -11,19 +11,10 @@ from typing import Any
 
 from langchain_core.tools import BaseTool, StructuredTool
 
+from invoice_agents.fx import USD_PER_UNIT
 from invoice_agents.inventory import Inventory, item_key
 from invoice_agents.models import Invoice, ToolCall
 from invoice_agents.validation import SeenInvoices
-
-# Fixed mock rates: the system runs offline, so there is no live FX feed.
-USD_PER_UNIT: dict[str, float] = {
-    "USD": 1.0,
-    "EUR": 1.08,
-    "GBP": 1.27,
-    "CAD": 0.73,
-    "MXN": 0.055,
-    "JPY": 0.0067,
-}
 
 
 def _usd(amount: float) -> str:
