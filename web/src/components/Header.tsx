@@ -37,11 +37,11 @@ export function Header({
   const { dark, toggle } = useTheme();
   return (
     <header className="bar-yellow sticky top-0 z-10">
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-        <div className="flex items-center gap-2">
-          <Logo size={22} />
-          <span className="text-base font-medium">Acme AP</span>
-          <span className="cap">console</span>
+      <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-4 py-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <Logo size={40} />
+          <span className="display text-[28px] leading-none">Acme AP</span>
+          <span className="cap self-end pb-0.5 text-sm">console</span>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-4">
           <span className="inline-flex items-center gap-2" aria-live="polite">
