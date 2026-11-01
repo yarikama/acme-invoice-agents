@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import re
+import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
+from typing import Literal
 
 from invoice_agents.fx import to_usd
 from invoice_agents.ingestion.dates import parse_date
@@ -49,18 +52,55 @@ COMPANY_SUFFIXES = re.compile(
 )
 
 
+# What became of an invoice: None while it is in progress or waiting for a
+# VP. Paid and in-flight invoices count as received for duplicates; one that
+# was rejected, failed or dropped may be sent again.
+Outcome = Literal["paid", "rejected", "failed", "dropped"]
+STANDING: frozenset[Outcome | None] = frozenset({None, "paid"})
+
+
 @dataclass
+class Received:
+    """One invoice that reached validation, and what became of it."""
+
+    invoice: Invoice
+    run_id: str
+    source: str = ""
+    outcome: Outcome | None = None
+    reason: str | None = None
+    received_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+
+
 class SeenInvoices:
-    """Invoices already processed in this run, for duplicates and vendor history."""
+    """Invoices already received, for duplicates, splits and vendor history.
 
-    revisions: dict[str, set[str | None]] = field(default_factory=dict)
-    invoices: list[Invoice] = field(default_factory=list)
+    Kept in memory for one process; `Ledger` keeps them in SQLite, so they
+    survive a restart.
+    """
 
-    def add(self, invoice: Invoice) -> None:
-        self.invoices.append(invoice)
-        if invoice.invoice_number:
-            key = _number_key(invoice.invoice_number)
-            self.revisions.setdefault(key, set()).add(invoice.revision)
+    def __init__(self) -> None:
+        self._entries: list[Received] = []
+
+    @property
+    def entries(self) -> list[Received]:
+        return self._entries
+
+    @property
+    def invoices(self) -> list[Invoice]:
+        return [e.invoice for e in self.entries]
+
+    def add(
+        self, invoice: Invoice, run_id: str | None = None, source: str = ""
+    ) -> None:
+        self._entries.append(Received(invoice, run_id or uuid.uuid4().hex, source))
+
+    def settle(self, run_id: str, outcome: Outcome, reason: str | None = None) -> None:
+        for entry in self._entries:
+            if entry.run_id == run_id:
+                entry.outcome, entry.reason = outcome, reason
+
+    def clear(self) -> None:
+        self._entries.clear()
 
 
 # Warnings an agent may not clear on its own: each one goes to a VP.
@@ -563,12 +603,35 @@ def _threshold(inv: Invoice, policy: Policy) -> list[Finding]:
 
 
 def _duplicates(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
+    """The same invoice number again. Only earlier copies still standing
+    count: one that was paid, or is in progress or waiting for a VP. A
+    rejected invoice may be sent again once it is fixed."""
     if not inv.invoice_number:
         return []
-    earlier = seen.revisions.get(_number_key(inv.invoice_number))
-    if not earlier:
+    key = _number_key(inv.invoice_number)
+    standing = [
+        e
+        for e in seen.entries
+        if e.outcome in STANDING
+        and e.invoice.invoice_number
+        and _number_key(e.invoice.invoice_number) == key
+    ]
+    if not standing:
         return []
-    if inv.revision and inv.revision not in earlier:
+    paid = [e for e in standing if e.outcome == "paid"]
+    if inv.revision and all(e.invoice.revision != inv.revision for e in standing):
+        if paid:
+            first = paid[0].invoice
+            return [
+                _f(
+                    "ALREADY_PAID",
+                    Severity.ERROR,
+                    "An earlier version was already paid",
+                    f"{inv.invoice_number} was paid at"
+                    f" {first.currency} {first.total or 0:,.2f}; revision"
+                    f" {inv.revision} cannot be paid on top of it.",
+                )
+            ]
         return [
             _f(
                 "SUPERSEDES",
@@ -582,6 +645,6 @@ def _duplicates(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
             "DUPLICATE",
             Severity.ERROR,
             "Duplicate invoice",
-            f"{inv.invoice_number} was already processed.",
+            f"{inv.invoice_number} was already {'paid' if paid else 'received'}.",
         )
     ]

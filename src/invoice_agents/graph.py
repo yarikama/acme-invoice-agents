@@ -11,8 +11,10 @@ from __future__ import annotations
 import asyncio
 import operator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.config import get_stream_writer
@@ -91,6 +93,8 @@ class TraceEvent(TypedDict):
 
 class InvoiceState(TypedDict, total=False):
     path: str
+    # What to call the file: an upload is stored under a random name.
+    source: str
     source_format: str
     invoice: Invoice | None
     corrections: list[str]
@@ -127,6 +131,11 @@ class Deps:
             near_threshold_ratio=self.settings.near_threshold_ratio,
             vp_required=frozenset(self.settings.vp_required_findings),
         )
+
+
+def _run_id(config: RunnableConfig) -> str:
+    """The run's thread id: its key in the ledger and the checkpointer."""
+    return str(config.get("configurable", {}).get("thread_id", ""))
 
 
 def _tool_line(step: ToolCall) -> TraceEvent:
@@ -251,7 +260,9 @@ def build_graph(
             return "reject" if state.get("invoice") is None else "validate"
         return "validate"
 
-    async def validate_node(state: InvoiceState) -> InvoiceState:
+    async def validate_node(
+        state: InvoiceState, config: RunnableConfig
+    ) -> InvoiceState:
         _emit("validate", "start")
         invoice = _invoice(state)
         # Checking and recording the invoice stay one step on the event loop,
@@ -267,7 +278,11 @@ def build_graph(
             )
             for correction in state.get("corrections", [])
         ]
-        deps.seen.add(invoice)
+        deps.seen.add(
+            invoice,
+            run_id=_run_id(config),
+            source=state.get("source") or Path(state["path"]).name,
+        )
         route = policy_route(invoice, report, deps.policy)
         reason = vp_reason(invoice, report, deps.policy) if route == "human" else None
         return {
@@ -424,11 +439,17 @@ def build_graph(
     def after_human(state: InvoiceState) -> Literal["pay", "reject"]:
         return "pay" if state["human"].approved else "reject"
 
-    async def pay(state: InvoiceState) -> InvoiceState:
+    async def pay(state: InvoiceState, config: RunnableConfig) -> InvoiceState:
         _emit("pay", "start")
         invoice = _invoice(state)
         assert invoice.vendor and invoice.total is not None
         result = mock_payment(invoice.vendor, invoice.total, invoice.currency)
+        paid = result.status == "success"
+        deps.seen.settle(
+            _run_id(config),
+            "paid" if paid else "failed",
+            None if paid else f"mock_payment returned {result.status}",
+        )
         return {
             "payment": result,
             "trace": _event(
@@ -438,7 +459,7 @@ def build_graph(
             ),
         }
 
-    async def reject(state: InvoiceState) -> InvoiceState:
+    async def reject(state: InvoiceState, config: RunnableConfig) -> InvoiceState:
         _emit("pay", "skipped")
         if state.get("human") and not state["human"].approved:
             who = f" ({state['human'].by})" if state["human"].by else ""
@@ -449,6 +470,7 @@ def build_graph(
             reason = "Could not extract the invoice: " + " ".join(
                 state.get("extract_feedback", [])
             )
+        deps.seen.settle(_run_id(config), "rejected", reason)
         return {
             "rejection_reason": reason,
             "trace": _event("pay", f"Not paid. {reason}"),

@@ -62,12 +62,13 @@ def test_acceptable_counts_alternatives():
 
 
 async def test_prepare_stops_before_the_approver(settings: Settings):
-    case = Case(("invoice_1004.json", "invoice_1004_revised.json"), "human", "")
+    case = Case(("invoice_1004.json", "invoice_1004_revised.json"), "reject", "")
     prepared = await triage_eval.prepare(case, settings)
 
+    # The original ran to the end and was paid, so the revision can't be.
     assert prepared is not None
-    assert prepared.route == "human"
-    assert "SUPERSEDES" in {f.code for f in prepared.report.findings}
+    assert prepared.route == "reject"
+    assert "ALREADY_PAID" in {f.code for f in prepared.report.findings}
 
 
 async def test_prepare_skips_invoices_that_need_an_extractor(settings: Settings):
@@ -179,7 +180,7 @@ def test_eval_with_triage_counts_fast_paths_and_their_cost(
     assert data["triage_model"] == "good"
     assert by_case["invoice_1016.json"]["fast_path"] == "reject"
     assert by_case["invoice_1016.json"]["cost_usd"] == pytest.approx(0.00002)
-    # A revision has a warning, so it goes to the approver.
-    assert by_case["invoice_1004_revised.json +"]["fast_path"] is None
+    # A revision of a paid invoice has an error, which code confirms.
+    assert by_case["invoice_1004_revised.json +"]["fast_path"] == "reject"
     assert data["summary"]["fast_paths"] >= 3
     assert "settled by triage" in capsys.readouterr().out

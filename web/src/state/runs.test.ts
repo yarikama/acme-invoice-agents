@@ -283,3 +283,17 @@ describe("soFar", () => {
     expect(soFar(done)).toEqual({ invoice, findings: [] });
   });
 });
+
+describe("reset", () => {
+  it("clears every run when someone starts over, and ignores older events", () => {
+    seq = 0;
+    const before = play([ev({ type: "started" }), ev({ type: "done", status: "paid", summary: summary() })]);
+    expect(before.order).toEqual(["r1"]);
+    const reset = ev({ type: "reset" } as Partial<RunEvent> & { type: "reset" });
+    const after = play([reset], before);
+    expect(after.order).toEqual([]);
+    expect(after.lastSeq).toBe(reset.seq);
+    // A replayed event from before the reset doesn't bring the run back.
+    expect(play([{ ...before.runs.r1!.events[0]! }], after).order).toEqual([]);
+  });
+});

@@ -5,7 +5,7 @@ import type { RunEvent, RunOverview } from "../api/types";
 import { initialRuns, runsReducer } from "./runs";
 
 // Not "error": that name is EventSource's own connection-error event.
-const EVENT_TYPES = ["started", "progress", "trace", "awaiting_vp", "decision", "done", "run_error"];
+const EVENT_TYPES = ["started", "progress", "trace", "awaiting_vp", "decision", "done", "run_error", "reset"];
 
 export type StreamState = "connecting" | "live" | "retrying";
 

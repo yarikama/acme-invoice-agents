@@ -120,6 +120,8 @@ export type RunEvent = EventBase &
     | { type: "decision"; approved: boolean; note: string }
     | { type: "done"; summary: Summary }
     | { type: "run_error"; message: string }
+    // Someone started over: every run and received invoice was forgotten.
+    | { type: "reset" }
   );
 
 export interface Sample {

@@ -303,3 +303,17 @@ async def test_a_vp_token_goes_with_the_decision(
         await remote.Api("http://api", c).decide("r1", False, "no")
     assert fake.auth == ["Bearer s3cret"]
     get_settings.cache_clear()
+
+
+async def test_reset_through_the_api_says_why_it_was_refused() -> None:
+    answers = iter(
+        [
+            httpx.Response(204),
+            httpx.Response(409, json={"detail": "1 run(s) still working"}),
+        ]
+    )
+    transport = httpx.MockTransport(lambda _request: next(answers))
+    async with httpx.AsyncClient(transport=transport) as c:
+        api = remote.Api("http://api", c)
+        assert await api.reset() is None
+        assert await api.reset() == "1 run(s) still working"

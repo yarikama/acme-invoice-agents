@@ -74,8 +74,8 @@ CASES: list[Case] = [
     ),
     Case(
         ("invoice_1004.json", "invoice_1004_revised.json"),
-        "human",
-        "A revision of an invoice already received; only one may be paid.",
+        "reject",
+        "A revision of an invoice already paid: paying it too would pay twice.",
     ),
     Case(("invoice_1005.json",), "reject", "8 GadgetX against 5 in stock."),
     Case(("invoice_1006.csv",), "pay", "Clean."),

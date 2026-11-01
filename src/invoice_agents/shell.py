@@ -69,6 +69,7 @@ from invoice_agents.cli import (
 )
 from invoice_agents.config import get_settings
 from invoice_agents.inventory import SEED
+from invoice_agents.ledger import Ledger
 from invoice_agents.llm import chat_model
 from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
 
@@ -98,6 +99,11 @@ COMMANDS = [
     Command("status", "/status", "Provider, models, and what is running."),
     Command("inventory", "/inventory", "Stock and list prices the agents check."),
     Command("eval", "/eval [set]", "Score the agents: samples, adversarial, held_out."),
+    Command(
+        "reset",
+        "/reset",
+        "Start over: forget past runs, so the samples aren't duplicates.",
+    ),
     Command("clear", "/clear", "Clear the screen."),
     Command("help", "/help [command]", "All commands, or one."),
     Command("quit", "/quit", "Stop what this session started and leave (Ctrl-D)."),
@@ -333,6 +339,7 @@ class Shell:
             "status": self.status,
             "inventory": self.inventory,
             "eval": self.eval,
+            "reset": self.reset,
             "clear": lambda _a: console.clear(),
             "help": self.help,
         }
@@ -568,6 +575,22 @@ class Shell:
             "Web console", self.args.web if self.conn.web_up else "not running"
         )
         console.print(table)
+
+    def reset(self, _args: list[str]) -> None:
+        self._connect()
+        assert self.conn is not None
+        if self.conn.api_up:
+            refused = self.loop.run(remote.Api(self.args.api, self.client).reset())
+            if refused:
+                console.print(f"  [bold]Not reset:[/] {escape(refused)}")
+                return
+        else:
+            s = get_settings()
+            Ledger(s.db_path, s.decisions_log).clear()
+        self.history.clear()
+        console.print(
+            "  Started over: no past runs, and no invoice counts as received."
+        )
 
     def inventory(self, _args: list[str]) -> None:
         table = Table(box=None, padding=(0, 3), header_style="#a6a69f")

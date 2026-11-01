@@ -45,14 +45,18 @@ def test_check_inventory_matches_names_loosely(tools: ReviewTools) -> None:
 def test_vendor_history_lists_earlier_invoices_but_not_this_one(
     tools: ReviewTools, seen: SeenInvoices
 ) -> None:
-    seen.add(invoice("INV-1", vendor="widgets inc", total=1200.5))
+    seen.add(invoice("INV-1", vendor="widgets inc", total=1200.5), run_id="a")
+    seen.settle("a", "paid")
     seen.add(invoice("INV-2", revision="2", total=None, invoice_date=None))
     seen.add(invoice("INV-3", vendor="Someone Else"))
-    seen.add(CURRENT)  # recorded by validation before the approver runs
+    seen.add(CURRENT)  # an identical copy from an earlier run: a duplicate
+    seen.add(CURRENT)  # this run's own, recorded before the approver runs
 
     assert tools.vendor_history("Widgets Inc.") == (
-        "2 earlier from Widgets Inc.: INV-1, 2026-01-15, USD 1200.5;"
-        " INV-2 rev 2, undated, USD no total."
+        "3 earlier from Widgets Inc.: INV-1, 2026-01-15, USD 1200.5 (paid);"
+        " INV-2 rev 2, undated, USD no total (not settled yet);"
+        f" {CURRENT.invoice_number}, {CURRENT.invoice_date},"
+        f" USD {CURRENT.total} (not settled yet)."
     )
 
 

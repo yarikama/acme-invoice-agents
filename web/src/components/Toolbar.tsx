@@ -1,4 +1,4 @@
-import { PlayIcon, StackIcon, UploadSimpleIcon } from "@phosphor-icons/react";
+import { ArrowCounterClockwiseIcon, PlayIcon, StackIcon, UploadSimpleIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
 import { api } from "../api/client";
@@ -13,6 +13,8 @@ export function Toolbar({ onStarted }: Props) {
   const [sample, setSample] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Starting over forgets every run, so it asks once more, in the page.
+  const [confirming, setConfirming] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -35,6 +37,20 @@ export function Toolbar({ onStarted }: Props) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // The event stream tells every open console to clear its list.
+  const startOver = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.reset();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      setConfirming(false);
     }
   };
 
@@ -84,6 +100,28 @@ export function Toolbar({ onStarted }: Props) {
             if (file) run(() => api.upload(file));
           }}
         />
+        {confirming ? (
+          <span className="flex items-center gap-2" role="group" aria-label="Start over">
+            <span className="text-sm">Forget every run and invoice received?</span>
+            <button type="button" className="key key-sm" disabled={busy} onClick={startOver}>
+              Start over
+            </button>
+            <button type="button" className="key key-sm" onClick={() => setConfirming(false)}>
+              Keep them
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="key key-sm"
+            disabled={busy}
+            title="Forget past runs, so the samples aren't flagged as duplicates"
+            onClick={() => setConfirming(true)}
+          >
+            <ArrowCounterClockwiseIcon size={16} aria-hidden="true" />
+            Start over
+          </button>
+        )}
       </div>
       {error && (
         <p role="alert" className="m-0 text-sm">
