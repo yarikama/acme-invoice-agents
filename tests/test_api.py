@@ -1,6 +1,7 @@
 """The HTTP API, run in-process with the offline agents."""
 
 import json
+import sqlite3
 from collections.abc import AsyncIterator
 
 import pytest
@@ -300,3 +301,11 @@ async def test_a_tool_call_reaches_the_stream_once_before_the_draft(
     assert lines.index(tool[0]) < next(
         i for i, m in enumerate(lines) if m.startswith("Draft 1")
     )
+
+
+async def test_inventory_comes_from_the_database(client, tmp_path):
+    with sqlite3.connect(tmp_path / "inventory.db") as conn:
+        conn.execute("UPDATE inventory SET stock = 3 WHERE item = 'WidgetA'")
+    rows = {r["item"]: r for r in (await client.get("/api/inventory")).json()}
+    assert rows["WidgetA"]["stock"] == 3
+    assert rows["GadgetX"]["unit_price"] == 750

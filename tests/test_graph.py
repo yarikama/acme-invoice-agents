@@ -203,3 +203,19 @@ async def test_tool_calls_stream_as_they_finish_before_the_draft(inventory):
         "skip: check_i",  # in the update too, marked as already sent
         "Draft 1",
     ]
+
+
+async def test_an_invented_line_is_flagged_for_a_person(inventory):
+    invented = INV_1001.model_copy(
+        update={
+            "line_items": [
+                *INV_1001.line_items,
+                LineItem(item="GadgetX", quantity=1, unit_price=0),
+            ]
+        }
+    )
+    graph = make_graph(inventory, StubExtractor(invented))
+    state = await graph.ainvoke({"path": str(INVOICES / "invoice_1001.txt")}, config())
+    [finding] = [f for f in state["report"].findings if f.code == "NOT_IN_DOCUMENT"]
+    assert "item 'GadgetX'" in finding.detail
+    assert "payment" not in state

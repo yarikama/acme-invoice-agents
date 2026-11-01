@@ -151,7 +151,8 @@ def test_settings_commands(sh: shell.Shell, capsys: pytest.CaptureFixture[str]) 
     out = said(capsys)
     assert "offline" in out and "not running" in out
     sh.handle("/inventory")
-    assert "WidgetA" in said(capsys)
+    out = said(capsys)
+    assert "WidgetA" in out and "Vendor master (11)" in out
     sh.handle("/open")
     assert "isn't running" in said(capsys)
     sh.handle("/approve")

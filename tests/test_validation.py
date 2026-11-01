@@ -1,6 +1,6 @@
 from invoice_agents.ingestion import load_document
 from invoice_agents.models import Invoice, LineItem, Severity
-from invoice_agents.validation import Policy, SeenInvoices, validate
+from invoice_agents.validation import Policy, SeenInvoices, ungrounded, validate
 from tests.conftest import INVOICES
 
 
@@ -278,8 +278,8 @@ def test_a_vendor_name_a_letter_off_a_known_one_is_flagged(inventory):
         make(items, 250, invoice_number="INV-9003", vendor="Acme Industrial Supplies")
     )
     assert not flagged("Atlas Industrial Supply")
-    # Without history there is nothing to compare against.
-    assert "LOOKALIKE_VENDOR" not in codes(validate(swapped, inventory))
+    # The vendor master knows Summit even before it has invoiced.
+    assert "LOOKALIKE_VENDOR" in codes(validate(swapped, inventory))
 
 
 def test_an_impostor_stays_flagged_on_its_next_invoice(inventory):
@@ -313,3 +313,54 @@ def test_no_sample_vendor_looks_like_another(inventory):
             flagged.append(path.name)
         seen.add(doc.invoice)
     assert flagged == []
+
+
+def test_vendor_master_notes_a_first_invoice_from_a_new_vendor(inventory):
+    assert "Summit Manufacturing Co." in inventory.vendors()
+    new = validate(make([("WidgetA", 1, 250)], 250, vendor="Fraudster LLC"), inventory)
+    [note] = [f for f in new.findings if f.code == "NEW_VENDOR"]
+    assert note.severity is Severity.INFO  # a note, not a reason to refuse
+    assert note.detail.startswith("Fraudster LLC is not in the vendor master")
+    known = make([("WidgetA", 1, 250)], 250, vendor="WIDGETS INC")
+    assert "NEW_VENDOR" not in codes(validate(known, inventory))
+    # Once it has invoiced, it is no longer new.
+    seen = SeenInvoices()
+    seen.add(make([("WidgetA", 1, 250)], 250, vendor="Fraudster LLC"))
+    again = make(
+        [("WidgetA", 1, 250)], 250, invoice_number="X-2", vendor="Fraudster LLC"
+    )
+    assert "NEW_VENDOR" not in codes(validate(again, inventory, seen))
+
+
+def test_a_vendor_announcing_a_new_name_is_flagged(inventory):
+    renamed = make(
+        [("WidgetA", 1, 250)],
+        250,
+        vendor="QuickShip Distributers",
+        vendor_address="(formerly FastShip Ltd.) 12 Dock Rd",
+    )
+    [finding] = [
+        f for f in validate(renamed, inventory).findings if f.code == "VENDOR_RENAMED"
+    ]
+    assert finding.severity is Severity.WARNING
+    assert finding.detail.startswith("QuickShip Distributers was formerly FastShip Ltd")
+
+
+def test_the_inventory_reads_the_database(inventory):
+    names = [r.item for r in inventory.records()]
+    assert names == sorted(names) and "GadgetX" in names
+
+
+def test_extracted_values_the_document_does_not_show():
+    text = "Vendor: Widgets Inc.\nWidget A x 10 @ $250.00\nTOTAL: $2,500.00"
+    good = make([("WidgetA", 10, 250)], 2500)
+    assert ungrounded(good, text, []) == []
+    invented = make([("WidgetA", 10, 250), ("GadgetX", 1, 750)], 3250)
+    assert ungrounded(invented, text, []) == ["item 'GadgetX'", "total 3,250.00"]
+    # A name the model says it corrected is its to explain.
+    assert (
+        ungrounded(
+            make([("GadgetX", 1, 2500)], 2500), text, ["read Gadgt X as GadgetX"]
+        )
+        == []
+    )
