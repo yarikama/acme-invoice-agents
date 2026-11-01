@@ -85,6 +85,13 @@ async def test_structured_invoice_with_errors_is_rejected(inventory):
     assert "Total does not add up" in state["rejection_reason"]
 
 
+async def test_validate_trace_counts_in_plain_english(inventory):
+    graph = make_graph(inventory)
+    state = await graph.ainvoke({"path": str(INVOICES / "invoice_1016.json")}, config())
+    [line] = [t["message"] for t in state["trace"] if t["stage"] == "validate"]
+    assert line == "1 error, 0 warnings; policy route: reject."
+
+
 @pytest.mark.parametrize(("approved", "paid"), [(True, True), (False, False)])
 async def test_warnings_pause_for_the_vp(inventory, approved, paid):
     graph = make_graph(inventory)

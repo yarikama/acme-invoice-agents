@@ -105,6 +105,10 @@ def _event(stage: str, message: str) -> list[TraceEvent]:
     return [TraceEvent(stage=stage, message=message)]
 
 
+def _count(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
 def _invoice(state: InvoiceState) -> Invoice:
     invoice = state.get("invoice")
     if invoice is None:
@@ -196,7 +200,8 @@ def build_graph(
             "route": route,
             "trace": _event(
                 "validate",
-                f"{len(report.errors)} errors, {len(report.warnings)} warnings;"
+                f"{_count(len(report.errors), 'error')},"
+                f" {_count(len(report.warnings), 'warning')};"
                 f" policy route: {route}.",
             ),
         }

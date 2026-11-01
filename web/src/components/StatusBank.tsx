@@ -2,11 +2,20 @@ import { type Filter, matches, SEGMENTS } from "../lib/filters";
 import { money } from "../lib/format";
 import type { RunView } from "../state/runs";
 
-function usdTotal(runs: RunView[]): string {
-  const usd = runs.filter((r) => (r.summary?.invoice?.currency ?? "USD") === "USD");
-  const sum = usd.reduce((acc, r) => acc + (r.summary?.invoice?.total ?? 0), 0);
-  const other = runs.length - usd.length;
-  return money(sum) + (other ? ` + ${other} non-USD` : "");
+// Totals only add up within one currency, so other currencies are counted, not summed.
+function Total({ runs }: { runs: RunView[] }) {
+  const priced = runs.filter((r) => r.summary?.invoice?.total != null);
+  if (runs.length === 0) return <>none</>;
+  if (priced.length === 0) return <>no amount</>;
+  const usd = priced.filter((r) => r.summary!.invoice!.currency === "USD");
+  const sum = usd.reduce((acc, r) => acc + r.summary!.invoice!.total!, 0);
+  const other = priced.length - usd.length;
+  return (
+    <>
+      <span className="whitespace-nowrap">{money(sum)}</span>
+      {other > 0 && <span className="whitespace-nowrap"> + {other} non-USD</span>}
+    </>
+  );
 }
 
 export function StatusBank({
@@ -43,7 +52,9 @@ export function StatusBank({
               {seg.label}
             </span>
             <span className="text-4xl font-light">{members.length}</span>
-            <span className="text-xs text-ink-2">{members.length ? usdTotal(members) : "none"}</span>
+            <span className="text-xs text-ink-2">
+              <Total runs={members} />
+            </span>
           </button>
         );
       })}

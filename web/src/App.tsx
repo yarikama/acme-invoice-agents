@@ -10,7 +10,7 @@ import { type Filter, matches } from "./lib/filters";
 import { useConsole } from "./state/useConsole";
 
 export default function App() {
-  const { state, stream, provider, snapshot } = useConsole();
+  const { state, stream, provider, snapshot, loaded } = useConsole();
   const [filter, setFilter] = useState<Filter>("all");
   const [picked, setPicked] = useState<string | null>(null);
 
@@ -42,11 +42,13 @@ export default function App() {
           <div>
             <h1 className="m-0 text-3xl font-medium">Invoice inbox</h1>
             <p className="m-0 mt-1 text-ink-2">
-              {runs.length === 0
-                ? "Nothing processed yet."
-                : waiting > 0
-                  ? `${waiting} waiting for a VP decision.`
-                  : "Nothing waiting for a decision."}
+              {!loaded && runs.length === 0
+                ? "Loading invoices…"
+                : runs.length === 0
+                  ? "No invoices yet. Run the samples or upload one."
+                  : waiting > 0
+                    ? `${waiting} waiting for a VP decision.`
+                    : "Nothing waiting for a decision."}
             </p>
           </div>
           <Toolbar onStarted={onStarted} />
@@ -64,7 +66,13 @@ export default function App() {
                 showing {visible.length} of {runs.length}
               </span>
             </div>
-            <InboxTable runs={visible} selectedId={selected?.id ?? null} onSelect={onSelect} />
+            <InboxTable
+              runs={visible}
+              loaded={loaded}
+              filtered={runs.length > 0}
+              selectedId={selected?.id ?? null}
+              onSelect={onSelect}
+            />
           </section>
           <DetailPanel run={selected} llm={provider !== null && provider !== "offline"} />
         </div>
