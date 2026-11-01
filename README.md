@@ -179,7 +179,7 @@ make eval       # the eval; ARGS="--set all --repeat 3 --triage typesafe/jev-1.1
 make format
 ```
 
-CI runs 202 Python tests (98% coverage) and 37 web tests on every push; the pre-commit hook runs the linters and type checks. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. LangChain's tracing works as usual: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send every model and tool call to LangSmith.
+CI runs 204 Python tests (98% coverage) and 37 web tests on every push; the pre-commit hook runs the linters and type checks. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. LangChain's tracing works as usual: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send every model and tool call to LangSmith.
 
 ## What's left out
 
