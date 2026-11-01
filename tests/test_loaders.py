@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from invoice_agents.ingestion import UnsupportedFormatError, load_document
@@ -90,3 +92,46 @@ def test_unsupported_format(tmp_path):
 )
 def test_normalize_date(raw, expected):
     assert normalize_date(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "why"),
+    [
+        ("weird.csv", b"a,b\n1\n", "Could not read the CSV in code"),
+        ("list.json", b"[]", "Could not read the JSON in code"),
+        ("broken.json", b'{"vendor": ', "not valid JSON"),
+        (
+            "types.json",
+            b'{"line_items": [{"item": "W", "quantity": "lots", "unit_price": 1}]}',
+            "quantity: input should be a valid number",
+        ),
+        ("broken.xml", b"<invoice><total>", "not valid XML"),
+    ],
+)
+def test_a_structured_file_code_cannot_read_goes_to_the_agent_as_text(
+    tmp_path: Path, name: str, content: bytes, why: str
+) -> None:
+    path = tmp_path / name
+    path.write_bytes(content)
+    doc = load_document(path)
+    assert doc.invoice is None
+    assert doc.text == content.decode()
+    assert doc.problem is not None and why in doc.problem
+
+
+def test_text_in_an_older_encoding_is_still_read(tmp_path: Path) -> None:
+    path = tmp_path / "old.txt"
+    path.write_bytes("Café Supplies, total €1,000".encode("cp1252"))
+    assert load_document(path).text == "Café Supplies, total €1,000"
+
+
+def test_files_with_nothing_to_read_say_why(tmp_path: Path) -> None:
+    empty = tmp_path / "empty.txt"
+    empty.write_text("  \n")
+    assert load_document(empty).problem == "The file is empty."
+    fake = tmp_path / "fake.pdf"
+    fake.write_bytes(b"not a pdf")
+    doc = load_document(fake)
+    assert doc.text == ""
+    assert doc.problem is not None
+    assert doc.problem.startswith("The PDF could not be opened")

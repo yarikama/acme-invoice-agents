@@ -9,6 +9,7 @@ human pause in `human_review` until a decision is sent with Command(resume=...).
 from __future__ import annotations
 
 import asyncio
+import logging
 import operator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,7 +23,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import interrupt
 
-from invoice_agents.agents import GUARDRAIL, Extraction
+from invoice_agents.agents import GUARDRAIL, Extraction, ExtractionUnavailableError
 from invoice_agents.approval import (
     Outcome,
     Route,
@@ -74,6 +75,9 @@ def checkpoint_serde() -> JsonPlusSerializer:
     return JsonPlusSerializer(
         allowed_msgpack_modules=[(t.__module__, t.__name__) for t in STATE_TYPES]
     )
+
+
+log = logging.getLogger(__name__)
 
 
 class TraceEvent(TypedDict):
@@ -159,6 +163,7 @@ def _event(
     data: dict[str, Any] | None = None,
 ) -> list[TraceEvent]:
     event = TraceEvent(stage=stage, message=message)
+    log.info("%s: %s", stage, message)
     if usage:
         event["usage"] = usage
     if data:
@@ -210,6 +215,16 @@ def build_graph(
                     data={"invoice": doc.invoice.model_dump(mode="json")},
                 ),
             }
+        if not doc.text.strip():
+            # Nothing to extract from, so no attempt would help: reject it.
+            problem = doc.problem or "The file has no text to read."
+            return {
+                "source_format": doc.format.value,
+                "invoice": None,
+                "extract_attempts": settings.max_extract_attempts,
+                "extract_feedback": [problem],
+                "trace": _event("ingest", f"Unreadable. {problem}"),
+            }
 
         attempt = state.get("extract_attempts", 0) + 1
         tokens: Tokens = {}
@@ -218,6 +233,18 @@ def build_graph(
                 extraction = await deps.agents.extractor.extract(
                     doc.text, state.get("extract_feedback", [])
                 )
+        except ExtractionUnavailableError as exc:
+            if not doc.problem:
+                raise  # Free text with no LLM: skipped, not rejected.
+            # A structured file code couldn't read, and no agent to read it.
+            problem = f"{doc.problem} Reading it as text needs an LLM ({exc})"
+            return {
+                "source_format": doc.format.value,
+                "invoice": None,
+                "extract_attempts": settings.max_extract_attempts,
+                "extract_feedback": [problem],
+                "trace": _event("ingest", f"Unreadable. {problem}"),
+            }
         except ValueError as exc:
             return {
                 "source_format": doc.format.value,
@@ -232,6 +259,8 @@ def build_graph(
             }
         feedback = _extraction_feedback(extraction)
         message = f"Attempt {attempt}: extracted with the LLM"
+        if doc.problem:
+            message = f"{doc.problem} The extraction agent read its text. " + message
         if doc.ocr:
             message = f"Read the scan with OCR ({settings.ocr_backend}). " + message
         if feedback:
