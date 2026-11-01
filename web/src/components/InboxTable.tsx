@@ -110,7 +110,7 @@ export function InboxTable({
                   key={cell.id}
                   className={`relative border-b border-seam px-4 py-1 align-middle text-sm first:pl-6 last:pr-6 ${
                     i === 0 && row.id === selectedId
-                      ? "before:absolute before:top-1.5 before:bottom-1.5 before:left-1.5 before:w-2 before:border-2 before:border-r-0 before:border-ink"
+                      ? "before:absolute before:top-2 before:bottom-2 before:left-2 before:w-1 before:rounded-full before:bg-ink"
                       : ""
                   }`}
                 >
@@ -127,11 +127,11 @@ export function InboxTable({
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center gap-6 border-b border-seam px-6 py-4">
               <span className="flex flex-1 flex-col gap-2">
-                <span className="h-3 w-20 bg-pale" />
-                <span className="h-3 w-40 bg-pale" />
+                <span className="h-3 w-20 rounded bg-pale" />
+                <span className="h-3 w-40 rounded bg-pale" />
               </span>
-              <span className="h-5 w-12 bg-pale" />
-              <span className="h-3 w-20 bg-pale" />
+              <span className="h-5 w-12 rounded bg-pale" />
+              <span className="h-3 w-20 rounded bg-pale" />
             </div>
           ))}
         </div>

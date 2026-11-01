@@ -7,6 +7,8 @@ import { Findings } from "./Findings";
 import { LineItems } from "./LineItems";
 import { Pipeline } from "./Pipeline";
 import { TraceScreen } from "./TraceScreen";
+import { SECTION_ICON } from "../../lib/icons";
+import { Heading } from "../Badge";
 
 function closing(run: RunView): string {
   const s = run.summary;
@@ -25,7 +27,7 @@ function closing(run: RunView): string {
 export function DetailPanel({ run, llm }: { run: RunView | null; llm: boolean }) {
   if (!run) {
     return (
-      <section className="bg-panel p-6 text-ink-2">
+      <section className="card p-6 text-ink-2">
         Select an invoice to see its pipeline, findings and agent trace.
       </section>
     );
@@ -36,7 +38,8 @@ export function DetailPanel({ run, llm }: { run: RunView | null; llm: boolean })
   const live = run.status === "running";
 
   return (
-    <div className="flex flex-col gap-px bg-seam">
+    // One rounded card; the 1px gaps between sections show the seam colour.
+    <div className="flex flex-col gap-px overflow-hidden rounded-[var(--r-lg)] border border-seam bg-seam">
       <section aria-labelledby="detail-h" className="bg-panel p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="flex flex-wrap gap-2">
@@ -65,17 +68,15 @@ export function DetailPanel({ run, llm }: { run: RunView | null; llm: boolean })
       {run.status === "awaiting_vp" && s && <DecisionPanel runId={run.id} summary={s} />}
 
       <section aria-labelledby="stream-h" className="flex flex-col gap-4 bg-panel p-6">
-        <h3 id="stream-h" className="m-0 text-base font-medium">
+        <Heading id="stream-h" icon={SECTION_ICON.stream}>
           Agent stream
-        </h3>
+        </Heading>
         <Pipeline segments={pipeline(run)} />
         <TraceScreen label={label} lines={traceLines(run, llm)} live={live} />
       </section>
 
       {s && <Findings findings={s.findings} />}
       {inv && s && inv.line_items.length > 0 && <LineItems invoice={inv} findings={s.findings} />}
-      {/* Fills the column when the inbox beside it is taller. */}
-      <div className="flex-1 bg-panel" />
     </div>
   );
 }

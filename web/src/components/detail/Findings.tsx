@@ -1,5 +1,7 @@
 import type { Finding } from "../../api/types";
 import { plural } from "../../lib/format";
+import { SECTION_ICON } from "../../lib/icons";
+import { Heading } from "../Badge";
 
 const SEVERITY_WORD = { error: "fail", warning: "flag", info: "note" } as const;
 const ORDER = { error: 0, warning: 1, info: 2 } as const;
@@ -10,9 +12,9 @@ export function Findings({ findings }: { findings: Finding[] }) {
   return (
     <section aria-labelledby="findings-h" className="bg-panel p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h3 id="findings-h" className="m-0 text-base font-medium">
+        <Heading id="findings-h" icon={SECTION_ICON.findings}>
           Findings
-        </h3>
+        </Heading>
         <span className="cap">
           {findings.length ? `${plural(errors, "hard failure")}, ${findings.length} total` : "all checks passed"}
         </span>
