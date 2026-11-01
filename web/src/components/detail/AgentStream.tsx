@@ -9,7 +9,7 @@ export function AgentStream({ run, llm }: { run: RunView; llm: boolean }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <Pipeline segments={pipeline(run)} />
-      <TraceScreen label={label} lines={traceLines(run, llm)} live={run.status === "running"} />
+      <TraceScreen key={run.id} label={label} lines={traceLines(run, llm)} live={run.status === "running"} />
     </div>
   );
 }

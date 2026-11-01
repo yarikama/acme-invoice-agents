@@ -36,7 +36,7 @@ export function Header({
 }) {
   const { dark, toggle } = useTheme();
   return (
-    <header className="bar-yellow sticky top-0 z-10">
+    <header className="bar-ink sticky top-0 z-10">
       <div className="flex w-full flex-wrap items-center gap-x-6 gap-y-2 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-3">
           <Logo size={40} />
