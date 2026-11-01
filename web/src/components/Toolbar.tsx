@@ -16,10 +16,13 @@ export function Toolbar({ onStarted }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    api.samples().then((list) => {
-      setSamples(list);
-      setSample((current) => current || (list[0]?.name ?? ""));
-    }, () => setError("Can't reach the API. Start it with make api, then reload."));
+    api.samples().then(
+      (list) => {
+        setSamples(list);
+        setSample((current) => current || (list[0]?.name ?? ""));
+      },
+      () => setError("Can't reach the API. Start it with make api, then reload."),
+    );
   }, []);
 
   const run = async (start: () => Promise<RunOverview | RunOverview[]>) => {

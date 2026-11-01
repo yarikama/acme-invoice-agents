@@ -1,7 +1,17 @@
 import type { LayoutItem } from "react-grid-layout";
 
 // The console's widgets, in the order they stack on narrow screens.
-export const WIDGETS = ["overview", "routing", "throughput", "inbox", "summary", "decision", "stream", "findings", "lines"] as const;
+export const WIDGETS = [
+  "overview",
+  "routing",
+  "throughput",
+  "inbox",
+  "summary",
+  "decision",
+  "stream",
+  "findings",
+  "lines",
+] as const;
 export type WidgetId = (typeof WIDGETS)[number];
 
 export const COLS = 12;

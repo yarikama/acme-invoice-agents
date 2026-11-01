@@ -64,8 +64,26 @@ describe("runsReducer", () => {
     const state = runsReducer(streamed, {
       type: "snapshot",
       runs: [
-        { id: "r1", source: "x", status: "queued", created_at: "2026-01-01T00:00:00Z", invoice_number: null, vendor: null, total: null, currency: null },
-        { id: "r2", source: "y", status: "queued", created_at: "2030-01-01T00:00:00Z", invoice_number: null, vendor: null, total: null, currency: null },
+        {
+          id: "r1",
+          source: "x",
+          status: "queued",
+          created_at: "2026-01-01T00:00:00Z",
+          invoice_number: null,
+          vendor: null,
+          total: null,
+          currency: null,
+        },
+        {
+          id: "r2",
+          source: "y",
+          status: "queued",
+          created_at: "2030-01-01T00:00:00Z",
+          invoice_number: null,
+          vendor: null,
+          total: null,
+          currency: null,
+        },
       ],
     });
     expect(state.runs.r1!.status).toBe("running");
@@ -78,7 +96,18 @@ describe("runsReducer", () => {
     expect(state.order).toEqual(["r2", "r1"]);
     const snap = runsReducer(state, {
       type: "snapshot",
-      runs: [{ id: "r0", source: "z", status: "queued", created_at: "2025-01-01T00:00:00Z", invoice_number: null, vendor: null, total: null, currency: null }],
+      runs: [
+        {
+          id: "r0",
+          source: "z",
+          status: "queued",
+          created_at: "2025-01-01T00:00:00Z",
+          invoice_number: null,
+          vendor: null,
+          total: null,
+          currency: null,
+        },
+      ],
     });
     expect(snap.order).toEqual(["r2", "r1", "r0"]);
   });

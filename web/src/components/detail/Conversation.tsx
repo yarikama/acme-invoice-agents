@@ -114,13 +114,25 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
   switch (turn.kind) {
     case "validate":
       return (
-        <TurnFrame node="validate" voice="code" name="Validation" role="code" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame
+          node="validate"
+          voice="code"
+          name="Validation"
+          role="code"
+          ms={turn.ms}
+          usage={turn.usage}
+          fresh={fresh}
+        >
           {turn.errors === null ? (
             <p className="m-0">{turn.text}</p>
           ) : (
             <div className="flex flex-wrap items-center gap-2">
-              <Stat>{turn.errors} {turn.errors === 1 ? "error" : "errors"}</Stat>
-              <Stat>{turn.warnings} {turn.warnings === 1 ? "warning" : "warnings"}</Stat>
+              <Stat>
+                {turn.errors} {turn.errors === 1 ? "error" : "errors"}
+              </Stat>
+              <Stat>
+                {turn.warnings} {turn.warnings === 1 ? "warning" : "warnings"}
+              </Stat>
               <Stat>route: {turn.route}</Stat>
               {turn.reason && <span className="text-sm text-ink-2">{turn.reason}</span>}
             </div>
@@ -129,7 +141,15 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "triage":
       return (
-        <TurnFrame node="triage" voice="model" name="Triage" role="decision model" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame
+          node="triage"
+          voice="model"
+          name="Triage"
+          role="decision model"
+          ms={turn.ms}
+          usage={turn.usage}
+          fresh={fresh}
+        >
           {turn.decision ? (
             <div className="flex flex-wrap items-center gap-2">
               <Pill decision={turn.decision} />
@@ -146,7 +166,15 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "approver":
       return (
-        <TurnFrame node="review" voice="model" name="Approver" role="model" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame
+          node="review"
+          voice="model"
+          name="Approver"
+          role="model"
+          ms={turn.ms}
+          usage={turn.usage}
+          fresh={fresh}
+        >
           {turn.tools.map((t, i) => (
             <div key={i} className="tool-use" style={fresh ? { animationDelay: `${i * 90}ms` } : undefined}>
               <PixelIcon node="tool" size={14} className="mt-1 text-[var(--code)]" />
@@ -176,9 +204,19 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "critic":
       return (
-        <TurnFrame node="critique" voice="model" name="Critic" role="model" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame
+          node="critique"
+          voice="model"
+          name="Critic"
+          role="model"
+          ms={turn.ms}
+          usage={turn.usage}
+          fresh={fresh}
+        >
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`pill ${turn.agrees ? "pill-approve" : "pill-reject"}`}>{turn.agrees ? "Agrees" : "Objects"}</span>
+            <span className={`pill ${turn.agrees ? "pill-approve" : "pill-reject"}`}>
+              {turn.agrees ? "Agrees" : "Objects"}
+            </span>
             {turn.outcome && <Stat>outcome: {turn.outcome}</Stat>}
           </div>
           {turn.issues && <div className="bubble text-sm">{turn.issues}</div>}
@@ -186,15 +224,26 @@ function TurnView({ turn, fresh }: { turn: Turn; fresh: boolean }) {
       );
     case "human":
       return (
-        <TurnFrame node="human_review" voice="human" name={turn.by ?? "VP"} role="human" ms={turn.ms} usage={turn.usage} fresh={fresh}>
+        <TurnFrame
+          node="human_review"
+          voice="human"
+          name={turn.by ?? "VP"}
+          role="human"
+          ms={turn.ms}
+          usage={turn.usage}
+          fresh={fresh}
+        >
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`pill ${turn.approved ? "pill-approve" : "pill-reject"}`}>{turn.approved ? "Approved" : "Rejected"}</span>
+            <span className={`pill ${turn.approved ? "pill-approve" : "pill-reject"}`}>
+              {turn.approved ? "Approved" : "Rejected"}
+            </span>
             {turn.note && <span className="text-sm">{turn.note}</span>}
           </div>
         </TurnFrame>
       );
     case "step": {
-      const name = { ingest: "Ingest", pay: "Payment", reject: "Not paid", error: "Run failed" }[turn.node] ?? turn.node;
+      const name =
+        { ingest: "Ingest", pay: "Payment", reject: "Not paid", error: "Run failed" }[turn.node] ?? turn.node;
       return (
         <TurnFrame node={turn.node} voice="code" name={name} role="code" ms={turn.ms} usage={turn.usage} fresh={fresh}>
           <p className="m-0 text-[var(--ink)]">{turn.text}</p>
@@ -226,7 +275,17 @@ function RunTotals({ turns, live }: { turns: Turn[]; live: boolean }) {
  * they decided, and how long each took. While the run streams, a shimmering
  * line says what is happening now.
  */
-export function Conversation({ label, turns, live, doing }: { label: string; turns: Turn[]; live: boolean; doing: string }) {
+export function Conversation({
+  label,
+  turns,
+  live,
+  doing,
+}: {
+  label: string;
+  turns: Turn[];
+  live: boolean;
+  doing: string;
+}) {
   const end = useRef<HTMLDivElement>(null);
   // Turns present on first render are history; only later ones animate.
   // The parent keys this component by run, so switching runs starts fresh.

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { activity, dollars, parseCritique, parseDraft, parseTriage, parseValidate, tokenWord, totals, turns } from "./conversation";
+import {
+  activity,
+  dollars,
+  parseCritique,
+  parseDraft,
+  parseTriage,
+  parseValidate,
+  tokenWord,
+  totals,
+  turns,
+} from "./conversation";
 import type { TraceLine } from "./pipeline";
 
 const line = (seq: number, node: string, text: string, at?: number): TraceLine => ({
@@ -19,7 +29,11 @@ describe("parsers", () => {
       route: "human",
       reason: "Billed in EUR",
     });
-    expect(parseValidate("2 errors, 0 warnings; policy route: reject.")).toMatchObject({ errors: 2, route: "reject", reason: null });
+    expect(parseValidate("2 errors, 0 warnings; policy route: reject.")).toMatchObject({
+      errors: 2,
+      route: "reject",
+      reason: null,
+    });
     expect(parseValidate("something else").errors).toBeNull();
   });
 
@@ -30,11 +44,19 @@ describe("parsers", () => {
       suspicion: 11,
       settled: false,
     });
-    expect(parseTriage("m says approve (98% sure), suspicion 5%. Code confirmed every check passed, so the reasoning approver was skipped.").settled).toBe(true);
+    expect(
+      parseTriage(
+        "m says approve (98% sure), suspicion 5%. Code confirmed every check passed, so the reasoning approver was skipped.",
+      ).settled,
+    ).toBe(true);
   });
 
   it("reads a draft and a critique", () => {
-    expect(parseDraft("Draft 2: reject. Out of stock.\nTwice.")).toEqual({ round: 2, decision: "reject", rationale: "Out of stock.\nTwice." });
+    expect(parseDraft("Draft 2: reject. Out of stock.\nTwice.")).toEqual({
+      round: 2,
+      decision: "reject",
+      rationale: "Out of stock.\nTwice.",
+    });
     expect(parseDraft("free text").decision).toBeNull();
     expect(parseCritique("Critic agrees. Outcome: human.")).toEqual({ agrees: true, issues: "", outcome: "human" });
     expect(parseCritique("Critic objects: The draft ignores OUT_OF_STOCK.")).toEqual({
@@ -84,7 +106,10 @@ describe("turns", () => {
   });
 
   it("keeps tool calls that never reached a draft", () => {
-    const got = turns([line(1, "tool", "check_inventory(X): X is not in the inventory database."), line(2, "error", "boom")]);
+    const got = turns([
+      line(1, "tool", "check_inventory(X): X is not in the inventory database."),
+      line(2, "error", "boom"),
+    ]);
     expect(got.map((t) => t.kind)).toEqual(["approver", "step"]);
   });
 
@@ -97,17 +122,25 @@ describe("turns", () => {
 describe("usage", () => {
   it("rides on the turn it belongs to and adds up for the run", () => {
     const priced = { input_tokens: 1200, output_tokens: 300, cost_usd: 0.0042 };
-    const got = turns([
-      { ...line(1, "ingest", "Parsed JSON in code.", 1_000) },
-      { ...line(2, "review", "Draft 1: approve. Fine.", 9_000), usage: priced },
-      { ...line(3, "critique", "Critic agrees. Outcome: pay.", 12_000), usage: { input_tokens: 500, output_tokens: 0, cost_usd: 0.001 } },
-    ], 0);
+    const got = turns(
+      [
+        { ...line(1, "ingest", "Parsed JSON in code.", 1_000) },
+        { ...line(2, "review", "Draft 1: approve. Fine.", 9_000), usage: priced },
+        {
+          ...line(3, "critique", "Critic agrees. Outcome: pay.", 12_000),
+          usage: { input_tokens: 500, output_tokens: 0, cost_usd: 0.001 },
+        },
+      ],
+      0,
+    );
     expect(got[1]!.usage).toEqual(priced);
     expect(totals(got)).toEqual({ tokens: 2000, cost: 0.0052, ms: 12_000 });
   });
 
   it("leaves the cost unknown when any step was unpriced", () => {
-    const got = turns([{ ...line(1, "review", "Draft 1: approve.", 1), usage: { input_tokens: 10, output_tokens: 0, cost_usd: null } }]);
+    const got = turns([
+      { ...line(1, "review", "Draft 1: approve.", 1), usage: { input_tokens: 10, output_tokens: 0, cost_usd: null } },
+    ]);
     expect(totals(got).cost).toBeNull();
   });
 

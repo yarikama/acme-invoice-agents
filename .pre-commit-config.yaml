@@ -38,6 +38,12 @@ repos:
         entry: '(sk-or-v1-[0-9a-f]{16,}|xai-[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{32,})'
         exclude: ^(\.env\.example|\.pre-commit-config\.yaml)$
 
+      - id: web-format
+        name: web prettier
+        entry: bash -c 'cd web && npx prettier --check .'
+        language: system
+        files: ^web/
+        pass_filenames: false
       - id: web-lint
         name: web eslint
         entry: bash -c 'cd web && npx eslint --max-warnings 0 .'

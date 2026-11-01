@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { StreamState } from "../state/useConsole";
 import { Logo } from "./Logo";
 
-
 function useTheme() {
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const toggle = () => {

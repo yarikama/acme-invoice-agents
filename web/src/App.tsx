@@ -20,10 +20,7 @@ export default function App() {
 
   // Until the user picks one, show the run that needs a decision, else the newest.
   const selected =
-    (picked ? state.runs[picked] : undefined) ??
-    runs.find((r) => r.status === "awaiting_vp") ??
-    runs[0] ??
-    null;
+    (picked ? state.runs[picked] : undefined) ?? runs.find((r) => r.status === "awaiting_vp") ?? runs[0] ?? null;
 
   const onStarted = useCallback(
     (started: RunOverview[]) => {

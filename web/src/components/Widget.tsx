@@ -29,7 +29,10 @@ export function Widget({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={`${id}-h`} className={`card flex h-full min-h-0 flex-col overflow-hidden ${signal ? "card-signal" : ""}`}>
+    <section
+      aria-labelledby={`${id}-h`}
+      className={`card flex h-full min-h-0 flex-col overflow-hidden ${signal ? "card-signal" : ""}`}
+    >
       <header className={`flex items-center gap-3 px-5 pt-4 pb-3 ${draggable ? "widget-handle" : ""}`}>
         <Badge icon={icon} signal={signal} />
         <h2 id={`${id}-h`} className="m-0 min-w-0 truncate text-lg font-medium">
@@ -37,7 +40,9 @@ export function Widget({
         </h2>
         <span className="ml-auto flex min-w-0 items-center gap-3">
           {aside}
-          {draggable && <DotsSixVerticalIcon size={18} weight="bold" className="flex-none text-ink-2" aria-hidden="true" />}
+          {draggable && (
+            <DotsSixVerticalIcon size={18} weight="bold" className="flex-none text-ink-2" aria-hidden="true" />
+          )}
         </span>
       </header>
       <div className={`min-h-0 flex-1 overflow-auto ${flush ? "" : "px-5 pb-5"}`}>{children}</div>

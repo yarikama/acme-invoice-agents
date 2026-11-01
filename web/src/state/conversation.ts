@@ -125,8 +125,10 @@ export function turns(lines: TraceLine[], startedAt?: number): Turn[] {
       continue;
     }
     flush(line);
-    if (line.node === "validate") out.push({ ...timed(line), kind: "validate", text: line.text, ...parseValidate(line.text) });
-    else if (line.node === "triage") out.push({ ...timed(line), kind: "triage", text: line.text, ...parseTriage(line.text) });
+    if (line.node === "validate")
+      out.push({ ...timed(line), kind: "validate", text: line.text, ...parseValidate(line.text) });
+    else if (line.node === "triage")
+      out.push({ ...timed(line), kind: "triage", text: line.text, ...parseTriage(line.text) });
     else if (line.node === "critique") out.push({ ...timed(line), kind: "critic", ...parseCritique(line.text) });
     else if (line.node === "human_review") {
       // The verdict is read on its own, so an odd name can't flip it.

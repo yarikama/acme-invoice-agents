@@ -17,9 +17,7 @@ export interface RunsState {
   lastSeq: number;
 }
 
-export type RunsAction =
-  | { type: "snapshot"; runs: RunOverview[] }
-  | { type: "event"; event: RunEvent };
+export type RunsAction = { type: "snapshot"; runs: RunOverview[] } | { type: "event"; event: RunEvent };
 
 export const initialRuns: RunsState = { runs: {}, order: [], lastSeq: -1 };
 
