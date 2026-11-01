@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from invoice_agents import cli, remote
+from invoice_agents.config import get_settings
 from tests.conftest import INVOICES
 
 SUMMARY = {
@@ -282,7 +283,9 @@ async def test_a_vp_token_goes_with_the_decision(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("VP_TOKEN", "s3cret")
+    get_settings.cache_clear()
     fake = FakeApi()
     async with client(fake) as c:
         await remote.Api("http://api", c).decide("r1", False, "no")
     assert fake.auth == ["Bearer s3cret"]
+    get_settings.cache_clear()

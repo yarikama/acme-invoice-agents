@@ -312,3 +312,21 @@ def test_model_turns_name_their_model() -> None:
     out = text(view)
     assert "Critic  claude-haiku-5.5" in out
     assert "Validation  code" in out  # code steps keep their role
+
+
+def test_a_vp_name_with_brackets_keeps_the_verdict() -> None:
+    [turn] = turns(
+        [
+            trace(
+                "human_review",
+                "VP approved (Dana Whitfield (Finance)). Note: ok (fx).",
+                1,
+            )
+        ],
+        started=0,
+    )
+    assert turn.data == {
+        "approved": True,
+        "by": "Dana Whitfield (Finance)",
+        "note": "ok (fx).",
+    }

@@ -79,6 +79,8 @@ describe("turns", () => {
     ]);
     expect(named).toMatchObject({ kind: "human", approved: false, by: "Dana Whitfield", note: "Wrong rate" });
     expect(plain).toMatchObject({ kind: "human", approved: true, by: null, note: "" });
+    const [odd] = turns([line(3, "human_review", "VP approved (Dana Whitfield (Finance)). Note: FX ok (1.08).")]);
+    expect(odd).toMatchObject({ approved: true, by: "Dana Whitfield (Finance)", note: "FX ok (1.08)." });
   });
 
   it("keeps tool calls that never reached a draft", () => {
