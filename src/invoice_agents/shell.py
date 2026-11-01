@@ -68,7 +68,7 @@ from invoice_agents.cli import (
     process,
 )
 from invoice_agents.config import get_settings
-from invoice_agents.inventory import SEED
+from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import chat_model
 from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
@@ -597,9 +597,16 @@ class Shell:
         table.add_column("Item", style="bold")
         table.add_column("In stock", justify="right")
         table.add_column("List price", justify="right")
-        for item, stock, price in SEED:
-            table.add_row(item, str(stock), money(price, "USD"))
+        db = Inventory(get_settings().db_path)
+        db.seed()  # creates the database on a first run
+        for r in db.records():
+            table.add_row(r.item, str(r.stock), money(r.unit_price, "USD"))
         console.print(table)
+        vendors = db.vendors()
+        console.print(
+            f"\n  Vendor master ({len(vendors)}): " + escape(", ".join(vendors)),
+            style="#a6a69f",
+        )
 
     def eval(self, args: list[str]) -> None:
         from invoice_agents import evaluation

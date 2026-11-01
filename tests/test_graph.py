@@ -238,11 +238,31 @@ async def test_unreadable_files_are_rejected_with_a_reason(inventory, tmp_path):
 
 
 async def test_the_agent_reads_a_structured_file_code_could_not(inventory, tmp_path):
+    # Cut off mid-file, but its text still says what the invoice is.
     odd = tmp_path / "odd.json"
-    odd.write_text('{"vendor": ')
+    odd.write_text(
+        '{"vendor": "Widgets Inc.", "lines": "WidgetA 10 x 250, WidgetB 5 x 500",'
+        ' "total": 5000'
+    )
     graph = make_graph(inventory)
     state = await graph.ainvoke({"path": str(odd)}, config())
     [ingest] = [t["message"] for t in state["trace"] if t["stage"] == "ingest"]
     assert ingest.startswith("Could not read the JSON in code: not valid JSON")
     assert "The extraction agent read its text." in ingest
     assert state["payment"].status == "success"
+
+
+async def test_an_invented_line_is_flagged_for_a_person(inventory):
+    invented = INV_1001.model_copy(
+        update={
+            "line_items": [
+                *INV_1001.line_items,
+                LineItem(item="GadgetX", quantity=1, unit_price=0),
+            ]
+        }
+    )
+    graph = make_graph(inventory, StubExtractor(invented))
+    state = await graph.ainvoke({"path": str(INVOICES / "invoice_1001.txt")}, config())
+    [finding] = [f for f in state["report"].findings if f.code == "NOT_IN_DOCUMENT"]
+    assert "item 'GadgetX'" in finding.detail
+    assert "payment" not in state

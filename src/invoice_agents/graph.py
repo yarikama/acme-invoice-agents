@@ -53,7 +53,7 @@ from invoice_agents.payment import mock_payment
 from invoice_agents.tools import ReviewTools
 from invoice_agents.triage import TriageAnswer, TriageError, fast_path
 from invoice_agents.usage import Pricing, StepUsage, Tokens, collecting, step_usage
-from invoice_agents.validation import Policy, SeenInvoices, validate
+from invoice_agents.validation import Policy, SeenInvoices, ungrounded, validate
 
 STATE_TYPES = (
     Invoice,
@@ -102,6 +102,8 @@ class InvoiceState(TypedDict, total=False):
     source_format: str
     invoice: Invoice | None
     corrections: list[str]
+    # What the extraction model reported that the document doesn't say.
+    ungrounded: list[str]
     extract_feedback: list[str]
     extract_attempts: int
     report: ValidationReport
@@ -269,6 +271,9 @@ def build_graph(
             "source_format": doc.format.value,
             "invoice": extraction.invoice,
             "corrections": extraction.corrections,
+            "ungrounded": ungrounded(
+                extraction.invoice, doc.text, extraction.corrections
+            ),
             "extract_attempts": attempt,
             "extract_feedback": feedback,
             "trace": _event(
@@ -307,6 +312,17 @@ def build_graph(
             )
             for correction in state.get("corrections", [])
         ]
+        if missing := state.get("ungrounded"):
+            report.findings.append(
+                Finding(
+                    code="NOT_IN_DOCUMENT",
+                    severity=Severity.WARNING,
+                    title="Extracted values the document doesn't show",
+                    detail="The extraction reported "
+                    + ", ".join(missing)
+                    + ", which the document's text does not contain.",
+                )
+            )
         deps.seen.add(
             invoice,
             run_id=_run_id(config),

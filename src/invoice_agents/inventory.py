@@ -1,4 +1,5 @@
-"""The mock inventory database (SQLite) the validator checks against."""
+"""The mock inventory database (SQLite) the validator checks against: the
+stock and list price of each item, and the vendor master."""
 
 from __future__ import annotations
 
@@ -13,6 +14,24 @@ SEED: list[tuple[str, int, float]] = [
     ("WidgetB", 10, 500.00),
     ("GadgetX", 5, 750.00),
     ("FakeItem", 0, 1000.00),
+]
+
+
+# Vendors Acme has bought from before: the vendor master. An invoice from
+# anyone else is a first invoice from a new vendor, and a name a letter off
+# one of these is a possible impostor.
+VENDORS: list[str] = [
+    "Widgets Inc.",
+    "Gadgets Co.",
+    "Precision Parts Ltd.",
+    "Global Supply Chain Partners",
+    "Acme Industrial Supplies",
+    "MegaWidgets Corp",
+    "Consolidated Materials Group",
+    "Summit Manufacturing Co.",
+    "Atlas Industrial Supply",
+    "TechParts International",
+    "Reliable Components Inc.",
 ]
 
 
@@ -52,6 +71,24 @@ class Inventory:
                 " stock = excluded.stock, unit_price = excluded.unit_price",
                 SEED,
             )
+            conn.execute("CREATE TABLE IF NOT EXISTS vendors (name TEXT PRIMARY KEY)")
+            conn.executemany(
+                "INSERT OR IGNORE INTO vendors (name) VALUES (?)",
+                [(v,) for v in VENDORS],
+            )
+
+    def records(self) -> list[StockRecord]:
+        """Every item, as the database holds it now."""
+        return sorted(self._all().values(), key=lambda r: r.item)
+
+    def vendors(self) -> list[str]:
+        """The vendor master; empty for a database without the table."""
+        with sqlite3.connect(self.path) as conn:
+            try:
+                rows = conn.execute("SELECT name FROM vendors ORDER BY name")
+            except sqlite3.OperationalError:
+                return []
+            return [r[0] for r in rows]
 
     def lookup(self, name: str) -> StockRecord | None:
         key = item_key(name)

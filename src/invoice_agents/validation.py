@@ -149,11 +149,43 @@ def validate(
     findings += _stock(invoice, inventory)
     findings += _prices(invoice, inventory)
     findings += _threshold(invoice, policy)
-    if seen is not None:
-        findings += _duplicates(invoice, seen)
-        findings += _split(invoice, seen, policy)
-        findings += _lookalike_vendor(invoice, seen)
+    findings += _renamed(invoice)
+    master = inventory.vendors()
+    seen = seen if seen is not None else SeenInvoices()
+    findings += _duplicates(invoice, seen)
+    findings += _split(invoice, seen, policy)
+    findings += _lookalike_vendor(invoice, seen, master) or _new_vendor(
+        invoice, seen, master
+    )
     return ValidationReport(findings=findings)
+
+
+def _plain(text: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def ungrounded(invoice: Invoice, text: str, corrections: list[str]) -> list[str]:
+    """What an extraction model reported that the document doesn't say: an
+    item name that isn't in the text, or a total that isn't. Names it says
+    it corrected (an OCR misread, a typo) are its to explain."""
+    plain = _plain(text)
+    fixed = _plain(" ".join(corrections))
+    missing = [
+        f"item {line.item!r}"
+        for line in invoice.line_items
+        if _plain(line.item)
+        and _plain(line.item) not in plain
+        and _plain(line.item) not in fixed
+    ]
+    if invoice.total is not None:
+        figures = re.sub(r"[,\s$€£¥]", "", text)
+        total = abs(invoice.total)
+        forms = {f"{total:.2f}", f"{total:.1f}", f"{total:g}"}
+        if total.is_integer():
+            forms.add(str(int(total)))
+        if not any(f in figures for f in forms) and "total" not in fixed:
+            missing.append(f"total {total:,.2f}")
+    return missing
 
 
 def _f(code: str, severity: Severity, title: str, detail: str) -> Finding:
@@ -299,7 +331,12 @@ def _totals(inv: Invoice) -> list[Finding]:
 
 
 def _stock(inv: Invoice, inventory: Inventory) -> list[Finding]:
-    """Sum quantities per item first, so splitting an item over lines can't hide it."""
+    """Sum quantities per item first, so splitting an item over lines can't hide it.
+
+    Each invoice is checked against stock on hand, and paying one doesn't
+    reserve stock for the next: the brief's samples are each meant to be
+    checked against the seed, and an AP payment isn't a stock movement.
+    """
     billed: dict[str, float] = defaultdict(float)
     names: dict[str, str] = {}
     for line in inv.line_items:
@@ -520,20 +557,63 @@ def _closest(key: str, vendors: list[str]) -> str | None:
     return None
 
 
-def _lookalike_vendor(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
+RENAMED = re.compile(r"\b(?:formerly|previously|f/k/a|fka)\b[\s:]*([^)\n;]+)", re.I)
+
+
+def _renamed(inv: Invoice) -> list[Finding]:
+    """A vendor announcing a new name: how an impostor explains away a name
+    that doesn't match the one on file."""
+    text = " ".join(t for t in (inv.vendor, inv.vendor_address, inv.notes) if t)
+    match = RENAMED.search(text)
+    if not match:
+        return []
+    return [
+        _f(
+            "VENDOR_RENAMED",
+            Severity.WARNING,
+            "Vendor says it changed its name",
+            f"{inv.vendor or 'The vendor'} was formerly"
+            f" {match.group(1).strip(' .')}. Confirm the change, and the bank"
+            " account, with the vendor on a number already on file.",
+        )
+    ]
+
+
+def _new_vendor(inv: Invoice, seen: SeenInvoices, master: list[str]) -> list[Finding]:
+    """A first invoice from a vendor neither in the master nor seen before:
+    a note for the reviewer, not a reason to refuse."""
+    if not inv.vendor or not master:
+        return []
+    key = _vendor_key(inv.vendor)
+    known = [*master, *(i.vendor for i in seen.invoices if i.vendor)]
+    if any(_vendor_key(v) == key for v in known):
+        return []
+    return [
+        _f(
+            "NEW_VENDOR",
+            Severity.INFO,
+            "First invoice from a new vendor",
+            f"{inv.vendor} is not in the vendor master and has not invoiced before.",
+        )
+    ]
+
+
+def _lookalike_vendor(
+    inv: Invoice, seen: SeenInvoices, master: list[str] | None = None
+) -> list[Finding]:
     """A name a letter or two off a vendor already invoiced: "Summit
     Manufactruing Co." for "Summit Manufacturing Co." is how impostor invoices
     get paid.
 
-    Vendors count in the order they were first seen, and a name close to an
-    earlier vendor is a suspect, not a vendor: an impostor's second invoice is
-    flagged like its first. Order is all there is to go on here, so an impostor
-    seen before the real vendor would flag the real one instead; a vendor
-    master file would settle that.
+    The vendor master comes first, then vendors in the order they were first
+    seen; a name close to an earlier vendor is a suspect, not a vendor, so an
+    impostor's second invoice is flagged like its first. For a vendor not in
+    the master, order is all there is to go on: an impostor seen before the
+    real vendor would flag the real one instead.
     """
     if not inv.vendor:
         return []
-    vendors: list[str] = []
+    vendors: list[str] = list(master or [])
     suspects: dict[str, str] = {}  # suspect name key -> the vendor it resembles
     for other in seen.invoices:
         if not other.vendor or other is inv:
@@ -561,7 +641,7 @@ def _lookalike_vendor(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
             "LOOKALIKE_VENDOR",
             Severity.WARNING,
             "Vendor name is close to a known vendor's",
-            f"{inv.vendor!r} is not {close!r}, a vendor already invoiced, but"
+            f"{inv.vendor!r} is not {close!r}, a known vendor, but"
             " differs by a letter or two. Confirm it is a real, separate vendor.",
         )
     ]
