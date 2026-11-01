@@ -3,8 +3,9 @@
 It starts the API and the web console (unless --no-serve), then reads
 commands: /run a file, /dir a folder, /runs, /approve or /reject a run
 waiting for the VP, /eval, and the rest in COMMANDS. A path typed or dragged
-in on its own is run like /run. Unknown commands get the closest match and
-a pointer to /help; Tab completes commands and paths.
+in on its own is run like /run, and any other sentence goes to the assistant
+(assistant.py), which turns it into commands. Typing "/" opens a menu of
+commands that Tab moves through; unknown commands get the closest match.
 
 One event loop serves the whole session, so the in-process graph remembers
 earlier invoices (duplicate detection) and Ctrl-C can stop one run without
@@ -22,18 +23,40 @@ import shlex
 import subprocess
 import sys
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
+from langchain_core.language_models import BaseChatModel
+from prompt_toolkit import completion
+from prompt_toolkit.application import Application
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.document import Document
+from prompt_toolkit.filters import has_completions
+from prompt_toolkit.formatted_text import StyleAndTextTuples
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent, merge_key_bindings
+from prompt_toolkit.key_binding.defaults import load_key_bindings
+from prompt_toolkit.layout import (
+    ConditionalContainer,
+    FormattedTextControl,
+    HSplit,
+    Layout,
+    Window,
+)
+from prompt_toolkit.layout.controls import BufferControl
+from prompt_toolkit.layout.dimension import Dimension
+from prompt_toolkit.layout.menus import CompletionsMenu
+from prompt_toolkit.layout.processors import BeforeInput
+from prompt_toolkit.styles import Style
 from rich.markup import escape
 from rich.padding import Padding
 from rich.table import Table
 from rich.text import Text
 
-from invoice_agents import remote
+from invoice_agents import assistant, remote
 from invoice_agents.cli import (
     Connection,
     LocalRunner,
@@ -44,12 +67,12 @@ from invoice_agents.cli import (
 )
 from invoice_agents.config import get_settings
 from invoice_agents.inventory import SEED
+from invoice_agents.llm import chat_model
 from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
 
 LOGS = Path(".acme-logs")
 VP_MODES = ("ask", "approve", "reject")
-# \001 and \002 tell readline the colour codes take no room on the line.
-PROMPT = "\001\x1b[1;38;2;255;90;31m\002acme >\001\x1b[0m\002 "
+HISTORY = LOGS / "history"
 
 
 @dataclass(frozen=True)
@@ -104,7 +127,7 @@ def help_table(only: str | None = None) -> Padding:
 
 
 def complete(text: str, line: str) -> list[str]:
-    """Readline candidates for `text`, the word being typed in `line`."""
+    """Candidates for `text`, the word being typed in `line`."""
     words = line.split()
     first = not words or (len(words) == 1 and not line.endswith(" "))
     command = words[0].lstrip("/") if words else ""
@@ -116,28 +139,150 @@ def complete(text: str, line: str) -> list[str]:
         if first and text.startswith("/")
         else []
     )
+    if first and not text:
+        return commands
     # "/Users/..." is a path too: a file dragged in starts with "/".
     found = sorted(glob.glob(str(Path(text).expanduser()) + "*"))
     return commands + [p + "/" if Path(p).is_dir() else p for p in found]
 
 
-def _install_completion() -> None:
-    try:
-        import readline
-    except ImportError:  # pragma: no cover - Windows without pyreadline
-        return
+class Completer(completion.Completer):
+    """The menu under the input: commands with what they do, then paths.
 
-    def completer(text: str, state: int) -> str | None:
-        options = complete(text, readline.get_line_buffer())
-        return options[state] if state < len(options) else None
+    It opens by itself for "/" and for paths; for a sentence to the
+    assistant it stays shut unless Tab asks for it."""
 
-    readline.set_completer_delims(" \t\n")
-    readline.set_completer(completer)
-    # macOS ships libedit, which reads a different binding syntax.
-    if "libedit" in (readline.__doc__ or ""):
-        readline.parse_and_bind("bind ^I rl_complete")
-    else:
-        readline.parse_and_bind("tab: complete")
+    def get_completions(
+        self, document: Document, complete_event: completion.CompleteEvent
+    ) -> Iterator[completion.Completion]:
+        line = document.text_before_cursor
+        text = document.get_word_before_cursor(WORD=True)
+        typing_a_path = "/" in text or text.startswith((".", "~"))
+        if not (
+            line.startswith("/") or typing_a_path or complete_event.completion_requested
+        ):
+            return
+        for option in complete(text, line):
+            name = option.strip().lstrip("/")
+            meta = (
+                BY_NAME[name].help if option.startswith("/") and name in BY_NAME else ""
+            )
+            yield completion.Completion(
+                option,
+                start_position=-len(text),
+                display=option.strip(),
+                display_meta=meta,
+            )
+
+
+class Prompt:
+    """A chat-style input: a rule, the line, a rule, then hints. Typing "/"
+    swaps the hints for a menu of commands; Tab and the arrows move in it."""
+
+    def __init__(self, status: Callable[[], str]) -> None:
+        HISTORY.parent.mkdir(parents=True, exist_ok=True)
+        self.status = status
+        self.buffer = Buffer(
+            completer=Completer(),
+            complete_while_typing=True,
+            history=FileHistory(str(HISTORY)),
+            multiline=False,
+        )
+        line = Window(
+            BufferControl(
+                self.buffer,
+                input_processors=[BeforeInput("> ", style="class:arrow")],
+            ),
+            height=Dimension(min=1),
+            dont_extend_height=True,
+            wrap_lines=True,
+        )
+        rule = Window(char="─", height=1, style="class:rule")
+        hints = Window(FormattedTextControl(self._hints), height=1)
+        root = HSplit(
+            [
+                rule,
+                line,
+                rule,
+                ConditionalContainer(hints, filter=~has_completions),
+                CompletionsMenu(max_height=8, scroll_offset=1),
+            ]
+        )
+        self.app: Application[str] = Application(
+            layout=Layout(root, focused_element=line),
+            key_bindings=merge_key_bindings([load_key_bindings(), self._keys()]),
+            style=STYLE,
+            erase_when_done=True,
+        )
+
+    def _keys(self) -> KeyBindings:
+        keys = KeyBindings()
+
+        @keys.add("enter")
+        def _(event: KeyPressEvent) -> None:
+            state = self.buffer.complete_state
+            if state and state.current_completion:
+                # Enter on a menu item takes it, and runs it when it needs
+                # nothing more: /runs runs, /run waits for a file.
+                self.buffer.apply_completion(state.current_completion)
+                name = self.buffer.text.strip().lstrip("/")
+                if name not in BY_NAME or " " in BY_NAME[name].usage:
+                    return
+            self.buffer.append_to_history()
+            event.app.exit(result=self.buffer.text)
+
+        @keys.add("s-tab")
+        def _(_event: KeyPressEvent) -> None:
+            self.buffer.complete_previous()
+
+        @keys.add("escape", eager=True)
+        def _(_event: KeyPressEvent) -> None:
+            self.buffer.cancel_completion()
+
+        @keys.add("c-c")
+        def _(event: KeyPressEvent) -> None:
+            event.app.exit(exception=KeyboardInterrupt())
+
+        @keys.add("c-d")
+        def _(event: KeyPressEvent) -> None:
+            if not self.buffer.text:
+                event.app.exit(exception=EOFError())
+
+        return keys
+
+    def _hints(self) -> StyleAndTextTuples:
+        hints = [("/", " commands"), ("tab", " next"), ("↑", " history")]
+        hints += [("ctrl-c", " stop"), ("ctrl-d", " quit")]
+        line: StyleAndTextTuples = []
+        for i, (key, what) in enumerate(hints):
+            line += [("", "  " if i == 0 else "   "), ("class:key", key)]
+            line.append(("class:hint", what))
+        line.append(("class:hint", "   ·   " + self.status()))
+        return line
+
+    def read(self) -> str:
+        self.buffer.reset()
+        text = self.app.run()
+        # The box is erased; what was typed stays, like a sent message.
+        console.print(Text.assemble(("> ", f"bold {SIGNAL}"), (text, "#c3c2b7")))
+        return text
+
+
+STYLE = Style.from_dict(
+    {
+        "rule": "#3a3a37",
+        "arrow": f"bold {SIGNAL}",
+        "key": "#c3c2b7",
+        "hint": "#7c7c75",
+        "completion-menu": "bg:default #c3c2b7",
+        "completion-menu.completion": "bg:default #c3c2b7",
+        "completion-menu.completion.current": f"bg:default bold {SIGNAL}",
+        "completion-menu.meta.completion": "bg:default #7c7c75",
+        "completion-menu.meta.completion.current": "bg:default #a6a69f",
+        "scrollbar.background": "bg:default",
+        "scrollbar.button": "bg:#3a3a37",
+    }
+)
 
 
 class Shell:
@@ -151,6 +296,7 @@ class Shell:
         self.conn: Connection | None = None
         # Results of runs in this process, for /runs when there is no API.
         self.history: list[dict[str, Any]] = []
+        self.llm: BaseChatModel | None = None
         self.handlers: dict[str, Callable[[list[str]], Any]] = {
             "run": self.run,
             "dir": self.dir,
@@ -179,15 +325,17 @@ class Shell:
             Text.assemble(
                 "  Type ",
                 ("/help", f"bold {SIGNAL}"),
-                " for commands, or a path to run an invoice. Tab completes.\n",
+                " for commands, a path to run an invoice, or ask in plain words.\n",
                 style="#a6a69f",
             )
         )
 
     def loop_forever(self) -> int:
+        tty = sys.stdin.isatty() and sys.stdout.isatty()
+        prompt = Prompt(self._status_line) if tty else None
         while True:
             try:
-                line = input(PROMPT if sys.stdin.isatty() else "")
+                line = prompt.read() if prompt else input()
             except EOFError:
                 console.print()
                 return 0
@@ -210,22 +358,21 @@ class Shell:
             return True
         try:
             words = shlex.split(line)
-        except ValueError as exc:
-            console.print(f"  [bold]Can't read that line:[/] {escape(str(exc))}")
+        except ValueError:
+            # "what's waiting?" has an open quote; only a sentence does that.
+            words = []
+        paths = [Path(w).expanduser() for w in words]
+        # A file dragged in arrives as an absolute path, starting with "/".
+        if paths and all(p.exists() for p in paths):
+            head = words[0].lstrip("/").lower()
+            if not (words[0].startswith("/") and head in {*BY_NAME, *ALIASES}):
+                self.run(words)
+                return True
+        if not line.startswith("/") or not words:
+            self.ask(line)
             return True
         head, rest = words[0], words[1:]
         name = ALIASES.get(head[1:].lower(), head[1:].lower())
-        # A file dragged in arrives as an absolute path, starting with "/".
-        is_command = head.startswith("/") and (name in BY_NAME)
-        if not is_command and Path(head).expanduser().exists():
-            self.run(words)
-            return True
-        if not head.startswith("/"):
-            console.print(
-                f"  [bold]Not a command or a file:[/] {escape(head)}\n"
-                "  Commands start with /. Type /help to see them."
-            )
-            return True
         if name == "quit":
             return False
         handler = self.handlers.get(name)
@@ -434,6 +581,48 @@ class Shell:
                 style="#7c7c75",
             )
 
+    def ask(self, request: str) -> None:
+        """Hand a sentence to the assistant, then run what it chose."""
+        s = get_settings()
+        if s.llm_provider not in ("openrouter", "xai"):
+            console.print(
+                "  [bold]Plain-language requests need a live model.[/] Set"
+                " LLM_PROVIDER=openrouter and OPENROUTER_API_KEY, or use a /command:"
+                " type / to see them."
+            )
+            return
+        if self.llm is None:
+            self.llm = chat_model(s, s.extract_model, "low")
+        try:
+            with console.status(f"Asking {s.extract_model}…"):
+                answer, tokens = self.loop.run(assistant.plan(self.llm, request))
+        except Exception as exc:  # the provider, the network or a bad answer
+            console.print(
+                f"  [bold]The assistant couldn't answer:[/] {escape(str(exc))}"
+            )
+            return
+        steps, dropped = assistant.checked(answer)
+        used = sum(u["input_tokens"] + u["output_tokens"] for u in tokens.values())
+        head = Text("  ◆ ", style=SIGNAL)
+        head.append(s.extract_model, style="bold")
+        head.append(f"  {used:,} tokens" if used else "", style="#7c7c75")
+        console.print(head)
+        console.print(Padding(Text(answer.reply), (0, 0, 0, 4)))
+        for reason in dropped:
+            console.print(Text(f"    ✕ Not run: {reason}", style="#a6a69f"))
+        for step in steps:
+            command = shlex.join([f"/{step.command}", *step.args])
+            console.print(Text.assemble("    → ", (command, f"bold {SIGNAL}")))
+        if steps:
+            console.print()
+        for step in steps:
+            self.handlers[step.command](step.args)
+
+    def _status_line(self) -> str:
+        s = get_settings()
+        api = "API up" if self.conn and self.conn.api_up else "local"
+        return f"{s.llm_provider} · {api} · VP: {self.vp_mode}"
+
     # --- helpers --------------------------------------------------------------
 
     def _usage(self, name: str) -> None:
@@ -482,8 +671,6 @@ def run_shell(args: argparse.Namespace) -> int:
             target = args.invoice_path or args.dir
             if target is not None:
                 shell.run([str(target)])
-            if sys.stdin.isatty():
-                _install_completion()
             return shell.loop_forever()
         except KeyboardInterrupt:
             console.print("\n  Stopped.")

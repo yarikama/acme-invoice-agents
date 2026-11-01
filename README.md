@@ -22,7 +22,9 @@ python main.py --dir data/invoices --vp ask
 
 With a file or folder the CLI runs it and exits; `-i` stays in the interactive console afterwards. `--vp ask|approve|reject` answers invoices that pause for a VP, and `--json` prints the results to stdout. While the API is up, the CLI runs through it, so every run also shows in the console.
 
-With no file, `python main.py` starts the API and the web console (`--no-serve` skips them) and opens a prompt with the console's actions as commands: `/run <file>` (or drag a file in), `/dir`, `/runs`, `/approve <run>` and `/reject <run>` for invoices waiting for a VP, `/inventory`, `/eval`, `/open`, `/status` and `/help`. A mistyped command gets the closest match, Tab completes commands and paths, Ctrl-C stops a run without leaving, and invoices run in one session are checked against each other for duplicates.
+With no file, `python main.py` starts the API and the web console (`--no-serve` skips them) and opens a chat-style input with the console's actions as commands: `/run <file>` (or drag a file in), `/dir`, `/runs`, `/approve <run>` and `/reject <run>` for invoices waiting for a VP, `/inventory`, `/eval`, `/open`, `/status` and `/help`. Typing `/` opens a menu of them that Tab moves through; a mistyped command gets the closest match, Ctrl-C stops a run without leaving, and invoices run in one session are checked against each other for duplicates.
+
+Anything else is a request in plain words ("run the adversarial ones", "process the scanned png"). Grok 4.3 turns it into commands, each shown before it runs. It can run invoices and look things up but not approve, reject or change how VP pauses are answered: code drops those from its plan, so a sentence, or text injected into one, never moves money. This needs a live model.
 
 ## What it changes for Acme
 
@@ -181,7 +183,7 @@ make eval       # the eval; ARGS="--set all --repeat 3 --triage typesafe/jev-1.1
 make format
 ```
 
-CI runs 228 Python tests (98% coverage) and 37 web tests on every push; the pre-commit hook runs the linters and type checks. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. LangChain's tracing works as usual: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send every model and tool call to LangSmith.
+CI runs 231 Python tests (98% coverage) and 37 web tests on every push; the pre-commit hook runs the linters and type checks. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. LangChain's tracing works as usual: set `LANGSMITH_TRACING=true` and `LANGSMITH_API_KEY` to send every model and tool call to LangSmith.
 
 ## What's left out
 

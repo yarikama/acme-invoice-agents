@@ -21,6 +21,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "aiosqlite>=0.22.1",
     "httpx>=0.28.1",
+    "prompt-toolkit>=3.0.50",
 ]
 
 [project.optional-dependencies]
