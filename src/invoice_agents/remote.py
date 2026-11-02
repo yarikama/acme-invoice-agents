@@ -163,6 +163,18 @@ async def serve(
 ) -> list[subprocess.Popen[bytes]]:
     """Start the API and the console unless they already run; wait until both answer."""
     started: list[subprocess.Popen[bytes]] = []
+    try:
+        return await _start(api_url, web_url, log_dir, started)
+    except BaseException:
+        # Ctrl-C while waiting: they run in their own session and would
+        # outlive the CLI.
+        stop(started)
+        raise
+
+
+async def _start(
+    api_url: str, web_url: str, log_dir: Path, started: list[subprocess.Popen[bytes]]
+) -> list[subprocess.Popen[bytes]]:
     # Redis first: the API decides at startup whether the assistant's
     # conversation is shared with the terminal.
     redis_server = await asyncio.to_thread(_start_redis, log_dir)

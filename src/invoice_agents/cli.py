@@ -261,6 +261,11 @@ class LocalRunner:
         except Exception as exc:
             self.ledger.settle(run_id, "failed", f"{type(exc).__name__}: {exc}")
             raise
+        except BaseException:
+            # Ctrl-C or a closed terminal: the run stops here, so free the
+            # invoice number rather than leave it in flight as a duplicate.
+            self.ledger.settle(run_id, "dropped", "Stopped before it finished.")
+            raise
         if result["status"] == "awaiting_vp":
             # This process's checkpoints end with it, so nothing can resume
             # the run: free the invoice number for a later run, and say so
@@ -345,7 +350,7 @@ async def _process_all(
 ) -> list[dict[str, Any]]:
     results = []
     for path in paths:
-        console.rule(f"[bold]{path.name}", style="#3a3a37")
+        console.rule(f"[bold]{escape(path.name)}", style="#3a3a37")
         started = time.perf_counter()
         result: dict[str, Any]
         try:

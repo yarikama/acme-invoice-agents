@@ -122,11 +122,18 @@ def within_reach(step: Step, request: str, root: Path = ROOT) -> list[str]:
     if step.command not in ("run", "dir"):
         return []
     folders = [(root / f).resolve() for f in FOLDERS]
+    # Whole words the person typed: a fragment of one ("." in a sentence, a
+    # parent folder of a typed file, an empty string) doesn't count.
+    typed = {t.strip("'\"`,;()[]") for t in request.split()} - {""}
     outside = []
     for arg in step.args:
+        if not arg.strip():
+            outside.append(arg or '""')
+            continue
         path = (root / arg).resolve()
-        typed = arg in request
-        if not typed and not any(path.is_relative_to(f) for f in folders):
+        if arg.strip() not in typed and not any(
+            path.is_relative_to(f) for f in folders
+        ):
             outside.append(arg)
     return outside
 
@@ -139,6 +146,10 @@ def checked(plan: Plan) -> tuple[list[Step], list[str]]:
         name = step.command.strip().lstrip("/").lower()
         if name in ALLOWED:
             step.command = name
+            if name == "eval":
+                # A set name only: flags (--repeat, --out, --critic) are a
+                # person's to type.
+                step.args = step.args[:1]
             if step.parser is not None:
                 choice = step.parser.strip().lower()
                 # Only a parser that exists, and only where a file is read.

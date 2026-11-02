@@ -517,3 +517,22 @@ async def test_a_reconnect_from_before_a_restart_gets_this_process_s_whole_log(c
 async def test_the_chat_says_how_many_messages_it_holds(client):
     body = (await client.get("/api/chat")).json()
     assert body["count"] == 0 and body["messages"] == []
+
+
+async def test_a_page_on_another_site_cannot_change_anything(client):
+    evil = {"Origin": "http://evil.example"}
+    refused = await client.post("/api/reset", headers=evil)
+    assert refused.status_code == 403
+    upload = await client.post(
+        "/api/runs/upload", files={"file": ("x.json", b"{}")}, headers=evil
+    )
+    assert upload.status_code == 403
+    # This console (same host), the configured one, and the CLI (no Origin).
+    assert (
+        await client.post("/api/reset", headers={"Origin": "http://test"})
+    ).status_code == 204
+    console = {"Origin": "http://localhost:5173"}
+    assert (await client.post("/api/reset", headers=console)).status_code == 204
+    assert (await client.post("/api/reset")).status_code == 204
+    # Reading stays open.
+    assert (await client.get("/api/runs", headers=evil)).status_code == 200

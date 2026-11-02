@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SourceFormat(StrEnum):
@@ -26,6 +27,15 @@ class SourceFormat(StrEnum):
 FINITE = ConfigDict(allow_inf_nan=False)
 
 
+# Terminal control characters (escape sequences can clear the screen or
+# rewrite the VP card): an invoice field has no use for them.
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def _printable(value: Any) -> Any:
+    return _CONTROL.sub("", value) if isinstance(value, str) else value
+
+
 class LineItem(BaseModel):
     model_config = FINITE
 
@@ -36,6 +46,11 @@ class LineItem(BaseModel):
         default=None, description="Line total as printed, if the invoice shows one"
     )
     note: str | None = Field(default=None, description="Per-line note, if any")
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _no_control(cls, value: Any) -> Any:
+        return _printable(value)
 
 
 class Invoice(BaseModel):
@@ -67,6 +82,11 @@ class Invoice(BaseModel):
     notes: str | None = Field(
         default=None, description="Free-text notes on the invoice"
     )
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _no_control(cls, value: Any) -> Any:
+        return _printable(value)
 
 
 class Severity(StrEnum):
