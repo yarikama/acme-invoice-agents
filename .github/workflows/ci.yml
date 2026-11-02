@@ -20,6 +20,8 @@ jobs:
       TEST_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
+      # OCR for the scanned invoices.
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true

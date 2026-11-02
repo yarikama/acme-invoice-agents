@@ -24,12 +24,13 @@ dependencies = [
     "prompt-toolkit>=3.0.50",
     "langchain-community>=0.4",
     "redis>=5",
-]
-
-[project.optional-dependencies]
-ocr = [
+    # Reads scanned PDFs and photos (OCR, on CPU).
     "docling==2.140.0",
     "langchain-docling==3.0.0",
+    # Listed so the CPU source below applies to them.
+    "torch",
+    "torchvision",
+    "pymupdf>=1.26",
 ]
 
 [dependency-groups]
@@ -79,3 +80,14 @@ source = ["invoice_agents"]
 fail_under = 95
 show_missing = true
 skip_covered = true
+
+# Docling needs PyTorch; on Linux (CI, Docker) take the CPU build, which is a
+# fraction of the size of the default CUDA one.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

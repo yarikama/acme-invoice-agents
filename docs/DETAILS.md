@@ -53,12 +53,23 @@ flowchart LR
   D --> H[VP decides] --> P & R
 ```
 
-- **Ingest.** JSON, CSV and XML are parsed in code. TXT and PDF go to an extraction agent on `grok-4.3`, which returns a typed `Invoice` and lists each OCR fix it made; a partial result goes back with the problems listed, up to three attempts, and a value the document's text does not contain is flagged. A structured file in a layout code can't read is handed to the agent as text. Scanned PDFs and photos are read with [Docling](https://github.com/docling-project/docling) when the optional extra is installed (`uv sync --extra ocr`).
+- **Ingest.** JSON, CSV and XML are parsed in code. TXT and PDF go to an extraction agent on `grok-4.3`, which returns a typed `Invoice` and lists each OCR fix it made; a partial result goes back with the problems listed, up to three attempts, and a value the document's text does not contain is flagged. A structured file in a layout code can't read is handed to the agent as text. Scanned PDFs and photos are read with OCR first; see below.
 - **Validate.** Deterministic checks, no LLM: arithmetic, non-positive amounts, quantities summed per item against SQLite stock, unknown items, prices well above list, duplicates and revisions (per vendor, remembered across restarts), invoices split to stay under the threshold, vendor names a letter off the vendor master, vendors announcing a new name, currency (the threshold is in dollars), dates against terms, pressure language, instructions addressed to the reviewer, and requests to change bank details.
 - **Approve.** A function-calling agent on `grok-4.7` looks up what its decision depends on (`check_inventory`, `vendor_history`, `convert_to_usd`) and submits its decision through a `SubmitDecision` tool, which a linter in code checks before accepting.
 - **Critique.** A critic checks the draft against the findings, the policy and the lookups, and can send it back; a dispute still open after two rounds goes to a VP.
 - **Policy.** Code has the last word. An error means reject; over $10,000 means a VP, as do the warnings in `VP_REQUIRED_FINDINGS`. The VP's answer resumes the paused run, even after a restart.
 - **Pay.** `mock_payment`, behind an idempotency key, so a node that runs again after a crash can't pay twice. Every outcome is logged with its reason, in the ledger and in `logs/decisions.jsonl`.
+
+### Scanned invoices: a parser you can switch
+
+Scans and photos have no text layer, so they are read with OCR before the extraction agent sees them. Two parsers are installed, both reading characters with [Tesseract](https://github.com/tesseract-ocr/tesseract); `OCR_BACKEND` picks one:
+
+| `OCR_BACKEND` | How it reads | The two sample scans, live on Grok | OCR time |
+|---|---|---|---|
+| `pymupdf` (default) | [PyMuPDF](https://pymupdf.readthedocs.io/) renders each page; Tesseract reads it whole, line by line, so a table row stays one line | 2/2 correct (paid), $0.022 each | about 0.5 s a page |
+| `docling` | [Docling](https://github.com/docling-project/docling)'s layout model finds blocks and tables first and returns Markdown | 0/2: its table model dropped item cells on these slightly skewed scans, so both were rejected (safely, nothing paid) | about 3–6 s a page |
+
+PyMuPDF is the default because it reads these scans correctly. Docling is the better choice for multi-column documents and real tables, where layout matters more than speed. A parser is one function from a file to text (`ingestion/ocr.py`), so another engine, such as a cloud OCR API, fits beside them. PyMuPDF is AGPL-licensed, which matters for a closed-source product; Docling is MIT.
 
 ### Five loops catch mistakes before a person sees them
 
@@ -100,7 +111,7 @@ The held-out set was written after the adversarial fixes and committed before it
 | Assistant | Plan-then-run with code allowlists; Redis-backed shared history | Plain words in both consoles without letting text move money | Needs a live model; Redis to share |
 | Replay | Record each agent's answers and timing, keyed by its inputs | Reviewers without a key see the real agents, at the real pace | A recording to refresh when inputs change; a test fails when it no longer covers every eval case |
 | VP identity | A bearer token per VP; the run records whose | Separation of duties needs the approver to be someone, provably | Shared secrets, not SSO |
-| OCR | Docling, optional | Local, CPU, MIT; text PDFs keep the fast path | A heavy install |
+| OCR | PyMuPDF by default, Docling by setting; both on Tesseract | Local, CPU, no cloud; text PDFs keep the fast path | Tesseract to install; Docling brings PyTorch |
 
 ## API
 

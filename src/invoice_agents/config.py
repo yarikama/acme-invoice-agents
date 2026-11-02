@@ -99,8 +99,10 @@ class Settings(BaseSettings):
         "BANK_DETAILS_CHANGED",
         "LOOKALIKE_VENDOR",
     ]
-    # Reads scanned PDFs and photos (needs `uv sync --extra ocr`).
-    ocr_backend: Literal["docling"] = "docling"
+    # Reads scanned PDFs and photos: PyMuPDF (whole page, plain text, fast) or
+    # Docling (layout model, Markdown tables). Both use Tesseract; see
+    # ingestion/ocr.py for which to pick.
+    ocr_backend: Literal["pymupdf", "docling"] = "pymupdf"
     max_extract_attempts: int = 3
     max_review_rounds: int = 2
     # Model turns the approver gets for tool calls before it must decide.
@@ -132,10 +134,11 @@ class Settings(BaseSettings):
             self.replay_for_lack_of_key = True
         return self
 
-    @field_validator("triage_model", mode="before")
+    @field_validator("triage_model", "record_to", mode="before")
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:
-        """`TRIAGE_MODEL=` in a .env means no triage, not a model named ""."""
+        """`TRIAGE_MODEL=` in a .env means no triage, not a model named "";
+        `RECORD_TO=` means don't record, not record to the current folder."""
         if isinstance(value, str) and not value.strip():
             return None
         return value

@@ -47,7 +47,9 @@ def test_offline_run_scores_structured_files_and_skips_text(
     assert by_case["invoice_1016.json"]["findings"] == ["UNKNOWN_ITEM"]
     assert data["summary"]["accuracy"] == 1.0
     assert data["summary"]["total_cost_usd"] is None
-    assert "skipped (need an LLM)" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "1 skipped" in out or " skipped" in out
+    assert "SKIP" in out and "need an LLM" not in out
 
 
 def test_a_wrong_outcome_fails_the_run(

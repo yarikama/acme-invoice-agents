@@ -75,6 +75,19 @@
    },
    "seconds": 2.37
   },
+  "critique:1009979cc3019c933d41": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1848,
+     "output_tokens": 513
+    }
+   },
+   "seconds": 8.08
+  },
   "critique:14306333d398c16b9afe": {
    "critique": {
     "agrees": true,
@@ -834,6 +847,19 @@
    },
    "seconds": 7.08
   },
+  "critique:cb7f375d31e15b854d1a": {
+   "critique": {
+    "agrees": true,
+    "issues": []
+   },
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 1806,
+     "output_tokens": 595
+    }
+   },
+   "seconds": 8.01
+  },
   "critique:d130789c819c0e3c2873": {
    "critique": {
     "agrees": true,
@@ -1143,6 +1169,48 @@
     2.82,
     2.82,
     2.82
+   ]
+  },
+  "draft:32e8840ce817a568c080": {
+   "draft": {
+    "decision": "approve",
+    "rationale": "No validation findings were reported, and every check passed. WidgetA and WidgetB unit prices match inventory list prices exactly ($250 and $500). The USD total is $3,000, below the $10,000 human-VP threshold, and there are no prior invoices from Summit Manufacturing Co. Nothing suggests fraud or a bad invoice.",
+    "addressed": []
+   },
+   "steps": [
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetA"
+     },
+     "result": "WidgetA: 15 in stock, list price $250.00."
+    },
+    {
+     "name": "check_inventory",
+     "args": {
+      "item": "WidgetB"
+     },
+     "result": "WidgetB: 10 in stock, list price $500.00."
+    },
+    {
+     "name": "vendor_history",
+     "args": {
+      "vendor": "Summit Manufacturing Co."
+     },
+     "result": "No earlier invoices from this vendor."
+    }
+   ],
+   "tokens": {
+    "x-ai/grok-4.7": {
+     "input_tokens": 4269,
+     "output_tokens": 365
+    }
+   },
+   "seconds": 6.79,
+   "step_at": [
+    3.18,
+    3.18,
+    3.18
    ]
   },
   "draft:33eb7f6648e7553c44c7": {
@@ -2032,7 +2100,7 @@
   "draft:a000b70452400c6a2462": {
    "draft": {
     "decision": "approve",
-    "rationale": "No validation findings: every check passed. Invoice total is $3,000 USD, below the $10,000 VP threshold. Inventory confirms WidgetA list price $250 and WidgetB list price $500, matching the invoice unit prices exactly, with sufficient stock (15 and 10). Vendor history shows no earlier invoices, so no duplicate-payment concern. Nothing indicates fraud or a bad invoice.",
+    "rationale": "No validation findings: every check passed, and there are no error or warning codes. Invoice total is $3,000 USD, below the $10,000 VP threshold. Inventory confirms WidgetA list price $250 (invoice $250, qty 6, 15 in stock) and WidgetB list price $500 (invoice $500, qty 3, 10 in stock), so prices match list and quantities are in stock. Vendor history shows no earlier invoices from Summit Manufacturing Co., so no duplicate-payment concern. Approve for payment.",
     "addressed": []
    },
    "steps": [
@@ -2060,15 +2128,15 @@
    ],
    "tokens": {
     "x-ai/grok-4.7": {
-     "input_tokens": 4269,
-     "output_tokens": 339
+     "input_tokens": 4283,
+     "output_tokens": 539
     }
    },
-   "seconds": 6.4,
+   "seconds": 8.35,
    "step_at": [
-    3.43,
-    3.43,
-    3.43
+    3.5,
+    3.5,
+    3.5
    ]
   },
   "draft:a1c699757afee67801a0": {
@@ -2614,6 +2682,49 @@
     3.86
    ]
   },
+  "extract:25159a8876a9c488558d": {
+   "extraction": {
+    "invoice": {
+     "invoice_number": "INV-10114",
+     "revision": null,
+     "vendor": "Summit Manufacturing Co.",
+     "vendor_address": null,
+     "invoice_date": "2026-01-20",
+     "due_date": "2026-02-20",
+     "currency": "USD",
+     "line_items": [
+      {
+       "item": "WidgetA",
+       "quantity": 6.0,
+       "unit_price": 250.0,
+       "amount": 1500.0,
+       "note": null
+      },
+      {
+       "item": "WidgetB",
+       "quantity": 3.0,
+       "unit_price": 500.0,
+       "amount": 1500.0,
+       "note": null
+      }
+     ],
+     "subtotal": null,
+     "tax_amount": null,
+     "shipping": null,
+     "total": 3000.0,
+     "payment_terms": null,
+     "notes": null
+    },
+    "corrections": []
+   },
+   "tokens": {
+    "x-ai/grok-4.3": {
+     "input_tokens": 1123,
+     "output_tokens": 722
+    }
+   },
+   "seconds": 9.5
+  },
   "extract:392cb9735cdbf5de2def": {
    "extraction": {
     "invoice": {
@@ -3052,6 +3163,49 @@
     }
    },
    "seconds": 9.92
+  },
+  "extract:9aada23652a93a4fb6a8": {
+   "extraction": {
+    "invoice": {
+     "invoice_number": "INV-1011",
+     "revision": null,
+     "vendor": "Summit Manufacturing Co.",
+     "vendor_address": null,
+     "invoice_date": "2026-01-20",
+     "due_date": "2026-02-20",
+     "currency": "USD",
+     "line_items": [
+      {
+       "item": "WidgetA",
+       "quantity": 6.0,
+       "unit_price": 250.0,
+       "amount": 1500.0,
+       "note": null
+      },
+      {
+       "item": "WidgetB",
+       "quantity": 3.0,
+       "unit_price": 500.0,
+       "amount": 1500.0,
+       "note": null
+      }
+     ],
+     "subtotal": null,
+     "tax_amount": null,
+     "shipping": null,
+     "total": 3000.0,
+     "payment_terms": null,
+     "notes": null
+    },
+    "corrections": []
+   },
+   "tokens": {
+    "x-ai/grok-4.3": {
+     "input_tokens": 1124,
+     "output_tokens": 976
+    }
+   },
+   "seconds": 18.18
   },
   "extract:a72eaf616b0f9fdba326": {
    "extraction": {
