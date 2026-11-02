@@ -171,6 +171,12 @@ def _signals_end_the_cli() -> Iterator[None]:
             signal.signal(sig, handler)
 
 
+# Said whenever "auto" found no key: what the viewer sees is a recording.
+NO_KEY = (
+    " No API key found, so this replays a recorded live run of the samples."
+    " Set XAI_API_KEY (or OPENROUTER_API_KEY) in .env to run it live."
+)
+
 # A run in this process ends with it, so it can't wait for a VP; one in
 # the API can (checkpoints), so it waits for the web console.
 CANT_WAIT = (
@@ -389,6 +395,8 @@ async def connect(
             RemoteRunner(remote.Api(args.api, client)), api_up, web_up, mode
         )
     mode = f"Running here with the {settings.llm_provider} provider."
+    if settings.replay_for_lack_of_key:
+        mode += NO_KEY
     return Connection(local or LocalRunner(settings), api_up, web_up, mode)
 
 

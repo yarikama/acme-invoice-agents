@@ -131,6 +131,8 @@ async def health(settings: SettingsDep, request: Request) -> dict[str, Any]:
     return {
         "status": "ok",
         "llm_provider": settings.llm_provider,
+        # "auto" found no API key: the console says it shows a recording.
+        "no_key": settings.replay_for_lack_of_key,
         # The console asks for a VP token up front when this is true.
         "vp_auth": bool(settings.vp_tokens),
         # The assistant needs a live model; "shared" means Redis holds the

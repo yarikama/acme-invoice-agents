@@ -1,8 +1,8 @@
 # The whole system with one command:  docker compose up
 #   console and API  http://localhost:8000
 #   the CLI          docker compose run --rm cli --invoice_path=data/invoices/invoice_1001.txt
-# Replay by default (no API key). For live Grok, put LLM_PROVIDER and the key
-# in .env: it is read at run time and never copied into the image.
+# Live Grok when .env has XAI_API_KEY or OPENROUTER_API_KEY; with no key it
+# replays a recorded live run. .env is read at run time, never put in the image.
 
 services:
   redis:

@@ -26,7 +26,7 @@ const json = (body: unknown): RequestInit => ({
 });
 
 export const api = {
-  health: () => request<{ status: string; llm_provider: string; vp_auth: boolean }>("/api/health"),
+  health: () => request<{ status: string; llm_provider: string; vp_auth: boolean; no_key?: boolean }>("/api/health"),
   samples: () => request<Sample[]>("/api/samples"),
   runs: () => request<RunOverview[]>("/api/runs"),
   startSample: (sample: string) => request<RunOverview>("/api/runs", json({ sample })),
