@@ -210,7 +210,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=Path("eval-results"))
     args = parser.parse_args(argv)
 
-    settings = get_settings()
+    # Scoring replays answers at once, not at the pace they were recorded.
+    settings = get_settings().model_copy(update={"replay_pace": 0.0})
     if settings.openrouter_api_key is None:
         print("triage-eval needs OPENROUTER_API_KEY", file=sys.stderr)
         return 2

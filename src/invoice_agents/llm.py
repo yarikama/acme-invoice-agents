@@ -91,10 +91,11 @@ def build_agents(settings: Settings) -> Agents:
     if settings.llm_provider == "replay":
         # Triage isn't recorded: every invoice goes through the agents.
         recording = Recording.shared(settings.replay_path)
+        pace = settings.replay_pace
         return Agents(
-            ReplayExtractor(recording),
-            ReplayApprover(recording),
-            ReplayCritic(recording),
+            ReplayExtractor(recording, pace),
+            ReplayApprover(recording, pace),
+            ReplayCritic(recording, pace),
         )
     extract_llm = chat_model(
         settings, settings.extract_model, settings.extract_reasoning

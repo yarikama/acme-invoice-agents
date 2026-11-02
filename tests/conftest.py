@@ -24,6 +24,8 @@ def fresh_memory(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
     monkeypatch.setattr(memory, "_local", {})
     monkeypatch.setenv("REDIS_URL", "")
+    # Replayed answers come back at once in tests, not at the recorded pace.
+    monkeypatch.setenv("REPLAY_PACE", "0")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
