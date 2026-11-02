@@ -96,7 +96,9 @@ class SeenInvoices:
 
     def settle(self, run_id: str, outcome: Outcome, reason: str | None = None) -> None:
         for entry in self._entries:
-            if entry.run_id == run_id:
+            # A payment is never undone by a later failure: duplicate checks
+            # must keep seeing it.
+            if entry.run_id == run_id and entry.outcome != "paid":
                 entry.outcome, entry.reason = outcome, reason
 
     def clear(self) -> None:
@@ -114,6 +116,9 @@ VP_REQUIRED_DEFAULT = frozenset(
         "INSTRUCTIONS_IN_DOCUMENT",
         "BANK_DETAILS_CHANGED",
         "LOOKALIKE_VENDOR",
+        "POSSIBLE_DUPLICATE",
+        "VENDOR_RENAMED",
+        "NOT_IN_DOCUMENT",
     }
 )
 
@@ -204,8 +209,51 @@ def _sentence(text: str) -> str:
     return text[:1].upper() + text[1:] + "."
 
 
+# A revision written into the invoice number: "INV-1004-R1", "INV-1004 Rev. 2".
+_REVISION_SUFFIX = re.compile(
+    r"^(?P<base>.*\d)[\s\-_/.]*(?:r|rev\.?|revision)\s*-?\s*(?P<rev>\d+)$", re.I
+)
+
+
 def _number_key(number: str) -> str:
-    return re.sub(r"[^0-9]", "", number)
+    """The digits that identify an invoice, without a revision suffix."""
+    match = _REVISION_SUFFIX.match(number.strip())
+    return re.sub(r"[^0-9]", "", match["base"] if match else number)
+
+
+def _revision_of(inv: Invoice) -> str | None:
+    """The revision, from its own field or a suffix on the number."""
+    if inv.revision:
+        return inv.revision
+    match = _REVISION_SUFFIX.match((inv.invoice_number or "").strip())
+    return f"R{match['rev']}" if match else None
+
+
+def paid_already(inv: Invoice, seen: SeenInvoices, run_id: str) -> str | None:
+    """Asked again just before paying: whether another run paid this invoice,
+    or another version of it, while this one waited (for a VP, say). The
+    checks at validation saw the ledger as it was then."""
+    if not inv.invoice_number:
+        return None
+    key = _number_key(inv.invoice_number)
+    vendor = _vendor_key(inv.vendor or "")
+    for e in seen.entries:
+        if (
+            e.run_id != run_id
+            and e.outcome == "paid"
+            and e.invoice.invoice_number
+            and _number_key(e.invoice.invoice_number) == key
+            and (
+                not vendor
+                or not e.invoice.vendor
+                or _vendor_key(e.invoice.vendor) == vendor
+            )
+        ):
+            return (
+                f"{e.invoice.invoice_number} was paid while this run waited;"
+                f" {inv.invoice_number} can't be paid on top of it."
+            )
+    return None
 
 
 def _required_fields(inv: Invoice) -> list[Finding]:
@@ -512,7 +560,8 @@ def _split(inv: Invoice, seen: SeenInvoices, policy: Policy) -> list[Finding]:
     """Invoices from one vendor, days apart, each under the threshold, that
     together cross it: a purchase split to avoid VP review."""
     limit = policy.approval_threshold
-    if inv.total is None or inv.total > limit or not inv.vendor:
+    total = usd_total(inv)
+    if total is None or total > limit or not inv.vendor:
         return []
     vendor = item_key(inv.vendor)
     number = _number_key(inv.invoice_number or "")
@@ -529,12 +578,13 @@ def _split(inv: Invoice, seen: SeenInvoices, policy: Policy) -> list[Finding]:
         for o in seen.invoices
         if o.vendor
         and item_key(o.vendor) == vendor
-        and o.total is not None
-        and o.total <= limit
+        and (usd_total(o) or 0) > 0
+        and (usd_total(o) or 0) <= limit
         and _number_key(o.invoice_number or "") != number
         and near(o)
     ]
-    combined = inv.total + sum(o.total or 0 for o in others)
+    # In dollars, like the threshold: a ¥500,000 and a $8,750 invoice add up.
+    combined = total + sum(usd_total(o) or 0 for o in others)
     if not others or combined <= limit:
         return []
     numbers = ", ".join(o.invoice_number or "unnumbered" for o in others)
@@ -715,7 +765,7 @@ def _resubmitted(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
         and _vendor_key(e.invoice.vendor) == vendor
         and e.invoice.total is not None
         and abs(e.invoice.total - inv.total) < 0.005
-        and e.invoice.currency == inv.currency
+        and e.invoice.currency.upper() == inv.currency.upper()
         and _number_key(e.invoice.invoice_number or "") != number
         and same_day(e.invoice)
     ]
@@ -760,7 +810,8 @@ def _duplicates(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
     if not standing:
         return []
     paid = [e for e in standing if e.outcome == "paid"]
-    if inv.revision and all(e.invoice.revision != inv.revision for e in standing):
+    revision = _revision_of(inv)
+    if revision and all(_revision_of(e.invoice) != revision for e in standing):
         if paid:
             first = paid[0].invoice
             return [
@@ -770,14 +821,14 @@ def _duplicates(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
                     "An earlier version was already paid",
                     f"{inv.invoice_number} was paid at"
                     f" {first.currency} {first.total or 0:,.2f}; revision"
-                    f" {inv.revision} cannot be paid on top of it.",
+                    f" {revision} cannot be paid on top of it.",
                 )
             ]
         return [
             _f(
                 "SUPERSEDES",
                 Severity.WARNING,
-                f"Revision {inv.revision} of an earlier invoice",
+                f"Revision {revision} of an earlier invoice",
                 f"{inv.invoice_number} was already received; only one may be paid.",
             )
         ]

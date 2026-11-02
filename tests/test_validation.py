@@ -477,3 +477,69 @@ def test_possible_duplicate_needs_the_same_vendor_day_and_total(inventory):
     seen.settle("r1", "rejected")
     other = first.model_copy(update=renumbered)
     assert "POSSIBLE_DUPLICATE" not in codes(validate(other, inventory, seen))
+
+
+def test_a_version_paid_while_this_one_waited_is_not_paid_on_top(inventory):
+    """INV-1004 and its R1 both wait for a VP; the VP approves the original,
+    then R1. Validation saw neither paid, so the pay step checks again."""
+    from invoice_agents.validation import paid_already
+
+    seen = SeenInvoices()
+    original = inv_1011().model_copy(update={"invoice_number": "INV-1004"})
+    revised = original.model_copy(update={"revision": "R1", "total": 5940.0})
+    seen.add(original, run_id="orig")
+    seen.add(revised, run_id="rev")
+    assert paid_already(revised, seen, "rev") is None  # nothing paid yet
+    seen.settle("orig", "paid")
+    assert "was paid while this run waited" in (
+        paid_already(revised, seen, "rev") or ""
+    )
+    # Its own payment, or another vendor's INV-1004, doesn't count.
+    assert paid_already(original, seen, "orig") is None
+    other = original.model_copy(update={"vendor": "Another Vendor LLC"})
+    assert paid_already(other, seen, "x") is None
+
+
+def test_a_revision_written_into_the_number_is_still_a_revision(inventory):
+    seen = SeenInvoices()
+    paid = inv_1011().model_copy(update={"invoice_number": "INV-1004"})
+    seen.add(paid, run_id="r1")
+    seen.settle("r1", "paid")
+    for number in ("INV-1004-R1", "INV-1004 Rev. 1", "INV-1004/r1"):
+        revised = paid.model_copy(update={"invoice_number": number, "total": 750.0})
+        assert "ALREADY_PAID" in codes(
+            validate(revised, inventory, seen), Severity.ERROR
+        ), number
+
+
+def test_a_split_across_currencies_is_added_up_in_dollars(inventory):
+    seen = SeenInvoices()
+    yen = make(
+        [("WidgetA", 1, 250.0)], 500_000.0, invoice_number="INV-7001", currency="JPY"
+    )
+    seen.add(yen)
+    usd = make([("WidgetA", 1, 250.0)], 8_750.0, invoice_number="INV-7002")
+    assert "SPLIT_BELOW_THRESHOLD" in codes(validate(usd, inventory, seen))
+
+
+def test_possible_duplicate_ignores_the_currency_s_case(inventory):
+    seen = SeenInvoices()
+    seen.add(inv_1011(), run_id="r1")
+    copy = inv_1011().model_copy(
+        update={"invoice_number": "INV-10114", "currency": "usd"}
+    )
+    assert "POSSIBLE_DUPLICATE" in codes(validate(copy, inventory, seen))
+
+
+def test_a_renamed_vendor_or_an_ungrounded_value_goes_to_a_vp():
+    required = Settings(_env_file=None).vp_required_findings  # pyright: ignore[reportCallIssue]
+    assert {"VENDOR_RENAMED", "NOT_IN_DOCUMENT", "POSSIBLE_DUPLICATE"} <= set(required)
+    assert {"VENDOR_RENAMED", "NOT_IN_DOCUMENT"} <= Policy().vp_required
+
+
+def test_blank_paths_in_the_environment_mean_none(monkeypatch):
+    for name in ("DECISIONS_LOG", "LOG_JSON", "CRITIC_MODEL", "CRITIC_REASONING"):
+        monkeypatch.setenv(name, "")
+    s = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    assert s.decisions_log is None and s.log_json is None
+    assert s.critic_model is None and s.critic_reasoning is None
