@@ -153,12 +153,33 @@ def docling_text(path: Path) -> str:
     return cached("docling", path, read)
 
 
+# Limits on what one file may cost to render: an invoice is a page or two,
+# and a 200-inch page or a phone photo with 72-dpi metadata would otherwise
+# render to gigabytes.
+MAX_PAGES = 10
+MAX_SIDE = 4000  # pixels, the longer side
+
+
 def page_images(path: Path, dpi: int = 300) -> list[bytes]:
-    """Each page of a PDF, or a photo as one page, rendered to PNG."""
+    """Each page of a PDF, or a photo as one page, rendered to PNG at `dpi`,
+    scaled down so its longer side stays within MAX_SIDE pixels."""
     import pymupdf
 
     with pymupdf.open(path) as doc:
-        return [page.get_pixmap(dpi=dpi).tobytes("png") for page in doc]
+        if doc.page_count > MAX_PAGES:
+            raise OcrUnavailableError(
+                f"The file has {doc.page_count} pages; scans of up to"
+                f" {MAX_PAGES} are read."
+            )
+        images = []
+        for page in doc:
+            longest = max(page.rect.width, page.rect.height) or 1
+            zoom = min(dpi / 72, MAX_SIDE / longest)
+            pix = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom))
+            # Tesseract sizes text by the image's DPI: record the real one.
+            pix.set_dpi(round(72 * zoom), round(72 * zoom))
+            images.append(pix.tobytes("png"))
+        return images
 
 
 def pymupdf_text(path: Path) -> str:
