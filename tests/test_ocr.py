@@ -135,3 +135,20 @@ async def test_the_graph_reads_files_off_the_event_loop(
     )
     assert "load_document" in seen and "validate" not in seen
     assert "Read the scan with OCR (pymupdf)" in state["trace"][0]["message"]
+
+
+def test_without_the_docling_extra_the_error_says_how_to_install(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(ocr_module.shutil, "which", lambda _name: "/usr/bin/tesseract")
+    monkeypatch.setattr(ocr_module, "docling_installed", lambda: False)
+    monkeypatch.setattr(ocr_module, "_read", {})
+    ocr_module._docling_loader.cache_clear()
+    scan = tmp_path / "scan.png"
+    scan.write_bytes((SCANNED / "invoice_1011_scan.png").read_bytes())
+    try:
+        with pytest.raises(OcrUnavailableError, match="uv sync --extra docling"):
+            load_document(scan, ocr_module.docling_text)
+    finally:
+        ocr_module._docling_loader.cache_clear()
+    assert ocr_module.available() == ["pymupdf", "grok"]

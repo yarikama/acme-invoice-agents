@@ -37,6 +37,7 @@ from invoice_agents.api.chat import ChatService, ChatUnavailableError
 from invoice_agents.api.runs import RunManager, RunNotFoundError, RunStateError
 from invoice_agents.config import Settings, get_settings
 from invoice_agents.graph import build_graph, checkpoint_serde, stored_deps
+from invoice_agents.ingestion import ocr
 from invoice_agents.inventory import Inventory
 from invoice_agents.llm import chat_model, load_pricing
 from invoice_agents.models import HumanDecision, SourceFormat
@@ -148,8 +149,10 @@ async def health(settings: SettingsDep, request: Request) -> dict[str, Any]:
         # The assistant needs a live model; "shared" means Redis holds the
         # conversation, so the terminal sees it too.
         "chat": {"available": chat.available, "shared": chat.shared},
-        # The parser scans get unless a run picks another.
+        # The parser scans get unless a run picks another, and the ones this
+        # install can run (docling is an optional extra).
         "parser": settings.ocr_backend,
+        "parsers": ocr.available(),
     }
 
 

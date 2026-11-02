@@ -67,7 +67,7 @@ Scans and photos have no text layer, so a parser turns them into text before the
 | Parser | How it reads | The two sample scans, live on Grok | Time to read a scan | Extra cost |
 |---|---|---|---|---|
 | `pymupdf` (default) | [PyMuPDF](https://pymupdf.readthedocs.io/) renders each page; [Tesseract](https://github.com/tesseract-ocr/tesseract) reads it whole, line by line, so a table row stays one line | 2/2 correct (paid) | about 0.5 s | none |
-| `docling` | [Docling](https://github.com/docling-project/docling)'s layout model finds blocks and tables first, then Tesseract; returns Markdown | 0/2: its table model dropped item cells on these slightly skewed scans, so both were rejected (safely, nothing paid) | 3–6 s | none |
+| `docling` (optional extra) | [Docling](https://github.com/docling-project/docling)'s layout model finds blocks and tables first, then Tesseract; returns Markdown | 0/2: its table model dropped item cells on these slightly skewed scans, so both were rejected (safely, nothing paid) | 3–6 s | none |
 | `grok` | Grok (`grok-4.3`) reads the page image and transcribes it exactly as printed, without correcting anything | 2/2 correct (paid) | 13–18 s | about $0.005 a scan |
 
 Where to pick it:
@@ -92,7 +92,7 @@ Where to pick it:
 
 Fifteen images from three invoices is a small set, and the degradations are simulated, so read the gaps rather than the decimals: Tesseract-based parsers hold up on clean to faxed scans and fall apart on photos, while Grok vision reads all of them, for 0.6¢ and about 13 seconds more per scan.
 
-PyMuPDF is the default because it is fast, free, offline, and reads these scans correctly. Docling suits multi-column documents and real tables. Grok vision suits phone photos, faxes and skewed or noisy scans, where Tesseract struggles, at the price of a model call. Grok only transcribes; the extraction agent and every check still run on its text, so a misread can't skip validation. Its readings are recorded with the rest, so replay shows them without a key.
+PyMuPDF is the default because it is fast, free, offline, and reads these scans correctly. Docling suits multi-column documents and real tables; it is an optional extra (`uv sync --extra docling`, about 1 GB with PyTorch, and its layout model downloads from Hugging Face on first use), so the default install stays small and offline. Grok vision suits phone photos, faxes and skewed or noisy scans, where Tesseract struggles, at the price of a model call. Grok only transcribes; the extraction agent and every check still run on its text, so a misread can't skip validation. Its readings are recorded with the rest, so replay shows them without a key.
 
 A parser is one function from a file to text (`ingestion/ocr.py`), so another engine, such as a cloud invoice OCR, fits beside these. PyMuPDF is AGPL-licensed, which matters for a closed-source product; Docling and Tesseract are MIT and Apache 2.0.
 

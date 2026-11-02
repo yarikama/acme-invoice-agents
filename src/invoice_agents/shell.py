@@ -71,6 +71,7 @@ from invoice_agents.cli import (
 )
 from invoice_agents.config import ROOT, get_settings
 from invoice_agents.inbox import Inbox, watch
+from invoice_agents.ingestion import ocr
 from invoice_agents.ingestion.ocr import PARSERS
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
@@ -592,6 +593,9 @@ class Shell:
     def parser(self, args: list[str]) -> None:
         if args and args[0] not in PARSERS:
             self._usage("parser")
+            return
+        if args and args[0] not in ocr.available():
+            console.print(f"  {ocr.NO_DOCLING}")
             return
         if args:
             self.args.parser = args[0]

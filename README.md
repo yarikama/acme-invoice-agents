@@ -83,7 +83,7 @@ flowchart LR
   V -.-> D
 ```
 
-1. **Ingest.** JSON, CSV and XML are read by code. Text and PDF invoices go to Grok, which fills in a typed form (vendor, amount, items, due date) and fixes typos like "2O26". If something is missing, it is asked again with what was wrong. Scanned PDFs and photos are read first by a parser you pick for each run: **PyMuPDF** (default; Tesseract on the whole page, fast and free), **Docling** (a layout model finds the tables first) or **Grok vision** (Grok reads the page image; best on poor scans). Pick it with `--parser`, `/parser` in the console, the **scan parser** menu in the web console, or in plain words ("read the 1011 scan with Grok").
+1. **Ingest.** JSON, CSV and XML are read by code. Text and PDF invoices go to Grok, which fills in a typed form (vendor, amount, items, due date) and fixes typos like "2O26". If something is missing, it is asked again with what was wrong. Scanned PDFs and photos are read first by a parser you pick for each run: **PyMuPDF** (default; Tesseract on the whole page, fast and free), **Docling** (optional: `uv sync --extra docling`; a layout model finds the tables first) or **Grok vision** (Grok reads the page image; best on poor scans). Pick it with `--parser`, `/parser` in the console, the **scan parser** menu in the web console, or in plain words ("read the 1011 scan with Grok").
 2. **Validate.** Code, no AI: it checks the math, stock in the SQLite inventory, unknown items, duplicates, prices, the $10,000 threshold and known fraud signs. Each problem is an error (blocks payment) or a warning (needs judgment).
 3. **Approve.** A Grok agent decides approve, reject or escalate. It calls tools to look up what it needs (stock, vendor history, exchange rates). A critic reviews the decision and can send it back. Code then applies the policy: an error means reject, and big or risky invoices go to a VP.
 4. **Pay or reject.** Approved invoices go to the mock payment API; rejections are logged with the reason.
@@ -124,7 +124,7 @@ The other samples are handled too: duplicates (1011 as text and PDF), a revision
 
 ![Cost and time per invoice: Grok only 2.57¢ and 31.6 s; Jev first 1.78¢ and 22.9 s; Perplexity first 0.87¢ and 12.9 s](docs/images/fast-and-slow.png)
 
-**Reads bad scans, with a parser you pick.** Scanned PDFs and photos go through PyMuPDF (default, free), Docling, or Grok vision, chosen per run. On 15 scans from clean to phone photo, Grok read every amount, date and invoice number exactly:
+**Reads bad scans, with a parser you pick.** Scanned PDFs and photos go through PyMuPDF (default, free), Docling (optional), or Grok vision, chosen per run. On 15 scans from clean to phone photo, Grok read every amount, date and invoice number exactly:
 
 ![Key numbers read exactly by each parser on clean, skewed, low-res, fax and phone-photo scans: PyMuPDF 93, 95, 95, 84, 35 percent; Docling 72, 55, 73, 70, 45; Grok vision 100 on all five](docs/images/parsers.png)
 

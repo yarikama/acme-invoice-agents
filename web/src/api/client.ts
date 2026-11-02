@@ -30,9 +30,14 @@ export type Parser = "pymupdf" | "docling" | "grok";
 
 export const api = {
   health: () =>
-    request<{ status: string; llm_provider: string; vp_auth: boolean; no_key?: boolean; parser?: Parser }>(
-      "/api/health",
-    ),
+    request<{
+      status: string;
+      llm_provider: string;
+      vp_auth: boolean;
+      no_key?: boolean;
+      parser?: Parser;
+      parsers?: Parser[];
+    }>("/api/health"),
   samples: () => request<Sample[]>("/api/samples"),
   runs: () => request<RunOverview[]>("/api/runs"),
   startSample: (sample: string, parser?: Parser) => request<RunOverview>("/api/runs", json({ sample, parser })),

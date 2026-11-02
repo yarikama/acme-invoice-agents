@@ -22,8 +22,8 @@ ENV UV_COMPILE_BYTECODE=1 \
     PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
-# Dependencies first, so code changes don't reinstall them. Docling brings
-# PyTorch; pyproject takes its CPU build on Linux.
+# Dependencies first, so code changes don't reinstall them. The optional
+# docling parser (PyTorch, about 1 GB) is left out.
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --locked --no-dev --no-install-project
 COPY src/ src/

@@ -24,13 +24,19 @@ dependencies = [
     "prompt-toolkit>=3.0.50",
     "langchain-community>=0.4",
     "redis>=5",
-    # Reads scanned PDFs and photos (OCR, on CPU).
+    # Renders scanned PDFs and photos for OCR (Tesseract) and for Grok vision.
+    "pymupdf>=1.26",
+]
+
+[project.optional-dependencies]
+# The docling scan parser: a layout model on PyTorch, about 1 GB. Optional,
+# since PyMuPDF and Grok vision read the sample scans better (make parser-eval).
+docling = [
     "docling==2.140.0",
     "langchain-docling==3.0.0",
     # Listed so the CPU source below applies to them.
     "torch",
     "torchvision",
-    "pymupdf>=1.26",
 ]
 
 [dependency-groups]
@@ -81,7 +87,7 @@ fail_under = 95
 show_missing = true
 skip_covered = true
 
-# Docling needs PyTorch; on Linux (CI, Docker) take the CPU build, which is a
+# The docling extra needs PyTorch; on Linux take the CPU build, which is a
 # fraction of the size of the default CUDA one.
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
