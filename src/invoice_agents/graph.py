@@ -36,6 +36,8 @@ from invoice_agents.approval import (
 from invoice_agents.config import Settings
 from invoice_agents.ingestion import load_document
 from invoice_agents.ingestion.ocr import BACKENDS as OCR_BACKENDS
+from invoice_agents.ingestion.ocr import Ocr, OcrUnavailableError
+from invoice_agents.ingestion.ocr import cached as ocr_cached
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import Agents, build_agents
@@ -54,7 +56,14 @@ from invoice_agents.models import (
 from invoice_agents.payment import MockBank
 from invoice_agents.tools import ReviewTools
 from invoice_agents.triage import TriageAnswer, TriageError, fast_path
-from invoice_agents.usage import Pricing, StepUsage, Tokens, collecting, step_usage
+from invoice_agents.usage import (
+    Pricing,
+    StepUsage,
+    Tokens,
+    add,
+    collecting,
+    step_usage,
+)
 from invoice_agents.validation import (
     Policy,
     SeenInvoices,
@@ -107,6 +116,8 @@ class InvoiceState(TypedDict, total=False):
     path: str
     # What to call the file: an upload is stored under a random name.
     source: str
+    # Which parser reads a scan (pymupdf, docling, grok); unset: the default.
+    parser: str
     source_format: str
     invoice: Invoice | None
     corrections: list[str]
@@ -225,12 +236,40 @@ def build_graph(
 ) -> CompiledStateGraph:
     settings = deps.settings
 
+    def parser_for(name: str) -> Ocr:
+        """The parser's read function, resolved only when a scan needs it, so
+        a text invoice never trips over a parser it doesn't use."""
+
+        def read(path: Path) -> str:
+            if name != "grok":
+                return OCR_BACKENDS[name](path)
+            reader = deps.agents.reader
+            if reader is None:
+                raise OcrUnavailableError(
+                    "The grok parser has Grok read the scan, which needs a model:"
+                    " set XAI_API_KEY or OPENROUTER_API_KEY, or pick pymupdf or"
+                    " docling."
+                )
+            # Once per file: an extraction retry reads the same scan again.
+            return ocr_cached("grok", path, lambda: reader.read(path))
+
+        return read
+
+    def parser_label(name: str) -> str:
+        if name == "grok" and deps.agents.reader is not None:
+            return f"Read the scan with Grok vision ({deps.agents.reader.model})."
+        return f"Read the scan with OCR ({name})."
+
     async def ingest(state: InvoiceState) -> InvoiceState:
         _emit("ingest", "start")
+        parser = state.get("parser") or settings.ocr_backend
         # Disk, PDF parsing and OCR all block: keep them off the event loop.
-        doc = await asyncio.to_thread(
-            load_document, state["path"], OCR_BACKENDS[settings.ocr_backend]
-        )
+        # A Grok reading's tokens count toward this step (the worker thread
+        # shares the context the tokens collect in).
+        with collecting() as read_tokens:
+            doc = await asyncio.to_thread(
+                load_document, state["path"], parser_for(parser)
+            )
         if doc.invoice is not None:
             return {
                 "source_format": doc.format.value,
@@ -274,6 +313,7 @@ def build_graph(
                 "trace": _event("ingest", f"Unreadable. {problem}"),
             }
         except ValueError as exc:
+            add(tokens, read_tokens)
             return {
                 "source_format": doc.format.value,
                 "invoice": None,
@@ -285,12 +325,13 @@ def build_graph(
                     step_usage(tokens, deps.pricing),
                 ),
             }
+        add(tokens, read_tokens)
         feedback = _extraction_feedback(extraction)
         message = f"Attempt {attempt}: extracted with the LLM"
         if doc.problem:
             message = f"{doc.problem} The extraction agent read its text. " + message
         if doc.ocr:
-            message = f"Read the scan with OCR ({settings.ocr_backend}). " + message
+            message = f"{parser_label(parser)} " + message
         if feedback:
             message += f", retrying: {' '.join(feedback)}"
         return {

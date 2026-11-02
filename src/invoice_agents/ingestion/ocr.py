@@ -13,6 +13,10 @@ Tesseract, which must be on the machine (`brew install tesseract`,
   that the whole-page read keeps. Seconds a page on CPU; the layout model
   downloads once from Hugging Face. Goes through langchain-docling.
 
+A third parser, `grok`, has Grok read the page image itself (see
+agents.LLMVisionReader): no Tesseract, best on photos and poor scans, but it
+needs an API key and costs a model call.
+
 A backend is one function from a path to text, so another engine (MinerU, a
 cloud OCR API) can be added beside these without touching the callers.
 """
@@ -61,7 +65,8 @@ _lock = threading.Lock()
 _read: dict[tuple[str, str, int, int], str] = {}
 
 
-def _cached(backend: str, path: Path, read: Callable[[], str]) -> str:
+def cached(backend: str, path: Path, read: Callable[[], str]) -> str:
+    """The file's text from this backend, read once per file version."""
     stat = path.stat()
     key = (backend, str(path.resolve()), stat.st_size, stat.st_mtime_ns)
     with _lock:
@@ -119,31 +124,39 @@ def docling_text(path: Path) -> str:
         loader = loader_cls(str(path), converter=converter, export_type="markdown")
         return "\n\n".join(d.page_content for d in loader.load())
 
-    return _cached("docling", path, read)
+    return cached("docling", path, read)
+
+
+def page_images(path: Path, dpi: int = 300) -> list[bytes]:
+    """Each page of a PDF, or a photo as one page, rendered to PNG."""
+    import pymupdf
+
+    with pymupdf.open(path) as doc:
+        return [page.get_pixmap(dpi=dpi).tobytes("png") for page in doc]
 
 
 def pymupdf_text(path: Path) -> str:
     """The document's text, page by page: PyMuPDF renders each page (a photo
     is one page) at 300 dpi and Tesseract reads it."""
     _need_tesseract()
-    import pymupdf
 
     def read() -> str:
         pages = []
-        with pymupdf.open(path) as doc:
-            for page in doc:
-                png = page.get_pixmap(dpi=300).tobytes("png")
-                out = subprocess.run(
-                    ["tesseract", "stdin", "stdout", "--psm", str(PSM), "-l", "eng"],
-                    input=png,
-                    capture_output=True,
-                    check=True,
-                    timeout=120,
-                )
-                pages.append(out.stdout.decode())
+        for png in page_images(path):
+            out = subprocess.run(
+                ["tesseract", "stdin", "stdout", "--psm", str(PSM), "-l", "eng"],
+                input=png,
+                capture_output=True,
+                check=True,
+                timeout=120,
+            )
+            pages.append(out.stdout.decode())
         return "\n\n".join(pages)
 
-    return _cached("pymupdf", path, read)
+    return cached("pymupdf", path, read)
 
 
-BACKENDS: dict[str, Ocr] = {"docling": docling_text, "pymupdf": pymupdf_text}
+BACKENDS: dict[str, Ocr] = {"pymupdf": pymupdf_text, "docling": docling_text}
+
+# Every parser a run can ask for; "grok" is built from the run's agents.
+PARSERS = ("pymupdf", "docling", "grok")

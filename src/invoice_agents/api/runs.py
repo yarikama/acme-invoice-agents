@@ -72,6 +72,14 @@ class Run:
         }
 
 
+def _payload(path: Path, source: str, parser: str | None) -> dict[str, Any]:
+    """A run's first state; the parser only when the run picked one."""
+    payload: dict[str, Any] = {"path": str(path), "source": source}
+    if parser:
+        payload["parser"] = parser
+    return payload
+
+
 def _node_of(item: Mapping[str, Any]) -> str:
     """The graph node that wrote a trace line in the state, which only keeps
     its stage: for runs rebuilt from a checkpoint."""
@@ -115,7 +123,7 @@ class RunManager:
     def list(self) -> list[Run]:
         return sorted(self.runs.values(), key=lambda r: r.created_at, reverse=True)
 
-    def start(self, path: Path, source: str) -> Run:
+    def start(self, path: Path, source: str, parser: str | None = None) -> Run:
         run = Run(
             id=uuid.uuid4().hex[:12],
             source=source,
@@ -123,7 +131,7 @@ class RunManager:
             created_at=datetime.now(UTC).isoformat(),
         )
         self.runs[run.id] = run
-        self._spawn(self._drive(run, {"path": str(path), "source": source}))
+        self._spawn(self._drive(run, _payload(path, source, parser)))
         return run
 
     def decide(self, run_id: str, decision: HumanDecision) -> Run:
@@ -141,7 +149,9 @@ class RunManager:
         )
         return run
 
-    async def start_batch(self, paths: list[Path]) -> list[Run]:
+    async def start_batch(
+        self, paths: list[Path], parser: str | None = None
+    ) -> list[Run]:
         """Run samples one after another, so duplicate detection sees them in order.
 
         Returns as soon as the batch is queued; each run starts once the one
@@ -162,7 +172,7 @@ class RunManager:
 
         async def drive_all() -> None:
             for run in runs:
-                await self._drive(run, {"path": str(run.path), "source": run.source})
+                await self._drive(run, _payload(run.path, run.source, parser))
 
         self._spawn(drive_all())
         return runs

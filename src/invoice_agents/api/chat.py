@@ -96,7 +96,9 @@ class ChatService:
         if name == "run":
             paths = [p for a in args if (p := self._find(a)) is not None]
             missing = [a for a in args if self._find(a) is None]
-            runs = [self.manager.start(p, source=p.name) for p in paths]
+            runs = [
+                self.manager.start(p, source=p.name, parser=step.parser) for p in paths
+            ]
             note = f"Started {_count(len(runs), 'run')}."
             if missing:
                 note += f" Not found in the sample folders: {', '.join(missing)}."
@@ -106,7 +108,9 @@ class ChatService:
             if folder is None:
                 return f"{args[0]} isn't one of the sample folders.", []
             files = sorted(p for p in folder.iterdir() if p.suffix.lower() in SUFFIXES)
-            runs = [self.manager.start(p, source=p.name) for p in files]
+            runs = [
+                self.manager.start(p, source=p.name, parser=step.parser) for p in files
+            ]
             return f"Started {_count(len(runs), 'run')} from {folder.name}/.", runs
         if name == "runs":
             return self._runs_note(), []

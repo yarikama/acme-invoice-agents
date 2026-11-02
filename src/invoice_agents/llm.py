@@ -13,7 +13,9 @@ from invoice_agents.agents import (
     LLMApprover,
     LLMCritic,
     LLMExtractor,
+    LLMVisionReader,
     NoExtractor,
+    Reader,
     RuleApprover,
     RuleCritic,
 )
@@ -23,9 +25,11 @@ from invoice_agents.replay import (
     RecordingApprover,
     RecordingCritic,
     RecordingExtractor,
+    RecordingReader,
     ReplayApprover,
     ReplayCritic,
     ReplayExtractor,
+    ReplayReader,
 )
 from invoice_agents.triage import DecisionTriager, Triager
 from invoice_agents.usage import Pricing, openrouter_pricing
@@ -40,6 +44,8 @@ class Agents:
     critic: Critic
     # System 1, asked before the approver; None skips triage.
     triager: Triager | None = None
+    # Grok reading scans itself (the "grok" parser); None without a model.
+    reader: Reader | None = None
 
 
 def chat_model(settings: Settings, model: str, reasoning: str) -> BaseChatModel:
@@ -96,6 +102,7 @@ def build_agents(settings: Settings) -> Agents:
             ReplayExtractor(recording, pace),
             ReplayApprover(recording, pace),
             ReplayCritic(recording, pace),
+            reader=ReplayReader(recording, settings.vision_model, pace),
         )
     extract_llm = chat_model(
         settings, settings.extract_model, settings.extract_reasoning
@@ -106,11 +113,13 @@ def build_agents(settings: Settings) -> Agents:
         settings.critic_model or settings.review_model,
         settings.critic_reasoning or settings.review_reasoning,
     )
+    vision_llm = chat_model(settings, settings.vision_model, settings.extract_reasoning)
     agents = Agents(
         LLMExtractor(extract_llm),
         LLMApprover(review_llm, max_steps=settings.max_tool_steps),
         LLMCritic(critic_llm),
         build_triager(settings),
+        LLMVisionReader(vision_llm, settings.vision_model),
     )
     if settings.record_to is None:
         return agents
@@ -120,6 +129,7 @@ def build_agents(settings: Settings) -> Agents:
         RecordingApprover(agents.approver, recording),
         RecordingCritic(agents.critic, recording),
         agents.triager,
+        RecordingReader(agents.reader, recording) if agents.reader else None,
     )
 
 

@@ -1,16 +1,25 @@
 import { ArrowCounterClockwiseIcon, PlayIcon, StackIcon, UploadSimpleIcon } from "@phosphor-icons/react";
 import { useEffect, useRef, useState } from "react";
 
-import { api } from "../api/client";
+import { api, type Parser } from "../api/client";
 import type { RunOverview, Sample } from "../api/types";
 
 interface Props {
   onStarted: (runs: RunOverview[]) => void;
 }
 
+// What each parser does, for its option and tooltip.
+const PARSERS: { value: Parser; label: string; hint: string }[] = [
+  { value: "pymupdf", label: "PyMuPDF", hint: "Tesseract reads the whole page; fast, free" },
+  { value: "docling", label: "Docling", hint: "A layout model finds tables first; Markdown" },
+  { value: "grok", label: "Grok vision", hint: "Grok reads the page image; best on poor scans" },
+];
+
 export function Toolbar({ onStarted }: Props) {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [sample, setSample] = useState("");
+  // Which parser reads scans in the runs started here; the API's default first.
+  const [parser, setParser] = useState<Parser>("pymupdf");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Starting over forgets every run, so it asks once more, in the page.
@@ -18,6 +27,10 @@ export function Toolbar({ onStarted }: Props) {
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    api.health().then(
+      (h) => h.parser && setParser(h.parser),
+      () => {},
+    );
     api.samples().then(
       (list) => {
         setSamples(list);
@@ -57,7 +70,7 @@ export function Toolbar({ onStarted }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-end gap-2">
-        <button type="button" className="key key-sm" disabled={busy} onClick={() => run(api.startBatch)}>
+        <button type="button" className="key key-sm" disabled={busy} onClick={() => run(() => api.startBatch(parser))}>
           <StackIcon size={16} aria-hidden="true" />
           Run all samples
         </button>
@@ -79,11 +92,25 @@ export function Toolbar({ onStarted }: Props) {
           type="button"
           className="key key-sm"
           disabled={busy || !sample}
-          onClick={() => run(() => api.startSample(sample))}
+          onClick={() => run(() => api.startSample(sample, parser))}
         >
           <PlayIcon size={16} aria-hidden="true" />
           Run
         </button>
+        <label className="flex flex-col gap-1" title={PARSERS.find((p) => p.value === parser)?.hint}>
+          <span className="cap">scan parser</span>
+          <select
+            className="key key-sm appearance-none bg-raised pr-8"
+            value={parser}
+            onChange={(e) => setParser(e.target.value as Parser)}
+          >
+            {PARSERS.map((p) => (
+              <option key={p.value} value={p.value} title={p.hint}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="button" className="key key-sm" disabled={busy} onClick={() => fileInput.current?.click()}>
           <UploadSimpleIcon size={16} aria-hidden="true" />
           Upload invoice
@@ -97,7 +124,7 @@ export function Toolbar({ onStarted }: Props) {
           onChange={(e) => {
             const file = e.target.files?.[0];
             e.target.value = "";
-            if (file) run(() => api.upload(file));
+            if (file) run(() => api.upload(file, parser));
           }}
         />
         {confirming ? (

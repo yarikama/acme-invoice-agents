@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from invoice_agents.agents import with_retries
 from invoice_agents.config import ROOT
+from invoice_agents.ingestion.ocr import PARSERS
 from invoice_agents.memory import answered, said
 from invoice_agents.usage import Tokens, collecting, record
 
@@ -48,6 +49,11 @@ class Step(BaseModel):
         default_factory=list,
         description="Its arguments, e.g. file paths for run, a folder for dir,"
         " a set name for eval.",
+    )
+    parser: str | None = Field(
+        default=None,
+        description="For run and dir only, when the person asks for one: what"
+        " reads scanned files: pymupdf, docling or grok. Omit for the default.",
     )
 
 
@@ -71,6 +77,9 @@ Commands you may use:
 - run <file>...: process invoice files (txt, json, csv, xml, pdf, png, jpg)
 - dir <folder>: process every file in a folder
 - runs: list recent runs and their status
+- For run and dir, a step's parser picks what reads scanned PDFs and photos: \
+pymupdf (Tesseract on the whole page, fast), docling (a layout model first) or \
+grok (Grok reads the page image). Set it only when the person asks.
 - inventory: stock and list prices
 - status: provider, models, whether the API and web console run
 - eval <set>: score the agents on a set: samples, adversarial, held_out, scanned, all
@@ -130,6 +139,12 @@ def checked(plan: Plan) -> tuple[list[Step], list[str]]:
         name = step.command.strip().lstrip("/").lower()
         if name in ALLOWED:
             step.command = name
+            if step.parser is not None:
+                choice = step.parser.strip().lower()
+                # Only a parser that exists, and only where a file is read.
+                step.parser = (
+                    choice if choice in PARSERS and name in ("run", "dir") else None
+                )
             keep.append(step)
         elif name in HUMAN_ONLY:
             dropped.append(f"/{name} is for a person to type, not the assistant.")
@@ -144,7 +159,13 @@ BUFFER = 20
 
 
 def commands(steps: list[Step]) -> list[str]:
-    return [" ".join([f"/{st.command}", *st.args]) for st in steps]
+    return [shown(st) for st in steps]
+
+
+def shown(step: Step) -> str:
+    """A step as the command it runs, with its parser when it picked one."""
+    command = " ".join([f"/{step.command}", *step.args])
+    return f"{command} (parser: {step.parser})" if step.parser else command
 
 
 async def plan(

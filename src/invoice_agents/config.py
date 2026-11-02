@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     chat_session: str = "console"
     extract_model: str = "grok-4.3"
+    # Reads scans from the page image when the parser is "grok".
+    vision_model: str = "grok-4.3"
     review_model: str = "grok-4.7"
     # Cap output, reasoning included: without it the provider reserves the
     # model's maximum (64K) and small credit limits reject the request.
@@ -99,10 +101,10 @@ class Settings(BaseSettings):
         "BANK_DETAILS_CHANGED",
         "LOOKALIKE_VENDOR",
     ]
-    # Reads scanned PDFs and photos: PyMuPDF (whole page, plain text, fast) or
-    # Docling (layout model, Markdown tables). Both use Tesseract; see
-    # ingestion/ocr.py for which to pick.
-    ocr_backend: Literal["pymupdf", "docling"] = "pymupdf"
+    # The default parser for scanned PDFs and photos; a run can pick another.
+    # pymupdf (whole page, fast) and docling (layout, Markdown tables) use
+    # Tesseract; grok has the model read the image. See ingestion/ocr.py.
+    ocr_backend: Literal["pymupdf", "docling", "grok"] = "pymupdf"
     max_extract_attempts: int = 3
     max_review_rounds: int = 2
     # Model turns the approver gets for tool calls before it must decide.

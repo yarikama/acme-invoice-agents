@@ -13,13 +13,14 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import aiosqlite
 from fastapi import (
     Depends,
     FastAPI,
     File,
+    Form,
     Header,
     HTTPException,
     Request,
@@ -105,8 +106,17 @@ ManagerDep = Annotated[RunManager, Depends(get_manager)]
 SettingsDep = Annotated[Settings, Depends(get_app_settings)]
 
 
+# What reads a scanned PDF or photo; unset: the configured default.
+Parser = Literal["pymupdf", "docling", "grok"]
+
+
 class StartRun(BaseModel):
     sample: str
+    parser: Parser | None = None
+
+
+class StartBatch(BaseModel):
+    parser: Parser | None = None
 
 
 def _sample_path(settings: Settings, name: str) -> Path:
@@ -138,6 +148,8 @@ async def health(settings: SettingsDep, request: Request) -> dict[str, Any]:
         # The assistant needs a live model; "shared" means Redis holds the
         # conversation, so the terminal sees it too.
         "chat": {"available": chat.available, "shared": chat.shared},
+        # The parser scans get unless a run picks another.
+        "parser": settings.ocr_backend,
     }
 
 
@@ -201,13 +213,18 @@ async def list_runs(manager: ManagerDep) -> list[dict[str, Any]]:
 async def start_run(
     body: StartRun, manager: ManagerDep, settings: SettingsDep
 ) -> dict[str, Any]:
-    run = manager.start(_sample_path(settings, body.sample), source=body.sample)
+    run = manager.start(
+        _sample_path(settings, body.sample), source=body.sample, parser=body.parser
+    )
     return run.overview()
 
 
 @app.post("/api/runs/upload", status_code=202)
 async def upload_run(
-    file: Annotated[UploadFile, File()], manager: ManagerDep, settings: SettingsDep
+    file: Annotated[UploadFile, File()],
+    manager: ManagerDep,
+    settings: SettingsDep,
+    parser: Annotated[Parser | None, Form()] = None,
 ) -> dict[str, Any]:
     name = Path(file.filename or "").name
     suffix = Path(name).suffix.lower()
@@ -219,14 +236,16 @@ async def upload_run(
     # Stored under a random name; the original name is only a label.
     path = settings.uploads_dir / f"{uuid.uuid4().hex}{suffix}"
     path.write_bytes(data)
-    return manager.start(path, source=name).overview()
+    return manager.start(path, source=name, parser=parser).overview()
 
 
 @app.post("/api/runs/batch", status_code=202)
 async def start_batch(
-    manager: ManagerDep, settings: SettingsDep
+    manager: ManagerDep, settings: SettingsDep, body: StartBatch | None = None
 ) -> list[dict[str, Any]]:
-    runs = await manager.start_batch(_samples(settings))
+    runs = await manager.start_batch(
+        _samples(settings), parser=body.parser if body else None
+    )
     return [run.overview() for run in runs]
 
 

@@ -47,10 +47,12 @@ from invoice_agents.agents import (
     Extraction,
     ExtractionUnavailableError,
     Extractor,
+    Reader,
     Review,
     RuleApprover,
     RuleCritic,
 )
+from invoice_agents.ingestion.ocr import OcrUnavailableError
 from invoice_agents.models import (
     ApprovalDraft,
     Critique,
@@ -70,6 +72,12 @@ class NotRecordedError(ExtractionUnavailableError):
 def _key(kind: str, *parts: str) -> str:
     digest = hashlib.sha256("\x1f".join(parts).encode()).hexdigest()[:20]
     return f"{kind}:{digest}"
+
+
+def read_key(path: Path) -> str:
+    """A scan's Grok reading, keyed by the file's bytes: the same scan under
+    another name replays the same reading."""
+    return f"read:{hashlib.sha256(path.read_bytes()).hexdigest()[:20]}"
 
 
 def _invoice(invoice: Invoice) -> str:
@@ -181,6 +189,26 @@ class RecordingExtractor:
         return out
 
 
+class RecordingReader:
+    def __init__(self, inner: Reader, recording: Recording) -> None:
+        self.inner, self.recording = inner, recording
+        self.model = inner.model
+
+    def read(self, path: Path) -> str:
+        start = time.perf_counter()
+        with _spent() as tokens:
+            text = self.inner.read(path)
+        self.recording.put(
+            read_key(path),
+            {
+                "text": text,
+                "tokens": tokens,
+                "seconds": round(time.perf_counter() - start, 2),
+            },
+        )
+        return text
+
+
 class RecordingApprover:
     def __init__(self, inner: Approver, recording: Recording) -> None:
         self.inner, self.recording = inner, recording
@@ -271,6 +299,23 @@ class ReplayExtractor:
         await _take(hit.get("seconds"), self.pace)
         _replayed(hit["tokens"])
         return Extraction.model_validate(hit["extraction"])
+
+
+class ReplayReader:
+    def __init__(self, recording: Recording, model: str, pace: float = 0.0) -> None:
+        self.recording, self.model, self.pace = recording, model, pace
+
+    def read(self, path: Path) -> str:
+        hit = self.recording.get(read_key(path))
+        if hit is None:
+            raise OcrUnavailableError(
+                "Replay has no Grok reading of this scan; it covers the sample"
+                " scans. Pick the pymupdf or docling parser, or set an API key."
+            )
+        if hit.get("seconds") and self.pace > 0:
+            time.sleep(hit["seconds"] * self.pace)  # in a worker thread
+        _replayed(hit["tokens"])
+        return hit["text"]
 
 
 class ReplayApprover:

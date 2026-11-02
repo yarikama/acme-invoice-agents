@@ -459,3 +459,33 @@ def test_the_built_console_is_served_after_the_api(tmp_path: Path) -> None:
     client = TestClient(target)
     assert "Acme AP Console" in client.get("/").text
     assert client.get("/api/health").json() == {"status": "ok"}
+
+
+async def test_each_way_to_start_a_run_passes_the_parser(client, monkeypatch):
+    payloads: list[dict] = []
+
+    async def drive(run, payload):
+        payloads.append(payload)
+        run.settled.set()
+
+    monkeypatch.setattr(manager(), "_drive", drive)
+    await client.post(
+        "/api/runs", json={"sample": "invoice_1001.txt", "parser": "grok"}
+    )
+    await client.post(
+        "/api/runs/upload",
+        files={"file": ("scan.png", b"png")},
+        data={"parser": "docling"},
+    )
+    await client.post("/api/runs/upload", files={"file": ("scan.png", b"png")})
+    await client.post("/api/runs/batch", json={"parser": "pymupdf"})
+    await asyncio.sleep(0.05)  # the batch drives its runs in the background
+    assert [p.get("parser") for p in payloads[:3]] == ["grok", "docling", None]
+    assert {p.get("parser") for p in payloads[3:]} == {"pymupdf"}
+    # No parser is a choice the API knows nothing about.
+    bad = await client.post(
+        "/api/runs", json={"sample": "invoice_1001.txt", "parser": "x"}
+    )
+    assert bad.status_code == 422
+    health = (await client.get("/api/health")).json()
+    assert health["parser"] == "pymupdf"
