@@ -1,4 +1,4 @@
-.PHONY: docker-up docker-down docker-run install lint format typecheck test check db eval triage-eval run run-all api web web-check clean
+.PHONY: docker-up docker-down docker-run install lint format typecheck test check db eval triage-eval parser-eval run run-all api web web-check clean
 
 install:
 	uv sync
@@ -31,6 +31,10 @@ eval:
 
 triage-eval:
 	uv run python -m invoice_agents.triage_eval $(ARGS)
+
+# The scan parsers on clean, skewed, low-res, fax and photo scans.
+parser-eval:
+	uv run python -m invoice_agents.parser_eval $(ARGS)
 
 run:
 	uv run python main.py --invoice_path=$(INVOICE)

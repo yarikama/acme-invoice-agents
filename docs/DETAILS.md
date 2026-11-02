@@ -80,6 +80,18 @@ Where to pick it:
 | The assistant, either console | "read the 1011 scan with Grok vision" plans `/run data/scanned/invoice_1011_scan.pdf (parser: grok)` for that run only |
 | The API | `"parser": "grok"` in `POST /api/runs` or `/api/runs/batch`; a `parser` form field on `/api/runs/upload` |
 
+**Benchmark.** `make parser-eval` renders the three sample PDFs, degrades each five ways (clean, skewed 3°, 100 dpi, a speckled 1-bit fax, a tilted and shadowed phone photo at JPEG quality 40), has every parser read all 15 images, and scores the text against each PDF's own text layer. The score that matters is key tokens: every token with a digit in it (amounts, quantities, dates, invoice numbers), read exactly. Letter O counts as zero, since the sample PDFs print "2O26" on purpose. Live, on Grok:
+
+| Parser | Clean | Skewed | Low-res | Fax | Phone photo | All words | Time per scan | Cost per scan |
+|---|---|---|---|---|---|---|---|---|
+| `pymupdf` | 93% | 95% | 95% | 84% | 35% | 81% | 2.7 s | free |
+| `docling` | 72% | 55% | 73% | 70% | 45% | 62% | 6.4 s | free |
+| `grok` | **100%** | **100%** | **100%** | **100%** | **100%** | 99% | 15.6 s | $0.006 |
+
+![Key numbers read exactly per parser and scan condition](images/parsers.png)
+
+Fifteen images from three invoices is a small set, and the degradations are simulated, so read the gaps rather than the decimals: Tesseract-based parsers hold up on clean to faxed scans and fall apart on photos, while Grok vision reads all of them, for 0.6¢ and about 13 seconds more per scan.
+
 PyMuPDF is the default because it is fast, free, offline, and reads these scans correctly. Docling suits multi-column documents and real tables. Grok vision suits phone photos, faxes and skewed or noisy scans, where Tesseract struggles, at the price of a model call. Grok only transcribes; the extraction agent and every check still run on its text, so a misread can't skip validation. Its readings are recorded with the rest, so replay shows them without a key.
 
 A parser is one function from a file to text (`ingestion/ocr.py`), so another engine, such as a cloud invoice OCR, fits beside these. PyMuPDF is AGPL-licensed, which matters for a closed-source product; Docling and Tesseract are MIT and Apache 2.0.
@@ -144,6 +156,7 @@ The held-out set was written after the adversarial fixes and committed before it
 ```bash
 make check      # ruff, pyright, pytest (95% coverage floor), eslint, prettier, tsc, vitest, build
 make eval       # ARGS="--set all --repeat 3 --triage typesafe/jev-1.14 --critic MODEL"
+make parser-eval  # the scan parsers on clean to phone-photo scans (Grok needs a key)
 ```
 
 CI runs 350 Python tests (97% coverage, one against a real Redis), 50 web tests, and a Docker job that builds the image and runs the spec command through it. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. Set `LANGSMITH_TRACING=true` to send every model and tool call to LangSmith.
