@@ -264,6 +264,14 @@ class RunManager:
         self.ledger.clear()
         if self.bank is not None:
             self.bank.clear()
+        # Runs waiting for a VP are dropped: end their streams, or a client
+        # watching one would wait forever.
+        for run in self.runs.values():
+            if run.status not in TERMINAL:
+                async with run._changed:
+                    run.status = "failed"
+                    run._changed.notify_all()
+                run.settled.set()
         self.runs.clear()
         async with self._log_changed:
             self.log.append(

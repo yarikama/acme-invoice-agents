@@ -336,7 +336,14 @@ class RemoteRunner:
                         view, console=console, refresh_per_second=12, transient=False
                     )
                     live.start()
-                    await self.api.decide(run_id, approved, note)
+                    try:
+                        await self.api.decide(run_id, approved, note)
+                    except httpx.HTTPStatusError as exc:
+                        if exc.response.status_code != 409:
+                            raise
+                        # A VP in the web console decided first: keep
+                        # following the run to its real outcome.
+                        console.print("  Another VP decided this one first.")
                 if event["type"] in ("done", "run_error"):
                     view.status = event.get("status", "failed")
                     _print_finished(view)

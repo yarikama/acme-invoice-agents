@@ -104,6 +104,16 @@ async def refuse_cross_site_writes(request: Request, call_next: Any) -> Any:
     reset) without a CORS preflight; the browser names its Origin. Writes
     come from this console, the configured ones, or a client that sends no
     Origin (the CLI, curl)."""
+    # Refuse an upload by its declared size, before the body is read and
+    # spooled: the handler's own check runs only after all of it arrived.
+    length = request.headers.get("content-length", "")
+    limit = get_settings().max_upload_bytes + 64 * 1024  # the multipart framing
+    if (
+        request.url.path == "/api/runs/upload"
+        and length.isdigit()
+        and int(length) > limit
+    ):
+        return JSONResponse({"detail": "File too large"}, status_code=413)
     origin = request.headers.get("origin")
     if request.method not in ("GET", "HEAD", "OPTIONS") and origin:
         same_site = urlparse(origin).netloc == request.headers.get("host")
