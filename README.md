@@ -124,6 +124,10 @@ The other samples are handled too: duplicates (1011 as text and PDF), a revision
 
 ![Cost and time per invoice: Grok only 2.57¢ and 31.6 s; Jev first 1.78¢ and 22.9 s; Perplexity first 0.87¢ and 12.9 s](docs/images/fast-and-slow.png)
 
+**Reads bad scans, with a parser you pick.** Scanned PDFs and photos go through PyMuPDF (default, free), Docling, or Grok vision, chosen per run. On 15 scans from clean to phone photo, Grok read every amount, date and invoice number exactly:
+
+![Key numbers read exactly by each parser on clean, skewed, low-res, fax and phone-photo scans: PyMuPDF 93, 95, 95, 84, 35 percent; Docling 72, 55, 73, 70, 45; Grok vision 100 on all five](docs/images/parsers.png)
+
 **Built not to pay twice.** A ledger remembers every invoice across restarts, so a duplicate or a revised copy of a paid invoice is rejected, and each payment has an idempotency key, so a retried step can't pay again.
 
 ## What it means for Acme
