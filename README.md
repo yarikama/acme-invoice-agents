@@ -4,10 +4,23 @@ Acme Corp loses $2M a year processing invoices by hand: staff retype messy PDFs,
 
 **On the 20 sample invoices, live on Grok: 20 of 20 end where they should, in 24 seconds and about two cents of model calls each. Nine attacks written to get a bad invoice paid: none paid.**
 
-| The web console | The terminal, live on Grok |
-|---|---|
-| ![Running every sample: the overview and impact panels, the routing chart, then a VP approving a euro invoice](docs/demo/web-console.gif) | ![A fraudulent text invoice run live: extraction, validation, the approver's tool calls, the critic and the rejection](docs/demo/cli-live.gif) |
-| [Full video, 27 s](docs/demo/web-console.mp4) | [Full video, 47 s](docs/demo/cli-live.mp4) (two invoices, the second answered by a VP at the prompt; waits for the model sped up and labelled) |
+## See it work
+
+### The web console
+
+Every sample runs; the overview, the impact against the manual process and the routing of all 20 invoices fill in; then a VP approves the invoice billed in euros, with a note for the audit log.
+
+![Running every sample: the overview and impact panels, the routing chart, then a VP approving a euro invoice](docs/demo/web-console.gif)
+
+[Full video (27 s)](docs/demo/web-console.mp4)
+
+### The terminal, live on Grok
+
+A fraudulent text invoice, run live: Grok extracts it, validation flags the zero-stock item and the pressure to pay, the approver checks inventory and vendor history with tool calls, the critic agrees, and it is rejected. Waits for the model are sped up and labelled.
+
+![A fraudulent text invoice run live: extraction, validation, the approver's tool calls, the critic and the rejection](docs/demo/cli-live.gif)
+
+[Full video (47 s)](docs/demo/cli-live.mp4), which goes on to a euro invoice that a VP approves at the prompt.
 
 ## Quick start
 
@@ -19,7 +32,7 @@ python main.py --invoice_path=data/invoices/invoice_1001.txt
 
 Or, with only Docker: `docker compose up`, then open http://localhost:8000 (the API, the console and Redis in one command), and `docker compose run --rm cli --invoice_path=data/invoices/invoice_1001.txt` for the CLI.
 
-**Live or replay.** With `XAI_API_KEY` (or `OPENROUTER_API_KEY`) in `.env`, every agent runs live on Grok. Without a key, the agents answer from a recording of a live run (`data/replay/recording.json`), while validation, the payment policy, the VP pause and payment all run for real; the CLI and the console both say when that is what you are watching.
+**Live or replay.** With `XAI_API_KEY` (or `OPENROUTER_API_KEY`) in `.env`, every agent runs live on Grok. Without a key, the agents answer from a recording of a live run (`data/replay/recording.json`), at the pace the live run took (`REPLAY_PACE=0` for at once), while validation, the payment policy, the VP pause and payment all run for real; the CLI and the console both say when that is what you are watching.
 
 The spec command runs the invoice, then stays in an interactive console; from a script, with `--json` or with `--once`, it runs and exits. `--dir data/invoices` runs a folder, `--watch` treats `data/inbox/` as the AP mailbox, `--vp ask|approve|reject|wait` answers invoices that pause for a VP, and `--log-json FILE` writes every step as a JSON line.
 
@@ -163,7 +176,7 @@ The held-out set was written after the adversarial fixes and committed before it
 | Triage | Optional System 1 with a code-confirmed fast path | 31–66% cheaper, 28–59% faster, no accuracy lost | A second API; limited to outcomes the rules allow |
 | Memory | A ledger of received invoices and outcomes; idempotent payment keys | Duplicates and double payments must survive a restart | State to reset for a demo (`--reset`, Start over) |
 | Assistant | Plan-then-run with code allowlists; Redis-backed shared history | Plain words in both consoles without letting text move money | Needs a live model; Redis to share |
-| Replay | Record each agent's answers, keyed by its inputs | Reviewers without a key see the real agents | A recording to refresh when inputs change |
+| Replay | Record each agent's answers and timing, keyed by its inputs | Reviewers without a key see the real agents, at the real pace | A recording to refresh when inputs change; a test fails when it no longer covers every eval case |
 | VP identity | A bearer token per VP; the run records whose | Separation of duties needs the approver to be someone, provably | Shared secrets, not SSO |
 | OCR | Docling, optional | Local, CPU, MIT; text PDFs keep the fast path | A heavy install |
 
@@ -187,7 +200,7 @@ make check      # ruff, pyright, pytest (95% coverage floor), eslint, prettier, 
 make eval       # ARGS="--set all --repeat 3 --triage typesafe/jev-1.14 --critic MODEL"
 ```
 
-CI runs 320 Python tests (97% coverage, one against a real Redis), 50 web tests, and a Docker job that builds the image and runs the spec command through it. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. Set `LANGSMITH_TRACING=true` to send every model and tool call to LangSmith.
+CI runs 350 Python tests (97% coverage, one against a real Redis), 50 web tests, and a Docker job that builds the image and runs the spec command through it. `RECORD_TO=data/replay/recording.json` on a live run refreshes the replay recording. Set `LANGSMITH_TRACING=true` to send every model and tool call to LangSmith.
 
 **Where to start reading:** `graph.py` (the pipeline), `agents.py` (the agents), `guardrails.py` (the decision linter), `approval.py` (the policy), `validation.py` (the checks). The CLI console (`shell.py`, `terminal.py`), the assistant and triage are optional layers on top.
 
