@@ -120,3 +120,19 @@ def test_cli_watch_processes_the_folder(
     assert "Watching" in out and "can't wait for a VP" in out
     assert [p.name for p in (inbox / "processed").iterdir()] == ["invoice_1015.csv"]
     assert [p.name for p in (inbox / "unprocessed").iterdir()] == ["invoice_1014.xml"]
+
+
+async def test_ctrl_c_mid_batch_keeps_only_the_unfinished_files(tmp_path: Path) -> None:
+    box = Inbox(tmp_path)
+    for name in ("a.json", "b.json", "c.json"):
+        landed(tmp_path, name)
+
+    async def handle(batch: list[Path]) -> None:
+        if batch[0].name == "b.json":
+            raise KeyboardInterrupt  # Ctrl-C while b runs
+
+    with pytest.raises(KeyboardInterrupt):
+        await watch(box, handle, interval=0.01)
+    # a finished and is filed, so a restart doesn't run it again.
+    assert [p.name for p in box.done.iterdir()] == ["a.json"]
+    assert sorted(p.name for p in box.arrived()) == ["b.json", "c.json"]

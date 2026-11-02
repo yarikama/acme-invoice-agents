@@ -120,3 +120,32 @@ def test_last_event_id_takes_ascii_digits_only() -> None:
     assert _after("²") == -1
     assert _after("9" * 5000) == -1
     assert _after(None) == -1
+
+
+async def test_a_vp_deciding_first_in_the_console_is_not_a_failed_run(
+    tmp_path: Path,
+) -> None:
+    import httpx
+
+    summary = {"invoice": {"total": 100.0, "currency": "USD"}, "findings": []}
+
+    class WebDecidedFirst:
+        async def start(self, path: Path, parser: str | None = None) -> str:
+            return "r1"
+
+        async def events(self, run_id: str):
+            yield {"type": "awaiting_vp", "summary": summary}
+            yield {"type": "done", "status": "paid"}
+
+        async def decide(self, run_id: str, approved: bool, note: str) -> None:
+            request = httpx.Request("POST", "http://api/decision")
+            raise httpx.HTTPStatusError(
+                "409", request=request, response=httpx.Response(409, request=request)
+            )
+
+        async def result(self, run_id: str) -> dict[str, Any]:
+            return {"status": "paid"}
+
+    runner = cli.RemoteRunner(WebDecidedFirst())  # pyright: ignore[reportArgumentType]
+    result = await runner.process(tmp_path / "x.json", "approve")
+    assert result["status"] == "paid"

@@ -118,7 +118,7 @@ The linter exists because of what the eval showed: in early runs Grok paid INV-1
 | Adversarial: instructions to the reviewer, a new bank account, a split order, a price 3.2× list | 4 | 4/4, none paid |
 | Held-out: a resubmission under a new number, a misspelt vendor, a claimed CFO approval, a homoglyph item, a padded surcharge | 5 | 5/5, none paid |
 
-The held-out set was written after the adversarial fixes and committed before it was scored; it got one lookalike vendor paid, which led to the lookalike check and later the vendor master, so its result is no longer a held-out one.
+The held-out set was written after the adversarial fixes and committed before it was scored; it got one lookalike vendor paid, which led to the lookalike check and later the vendor master, so its result is no longer a held-out one. Two of its cases also end right for a plainer reason than the attack they carry: the claimed CFO approval bills more GadgetX than is in stock, and the padded surcharge is an item the inventory doesn't know, so code rejects both before the claim or the fee is weighed. They show the attack does no harm, not that the approver sees through it.
 
 **Where the time goes.** Code is milliseconds: validation, policy and payment together take under 20 ms. The time is the models: a text invoice's extraction takes about 10 s, the approver about 9 s with its tool calls, the critic about 8 s (medians from the recording). A structured invoice skips extraction. System 1 triage answers in 0.3 s and, when it settles an invoice, skips the approver and the critic.
 

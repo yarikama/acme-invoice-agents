@@ -65,15 +65,15 @@ async def watch(
 
     Runs until `stop` is set (or forever). A file is filed even when its run
     failed: the result is in the ledger, and a retry would fail the same way.
-    One interrupted mid-batch (Ctrl-C) stays, to be processed next time.
+    Each file is filed as soon as it has an outcome, so one interrupted
+    mid-batch (Ctrl-C) stays, to be processed next time, and the ones
+    before it don't run again.
     """
     stop = stop or asyncio.Event()
     while not stop.is_set():
-        batch = inbox.arrived()
-        if batch:
-            held = await handle(batch) or set()
-            for path in batch:
-                if path.exists():
-                    inbox.file_away(path, held=path in held)
+        for path in inbox.arrived():
+            held = await handle([path]) or set()
+            if path.exists():
+                inbox.file_away(path, held=path in held)
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(stop.wait(), timeout=interval)

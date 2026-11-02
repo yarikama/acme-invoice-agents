@@ -536,3 +536,30 @@ async def test_a_page_on_another_site_cannot_change_anything(client):
     assert (await client.post("/api/reset")).status_code == 204
     # Reading stays open.
     assert (await client.get("/api/runs", headers=evil)).status_code == 200
+
+
+async def test_a_reset_ends_the_stream_of_a_run_waiting_for_a_vp(client):
+    resp = await client.post("/api/runs", json={"sample": "invoice_1014.xml"})
+    run_id = resp.json()["id"]
+    await settle(run_id)
+    assert manager().get(run_id).status == "awaiting_vp"
+    run = manager().get(run_id)
+
+    async def follow() -> int:
+        return len([e async for e in manager().events(run_id)])
+
+    task = asyncio.create_task(follow())
+    await asyncio.sleep(0.05)
+    assert (await client.post("/api/reset")).status_code == 204
+    assert await asyncio.wait_for(task, timeout=2) > 0  # it ended
+    assert run.status == "failed"
+
+
+async def test_an_upload_too_large_is_refused_before_its_body_is_read(
+    client, monkeypatch
+):
+    monkeypatch.setattr(get_settings(), "max_upload_bytes", 10)
+    big = await client.post(
+        "/api/runs/upload", files={"file": ("big.json", b"x" * 200_000)}
+    )
+    assert big.status_code == 413
