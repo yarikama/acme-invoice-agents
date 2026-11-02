@@ -14,7 +14,7 @@ Run all samples, see where every invoice went and what it saved, then approve on
 
 ![Running every sample: the overview and impact panels, the routing chart, then a VP approving a euro invoice](docs/demo/web-console.gif)
 
-▶ [Watch on YouTube](https://youtu.be/2TQYbxGx7Gw) · [video file (27 s)](docs/demo/web-console.mp4)
+▶ [Watch on YouTube](https://youtu.be/2TQYbxGx7Gw)
 
 ### The terminal, live on Grok
 
@@ -22,7 +22,7 @@ A fraudulent invoice: Grok reads it, the checks flag a zero-stock item and press
 
 ![A fraudulent text invoice run live: extraction, validation, the approver's tool calls, the critic and the rejection](docs/demo/cli-live.gif)
 
-▶ [Watch on YouTube](https://youtu.be/O3M04gAeVWo) · [video file (47 s)](docs/demo/cli-live.mp4)
+▶ [Watch on YouTube](https://youtu.be/O3M04gAeVWo)
 
 ## Run it
 
@@ -95,17 +95,15 @@ The other samples are handled too: duplicates (1011 as text and PDF), a revision
 
 ## What's special
 
-**Talk to it.** In the terminal console, type in plain words: "run the invoice that bills 20 GadgetX", "why was it rejected?". Grok turns it into commands and shows each before it runs. It remembers the conversation, and the web console shares the same one. It can never approve or pay: code doesn't let it.
+**Talk to it.** Type in plain words; Grok turns the request into commands, shows each before it runs, and remembers the conversation (shared with the web console). It can never approve or pay: code doesn't let it.
+
+![The terminal console: asked in plain words to process invoice 1002, Grok runs it, then explains the rejection](docs/images/talk.png)
 
 **A console a finance team can use.** Each invoice reads like a conversation between the agents: what they looked up, what they decided, how long it took and what it cost. Invoices that need a VP turn orange, with the reasons on one card.
 
-**Fast and slow thinking.** An optional fast model ([Jev](https://openrouter.ai/typesafe/jev-1.14), 0.3 s) settles the clear-cut invoices before the slow, careful Grok agents are called, but only where code agrees with it:
+**Fast and slow thinking.** An optional fast model ([Jev](https://openrouter.ai/typesafe/jev-1.14), 0.3 s) settles the clear-cut invoices before the slow, careful Grok agents are called, but only where code agrees with it. Same accuracy, a third to two thirds cheaper:
 
-| Setup | Correct | Time per invoice | Cost per invoice |
-|---|---|---|---|
-| Grok only | 19/20 | 31.6 s | $0.026 |
-| Jev first, Grok for the rest | 20/20 | 22.9 s (−28%) | $0.018 (−31%) |
-| Perplexity's decider first | 20/20 | 12.9 s (−59%) | $0.009 (−66%) |
+![Cost and time per invoice: Grok only 2.57¢ and 31.6 s; Jev first 1.78¢ and 22.9 s; Perplexity first 0.87¢ and 12.9 s](docs/images/fast-and-slow.png)
 
 **Built not to pay twice.** A ledger remembers every invoice across restarts, so a duplicate or a revised copy of a paid invoice is rejected, and each payment has an idempotency key, so a retried step can't pay again.
 
