@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
   <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
   <a href="https://microsoft.github.io/pyright/"><img src="https://img.shields.io/badge/types-pyright-2C6BED" alt="Checked with Pyright"></a>
-  <img src="https://img.shields.io/badge/coverage-97%25-2EA043" alt="Coverage 97%">
+  <img src="https://img.shields.io/badge/coverage-96%25-2EA043" alt="Coverage 96%">
   <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv"></a>
   <img src="https://img.shields.io/badge/LangGraph-agents-1C3C3C" alt="LangGraph">
   <img src="https://img.shields.io/badge/Grok-xAI-000000" alt="Grok by xAI">
@@ -46,7 +46,7 @@ A fraudulent invoice: Grok reads it, the checks flag a zero-stock item and press
 
 ```bash
 brew install tesseract       # OCR for scanned invoices (apt-get install tesseract-ocr on Linux)
-make install                 # Python and web dependencies
+make install                 # Python and web dependencies (about 450 MB)
 cp .env.example .env         # put XAI_API_KEY (or OPENROUTER_API_KEY) here to run live
 python main.py --invoice_path=data/invoices/invoice_1001.txt
 ```
@@ -69,6 +69,8 @@ More ways to run it:
 | `python main.py` | An interactive console, with the web console at http://localhost:5173 |
 
 **No API key?** It still runs: the agents replay a recording of a real Grok run, and the screen says so.
+
+**Ran a sample twice and it was rejected?** That is the ledger working: it remembers every invoice across runs, so the second INV-1001 is a duplicate. `python main.py --reset` starts over.
 
 ## How it works
 
@@ -112,6 +114,22 @@ The other samples are handled too: duplicates (1011 as text and PDF), a revision
 | Everything simulated locally | SQLite inventory, mock payment, fixed exchange rates |
 | Command line, structured logs and results | The command above; `--json` results; `--log-json` step logs; every outcome in `logs/decisions.jsonl` |
 
+## Scope: the core, and what sits on top
+
+**The core** is the brief's four stages, and it is small. Read these first:
+
+| File | What it does |
+|---|---|
+| `src/invoice_agents/graph.py` | The pipeline: ingest, validate, approve, pay, as a LangGraph graph with a pause for the VP |
+| `src/invoice_agents/agents.py` | The Grok agents: extraction, the tool-calling approver, the critic |
+| `src/invoice_agents/validation.py` | Every check in plain Python: math, stock, duplicates, fraud signs |
+| `src/invoice_agents/approval.py` | The policy: what pays, what is rejected, what goes to a VP |
+| `src/invoice_agents/guardrails.py` | The linter that checks each decision an agent submits |
+
+**On top**, each optional and removable without touching the core: the web console (`api/`, `web/`), the terminal assistant (`shell.py`, `assistant.py`), System 1 triage (`triage.py`), the scan parsers, replay, and the eval suites. They were added once the core passed every sample, to show what the workflow looks like to the people who use it.
+
+**Cut on purpose:** email intake (files or a watched folder instead), a real bank API, single sign-on and approval roles, stock reservation, live exchange rates, and a trained fraud model. Each is a production step, not a prototype one; see Limits.
+
 ## What's special
 
 **Talk to it.** Type in plain words; Grok turns the request into commands, shows each before it runs, and remembers the conversation (shared with the web console). It can never approve or pay: code doesn't let it.
@@ -135,8 +153,8 @@ The other samples are handled too: duplicates (1011 as text and PDF), a revision
 | The brief's problem | Now |
 |---|---|
 | 30% error rate | Every number checked by code; 20/20 correct, same outcome on every repeated run |
-| 5-day delays | About 24 seconds per invoice; 17 of 20 settle with no person |
-| VP approvals over email | Only 3 of 20 reach a VP, with the reasons on one card |
+| 5-day delays | About 24 seconds per invoice; 17 or 18 of 20 settle with no person |
+| VP approvals over email | Only 2 or 3 of 20 reach a VP (depending on the order they arrive in), with the reasons on one card |
 | $2M a year in manual work | About $0.02 per invoice in model calls: 100,000 invoices a year is about $2,400 |
 | Fraud | 0 of 9 attacks paid |
 
@@ -146,6 +164,6 @@ The other samples are handled too: duplicates (1011 as text and PDF), a revision
 - The numbers come from 20 samples and 9 attacks; real labelled invoices would come next.
 - VP identity is a token per person, not single sign-on.
 
-**More:** design choices, the experiments (critic models, six fast models, attacks), the API and development notes are in [docs/DETAILS.md](docs/DETAILS.md). Start reading the code at `src/invoice_agents/graph.py`.
+**More:** design choices, the experiments (critic models, six fast models, attacks), the API and development notes are in [docs/DETAILS.md](docs/DETAILS.md).
 
 The brief and sample invoices come from [galatiq-ai/galatiq-case-invoices](https://github.com/galatiq-ai/galatiq-case-invoices).
