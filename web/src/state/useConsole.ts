@@ -9,6 +9,9 @@ const EVENT_TYPES = ["started", "progress", "trace", "awaiting_vp", "decision", 
 
 export type StreamState = "connecting" | "live" | "retrying";
 
+// How long to wait before opening a new stream after the old one gave up.
+const RETRY_MS = 3000;
+
 /** All runs, kept current by the one SSE stream at /api/events. */
 export function useConsole() {
   const [state, dispatch] = useReducer(runsReducer, initialRuns);
@@ -38,15 +41,38 @@ export function useConsole() {
       .finally(() => setLoaded(true));
 
     // EventSource reconnects by itself and sends Last-Event-ID, so the
-    // server replays only what was missed.
-    const source = new EventSource("/api/events");
+    // server replays only what was missed. It gives up for good on an error
+    // response (a dev proxy's 502 while the API is down), so then this opens
+    // a new one after a pause.
+    let source: EventSource | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let closed = false;
+    let boot: string | undefined;
     const onEvent = (msg: MessageEvent<string>) => {
-      dispatch({ type: "event", event: JSON.parse(msg.data) as RunEvent });
+      const event = JSON.parse(msg.data) as RunEvent;
+      // A new API process: the reducer starts over from its log, and the run
+      // list brings back the runs it restored (paused for a VP).
+      if (event.boot && boot && event.boot !== boot) api.runs().then(snapshot, () => {});
+      boot = event.boot ?? boot;
+      dispatch({ type: "event", event });
     };
-    for (const type of EVENT_TYPES) source.addEventListener(type, onEvent);
-    source.onopen = () => setStream("live");
-    source.onerror = () => setStream("retrying");
-    return () => source.close();
+    const connect = () => {
+      source = new EventSource("/api/events");
+      for (const type of EVENT_TYPES) source.addEventListener(type, onEvent);
+      source.onopen = () => setStream("live");
+      source.onerror = () => {
+        setStream("retrying");
+        if (source?.readyState === EventSource.CLOSED && !closed) {
+          retry = setTimeout(connect, RETRY_MS);
+        }
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      clearTimeout(retry);
+      source?.close();
+    };
   }, [snapshot]);
 
   return { state, stream, provider, noKey, vpAuth, snapshot, loaded };

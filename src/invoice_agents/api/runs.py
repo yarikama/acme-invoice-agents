@@ -111,6 +111,9 @@ class RunManager:
         self.runs: dict[str, Run] = {}
         # Every event from every run, in order: one stream for the whole console.
         self.log: list[dict[str, Any]] = []
+        # Names this process's log: after a restart the log starts again at
+        # seq 0, and a console still holding the old one must start over too.
+        self.boot = uuid.uuid4().hex[:8]
         self._log_changed = asyncio.Condition()
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -261,6 +264,7 @@ class RunManager:
             self.log.append(
                 {
                     "type": "reset",
+                    "boot": self.boot,
                     "id": 0,
                     "seq": len(self.log),
                     "run_id": "",
@@ -291,6 +295,7 @@ class RunManager:
             full = {
                 "id": len(run.events),
                 "seq": len(self.log),
+                "boot": self.boot,
                 "run_id": run.id,
                 "source": run.source,
                 "created_at": run.created_at,

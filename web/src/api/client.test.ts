@@ -42,3 +42,14 @@ describe("the scan parser", () => {
     expect((inits[3]!.body as FormData).get("parser")).toBeNull();
   });
 });
+
+describe("api.reset", () => {
+  it("sends the VP token when there is one", async () => {
+    const fetch = stubFetch(200, null);
+    await api.reset("s3cret");
+    await api.reset();
+    const [withToken, without] = fetch.mock.calls.map((c) => (c as unknown as [string, RequestInit])[1]);
+    expect(withToken!.headers).toMatchObject({ Authorization: "Bearer s3cret" });
+    expect(without!.headers).toBeUndefined();
+  });
+});

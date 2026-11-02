@@ -56,6 +56,13 @@ export function ChatPanel() {
       const got = await api.chat(lastIndex(held.current));
       setAvailable(got.available);
       setShared(got.shared);
+      if (got.count !== undefined && got.count - 1 < lastIndex(held.current)) {
+        // The API restarted without Redis: the conversation began again, so
+        // replace ours rather than merge two of them by index.
+        const fresh = await api.chat();
+        setMessages(fresh.messages);
+        return;
+      }
       setMessages((now) => merge(now, got.messages));
     } catch {
       // The API is down or restarting; the next poll tries again.

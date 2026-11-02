@@ -15,6 +15,8 @@ export interface RunsState {
   // Newest first.
   order: string[];
   lastSeq: number;
+  // The API process the events came from (see RunEvent.boot).
+  boot?: string;
 }
 
 export type RunsAction = { type: "snapshot"; runs: RunOverview[] } | { type: "event"; event: RunEvent };
@@ -43,9 +45,12 @@ export function runsReducer(state: RunsState, action: RunsAction): RunsState {
 
     case "event": {
       const e = action.event;
+      // The API restarted: its log starts again at 0 and holds only what this
+      // process knows, so start over from it.
+      if (e.boot && state.boot && e.boot !== state.boot) state = { ...initialRuns };
       // The stream replays history on reconnect; skip what we already have.
       if (e.seq <= state.lastSeq) return state;
-      if (e.type === "reset") return { ...initialRuns, lastSeq: e.seq };
+      if (e.type === "reset") return { ...initialRuns, lastSeq: e.seq, boot: e.boot ?? state.boot };
       const existing = state.runs[e.run_id];
       const run = existing ?? blank(e.run_id, e.source, e.status, e.created_at);
       const next: RunView = {
@@ -61,6 +66,7 @@ export function runsReducer(state: RunsState, action: RunsAction): RunsState {
         runs,
         order: existing ? state.order : newestFirst([...state.order, e.run_id], runs),
         lastSeq: e.seq,
+        boot: e.boot ?? state.boot,
       };
     }
   }

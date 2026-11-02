@@ -170,8 +170,17 @@ ChatDep = Annotated[ChatService, Depends(get_chat)]
 @app.get("/api/chat")
 async def chat_messages(chat: ChatDep, after: int = -1) -> dict[str, Any]:
     """The shared conversation, from the terminal and the web console."""
-    messages = await asyncio.to_thread(chat.messages, after)
-    return {"messages": messages, "available": chat.available, "shared": chat.shared}
+    messages, count = await asyncio.to_thread(
+        lambda: (chat.messages(after), len(chat.history.messages))
+    )
+    # The count lets a console that holds more messages than exist (the API
+    # restarted without Redis) start the conversation over.
+    return {
+        "messages": messages,
+        "count": count,
+        "available": chat.available,
+        "shared": chat.shared,
+    }
 
 
 @app.post("/api/chat")
@@ -343,10 +352,21 @@ async def stream_all_events(
     """Every run's events on one connection, for the console.
 
     Browsers allow only six HTTP/1.1 connections per host, so one stream per
-    run would stall a batch. The SSE id here is the global `seq`.
+    run would stall a batch. The SSE id is "<boot>-<seq>": a reconnect after
+    the API restarted names an old boot, so it gets this process's whole log
+    rather than nothing until the new log catches up with the old seq.
     """
-    async for event in manager.all_events(_after(last_event_id)):
-        yield _sse(event, "seq")
+    after = -1
+    if last_event_id and "-" in last_event_id:
+        boot, _, seq = last_event_id.partition("-")
+        if boot == manager.boot:
+            after = _after(seq)
+    async for event in manager.all_events(after):
+        yield ServerSentEvent(
+            id=f"{manager.boot}-{event['seq']}",
+            event=event["type"],
+            raw_data=json.dumps(event),
+        )
 
 
 def _after(last_event_id: str | None) -> int:

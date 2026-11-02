@@ -99,6 +99,8 @@ export interface StepUsage {
 interface EventBase {
   id: number;
   seq: number;
+  // The API process the event came from; a new one restarts its log at 0.
+  boot?: string;
   run_id: string;
   source: string;
   created_at: string;
@@ -147,6 +149,8 @@ export interface ChatState {
   available: boolean;
   // Redis holds the conversation, so the terminal sees it too.
   shared: boolean;
+  // How many messages the conversation holds now.
+  count?: number;
 }
 
 export interface Sample {
