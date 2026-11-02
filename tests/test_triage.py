@@ -321,3 +321,13 @@ def test_build_agents_adds_a_triager_only_when_configured():
         build_agents(
             Settings(llm_provider="offline", triage_model="m", openrouter_api_key=None)
         )
+
+
+async def test_a_200_that_is_not_an_answer_gives_way_to_the_approver():
+    # An HTML error page with status 200, or a body with a non-dict usage.
+    html = triager(lambda r: httpx.Response(200, text="<html>Bad gateway</html>"))
+    with pytest.raises(TriageError, match="returned"):
+        await html.ask(INVOICE, CLEAN)
+    odd = triager(lambda r: httpx.Response(200, json={**ANSWER, "usage": 5}))
+    got = await odd.ask(INVOICE, CLEAN)
+    assert got.input_tokens == 0

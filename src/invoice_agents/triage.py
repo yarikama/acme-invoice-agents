@@ -121,7 +121,8 @@ class DecisionTriager:
         seconds = time.perf_counter() - start
         try:
             choice = data["answers"]["decision"]
-            usage = data.get("usage") or {}
+            usage = data.get("usage")
+            usage = usage if isinstance(usage, dict) else {}
             return TriageAnswer(
                 model=self.model,
                 decision=choice["choice"],
@@ -134,7 +135,7 @@ class DecisionTriager:
                 input_tokens=int(usage.get("input_tokens") or 0),
                 cost_usd=usage.get("cost"),
             )
-        except (KeyError, TypeError, ValueError) as exc:
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
             raise TriageError(f"Unexpected answer from {self.model}: {exc}") from exc
 
     async def _post(self, body: dict[str, Any]) -> dict[str, Any]:
@@ -149,7 +150,15 @@ class DecisionTriager:
                     error = f"{type(exc).__name__}: {exc}"
                 else:
                     if r.status_code == 200:
-                        return r.json()
+                        try:
+                            data = r.json()
+                        except ValueError:
+                            data = None
+                        if isinstance(data, dict):
+                            return data
+                        # A 200 that isn't an answer (an HTML error page):
+                        # triage gives way to the approver, not the run.
+                        raise TriageError(f"{self.model} returned {r.text[:200]!r}")
                     error = f"HTTP {r.status_code}: {r.text[:200]}"
                     if r.status_code != 429 and r.status_code < 500:
                         break

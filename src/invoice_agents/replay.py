@@ -155,9 +155,13 @@ def _spent() -> Iterator[usage.Tokens]:
     """The tokens recorded inside the block, still counted for the step."""
     outer = usage._current.get()  # pyright: ignore[reportPrivateUsage]
     with usage.collecting() as inner:
-        yield inner
-    if outer is not None:
-        usage.add(outer, inner)
+        try:
+            yield inner
+        finally:
+            # A call that failed (an answer that didn't fit the schema, say)
+            # still spent its tokens.
+            if outer is not None:
+                usage.add(outer, inner)
 
 
 def _replayed(tokens: usage.Tokens) -> None:

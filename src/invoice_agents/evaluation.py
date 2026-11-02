@@ -587,6 +587,14 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     console.print(f"Saved {report}")
+    if settings.llm_provider == "replay" and totals["skipped"]:
+        # In replay a skip is a case the recording no longer covers: its
+        # inputs changed. Accuracy leaves skips out, so say it and fail.
+        console.print(
+            f"[red]{totals['skipped']} skipped in replay:[/] the recording no"
+            " longer covers them; re-record with RECORD_TO on a live run."
+        )
+        return 1
     return 0 if all(r.correct is not False for r in results) else 1
 
 

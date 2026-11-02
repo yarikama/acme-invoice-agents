@@ -326,3 +326,24 @@ async def test_the_recording_covers_every_eval_case(
         path = settings.samples_dir.parent / case.folder / name
         state = await graph.ainvoke({"path": str(path)}, config)
         assert not any(replay.FALLBACK in t["message"] for t in state["trace"]), name
+
+
+def test_a_failed_recorded_call_still_counts_its_tokens(tmp_path: Path) -> None:
+    from langchain_core.messages import AIMessage
+
+    from invoice_agents.replay import _spent  # pyright: ignore[reportPrivateUsage]
+
+    with usage.collecting() as step, pytest.raises(ValueError), _spent():
+        usage.record(
+            AIMessage(
+                content="not the schema",
+                usage_metadata={
+                    "input_tokens": 5000,
+                    "output_tokens": 800,
+                    "total_tokens": 5800,
+                },
+                response_metadata={"model_name": "x-ai/grok-4.3"},
+            )
+        )
+        raise ValueError("Model output did not match Extraction")
+    assert step == {"x-ai/grok-4.3": {"input_tokens": 5000, "output_tokens": 800}}
