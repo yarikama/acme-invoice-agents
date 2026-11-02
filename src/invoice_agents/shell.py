@@ -612,12 +612,16 @@ class Shell:
         if choice is None or self.conn is None:
             yield
             return
+        # The run reconnects and takes the parser from args: set both.
         runner = self.conn.runner
         before, runner.parser = runner.parser, choice
+        session = getattr(self.args, "parser", None)
+        self.args.parser = choice
         try:
             yield
         finally:
             runner.parser = before
+            self.args.parser = session
 
     def _parser(self) -> str:
         return getattr(self.args, "parser", None) or get_settings().ocr_backend
@@ -700,7 +704,11 @@ class Shell:
             )
             return
         # The evaluation runs its own event loop; ours is idle between commands.
-        evaluation.main(["--set", which, *args[1:]])
+        try:
+            evaluation.main(["--set", which, *args[1:]])
+        except SystemExit as exc:
+            if exc.code not in (0, None):
+                console.print(f"  The eval stopped: {escape(str(exc))}")
 
     def help(self, args: list[str]) -> None:
         name = ALIASES.get(args[0].lstrip("/"), args[0].lstrip("/")) if args else None

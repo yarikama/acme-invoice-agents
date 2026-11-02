@@ -9,11 +9,13 @@ import asyncio
 import hmac
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from urllib.parse import urlparse
 
 import aiosqlite
 from fastapi import (
@@ -27,6 +29,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 from fastapi.staticfiles import StaticFiles
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -93,6 +96,23 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def refuse_cross_site_writes(request: Request, call_next: Any) -> Any:
+    """A page on another site can still send a simple POST (an upload, a
+    reset) without a CORS preflight; the browser names its Origin. Writes
+    come from this console, the configured ones, or a client that sends no
+    Origin (the CLI, curl)."""
+    origin = request.headers.get("origin")
+    if request.method not in ("GET", "HEAD", "OPTIONS") and origin:
+        same_site = urlparse(origin).netloc == request.headers.get("host")
+        if not same_site and origin not in get_settings().cors_origins:
+            return JSONResponse(
+                {"detail": f"Requests from {origin} may not change anything."},
+                status_code=403,
+            )
+    return await call_next(request)
 
 
 def get_manager(request: Request) -> RunManager:
@@ -370,7 +390,10 @@ async def stream_all_events(
 
 
 def _after(last_event_id: str | None) -> int:
-    return int(last_event_id) if last_event_id and last_event_id.isdigit() else -1
+    # ASCII digits only, and few: isdigit() also accepts "²" and 5,000 digits.
+    if last_event_id and re.fullmatch(r"[0-9]{1,12}", last_event_id):
+        return int(last_event_id)
+    return -1
 
 
 def _sse(event: dict[str, Any], id_key: str) -> ServerSentEvent:
