@@ -14,7 +14,7 @@ class SourceFormat(StrEnum):
     JSON = "json"
     XML = "xml"
     PDF = "pdf"
-    # Photos and scans of an invoice: read with OCR (`uv sync --extra ocr`).
+    # Photos and scans of an invoice: read with OCR (see ingestion/ocr.py).
     PNG = "png"
     JPG = "jpg"
     JPEG = "jpeg"

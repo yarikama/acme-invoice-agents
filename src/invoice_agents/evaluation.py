@@ -143,7 +143,7 @@ CASES: list[Case] = [
 ]
 
 # INV-1011 again, as a scanner would hand it over: an image with no text layer.
-# Needs OCR (`uv sync --extra ocr`); skipped without it.
+# Needs Tesseract for OCR; skipped without it.
 SCANNED: list[Case] = [
     Case(
         ("invoice_1011_scan.pdf",),
@@ -473,15 +473,17 @@ def render(results: list[Result], totals: dict[str, Any], console: Console) -> N
         )
     console.print(table)
     for r in results:
+        run = f" (run {r.attempt})" if "repeat" in totals else ""
         if r.correct is False:
-            run = f" (run {r.attempt})" if "repeat" in totals else ""
             console.print(f"[red]MISS[/] {r.case}{run}: {r.detail or r.findings}")
+        elif r.outcome == "skipped":
+            console.print(f"[dim]SKIP[/] {r.case}{run}: {r.detail}")
     accuracy = totals["accuracy"]
     line = f"{totals['correct']}/{totals['scored']} correct"
     if accuracy is not None:
         line += f" ({accuracy:.0%})"
     if totals["skipped"]:
-        line += f", {totals['skipped']} skipped (need an LLM)"
+        line += f", {totals['skipped']} skipped"
     if totals["total_cost_usd"] is not None:
         line += (
             f", ${totals['total_cost_usd']:.4f} total,"

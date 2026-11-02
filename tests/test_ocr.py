@@ -1,7 +1,6 @@
 """Scanned PDFs and photos go to OCR; text PDFs don't. No OCR model runs here."""
 
 import asyncio
-import builtins
 from pathlib import Path
 from typing import Any
 
@@ -39,23 +38,45 @@ def test_a_text_pdf_skips_ocr() -> None:
     assert not doc.ocr and "INV-1011" in doc.text
 
 
-def test_without_docling_the_error_says_how_to_install(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("backend", ["pymupdf", "docling"])
+def test_without_tesseract_the_error_says_how_to_install(
+    backend: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    real_import = builtins.__import__
-
-    def no_docling(name: str, *args: Any, **kwargs: Any) -> Any:
-        if "docling" in name:
-            raise ImportError(name)
-        return real_import(name, *args, **kwargs)
-
+    monkeypatch.setattr(ocr_module.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(ocr_module, "_read", {})
     ocr_module._docling_loader.cache_clear()
-    monkeypatch.setattr(builtins, "__import__", no_docling)
+    scan = tmp_path / "scan.png"
+    scan.write_bytes((SCANNED / "invoice_1011_scan.png").read_bytes())
     try:
-        with pytest.raises(OcrUnavailableError, match="uv sync --extra ocr"):
-            load_document(SCANNED / "invoice_1011_scan.png")
+        with pytest.raises(OcrUnavailableError, match="brew install tesseract"):
+            load_document(scan, ocr_module.BACKENDS[backend])
     finally:
         ocr_module._docling_loader.cache_clear()
+
+
+def test_pymupdf_renders_each_page_and_tesseract_reads_it_whole(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **kwargs: Any) -> Any:
+        calls.append(cmd)
+        assert kwargs["input"].startswith(b"\x89PNG")
+
+        class Done:
+            stdout = b"WidgetA 6 $250.00 $1,500.00\n"
+
+        return Done()
+
+    monkeypatch.setattr(ocr_module.shutil, "which", lambda _name: "/usr/bin/tesseract")
+    monkeypatch.setattr(ocr_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(ocr_module, "_read", {})
+    text = ocr_module.pymupdf_text(SCANNED / "invoice_1011_scan.pdf")
+    assert text == "WidgetA 6 $250.00 $1,500.00"
+    assert calls == [["tesseract", "stdin", "stdout", "--psm", "4", "-l", "eng"]]
+    # Read once: a retry gets the same text without running OCR again.
+    ocr_module.pymupdf_text(SCANNED / "invoice_1011_scan.pdf")
+    assert len(calls) == 1
 
 
 def test_docling_text_goes_through_the_langchain_loader_once_per_file(
@@ -108,9 +129,9 @@ async def test_the_graph_reads_files_off_the_event_loop(
         return await real(fn, *args, **kwargs)
 
     monkeypatch.setattr(graph.asyncio, "to_thread", spy)
-    monkeypatch.setitem(graph.OCR_BACKENDS, "docling", fake_ocr)
+    monkeypatch.setitem(graph.OCR_BACKENDS, "pymupdf", fake_ocr)
     state = await make_graph(inventory).ainvoke(
         {"path": str(SCANNED / "invoice_1011_scan.png")}, config()
     )
     assert "load_document" in seen and "validate" not in seen
-    assert "Read the scan with OCR (docling)" in state["trace"][0]["message"]
+    assert "Read the scan with OCR (pymupdf)" in state["trace"][0]["message"]

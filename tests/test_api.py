@@ -183,15 +183,15 @@ async def test_a_scan_without_ocr_fails_with_the_install_hint(
     from invoice_agents.ingestion.ocr import OcrUnavailableError
 
     def no_ocr(path):
-        raise OcrUnavailableError("needs OCR: uv sync --extra ocr")
+        raise OcrUnavailableError("needs OCR: brew install tesseract")
 
-    monkeypatch.setitem(graph.OCR_BACKENDS, "docling", no_ocr)
+    monkeypatch.setitem(graph.OCR_BACKENDS, "pymupdf", no_ocr)
     resp = await client.post("/api/runs/upload", files={"file": ("scan.png", b"png")})
     await settle(resp.json()["id"])
     run = manager().get(resp.json()["id"])
     assert run.status == "failed"
     [error] = [e for e in run.events if e["type"] == "run_error"]
-    assert error["message"] == "needs OCR: uv sync --extra ocr"
+    assert error["message"] == "needs OCR: brew install tesseract"
     # An expected condition, not a crash: no stack trace in the log.
     assert not [r for r in caplog.records if r.exc_info]
 

@@ -1,7 +1,7 @@
 """Make the scanned test invoices: INV-1011 as an image with no text layer.
 
-Run with the OCR extra installed (it brings pypdfium2 and Pillow):
-    uv run --extra ocr python data/make_scans.py
+Run (pypdfium2 and Pillow come with Docling):
+    uv run python data/make_scans.py
 """
 
 from pathlib import Path

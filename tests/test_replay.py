@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any
@@ -296,10 +297,15 @@ async def test_replay_takes_the_time_the_live_run_did(
 
 
 # Every case the eval scores must replay from the recording, not fall back to
-# the rule-based agents: a reviewer without a key sees the real agents. Scans
-# need the OCR extra and are left out. When this fails, the agents' inputs
+# the rule-based agents: a reviewer without a key sees the real agents. When
+# this fails, the agents' inputs
 # changed; re-record with RECORD_TO=data/replay/recording.json on a live run.
-RECORDED = [c for c in evaluation.cases_in("all") if c.folder != "scanned"]
+RECORDED = [
+    c
+    for c in evaluation.cases_in("all")
+    # Scans need Tesseract for OCR before the recorded agents can answer.
+    if c.folder != "scanned" or shutil.which("tesseract")
+]
 
 
 @pytest.mark.parametrize("case", RECORDED, ids=lambda c: c.name)
