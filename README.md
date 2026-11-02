@@ -32,15 +32,17 @@ cp .env.example .env         # put XAI_API_KEY (or OPENROUTER_API_KEY) here to r
 python main.py --invoice_path=data/invoices/invoice_1001.txt
 ```
 
+That is the command from the brief. It prints each step as it happens and a result card at the end; `--json` prints the results as JSON.
+
 Or with only Docker (no Python or Node needed):
 
 ```bash
 cp .env.example .env         # optional: add a key to run live
-docker compose up            # the web console and API at http://localhost:8000
+docker compose up -d         # the web console and API at http://localhost:8000
 docker compose run --rm cli --invoice_path=data/invoices/invoice_1001.txt
 ```
 
-That is the command from the brief. It prints each step as it happens and a result card at the end; `--json` prints the results as JSON. More ways to run it:
+More ways to run it:
 
 | Command | What it does |
 |---|---|
