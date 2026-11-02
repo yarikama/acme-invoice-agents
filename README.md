@@ -51,7 +51,7 @@ cp .env.example .env         # put XAI_API_KEY (or OPENROUTER_API_KEY) here to r
 python main.py --invoice_path=data/invoices/invoice_1001.txt
 ```
 
-That is the command from the brief. It prints each step as it happens and a result card at the end; `--json` prints the results as JSON.
+That is the command from the brief. It prints each step as it happens and a result card at the end, then exits; `--json` prints the results as JSON, and `-i` stays in the interactive console afterwards.
 
 Or with only Docker (no Python or Node needed):
 

@@ -289,13 +289,15 @@ def test_when_the_shell_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     # --serve alone keeps serving without a prompt when stdin isn't a terminal.
     assert not interactive("--serve")
 
-    # At a terminal, a file runs and the console stays, as if typed as /run...
+    # At a terminal too, a file runs and exits, like the brief's command...
     monkeypatch.setattr("sys.stdin.isatty", lambda: True, raising=False)
     monkeypatch.setattr("sys.stdout.isatty", lambda: True, raising=False)
-    assert interactive("--invoice_path", "x")
+    assert not interactive("--invoice_path", "x")
+    assert not interactive("--dir", "x")
     assert interactive("--serve")
-    # ...unless the output is for a program, or asked to exit.
-    assert not interactive("--invoice_path", "x", "--json")
+    assert interactive()
+    # ...unless -i asks to stay in the console afterwards.
+    assert interactive("-i", "--invoice_path", "x")
     assert not interactive("--invoice_path", "x", "--once")
     with pytest.raises(SystemExit):
         cli._parse_args(["--once", "-i"])

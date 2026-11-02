@@ -5,9 +5,9 @@
     python main.py --dir data/invoices
     python main.py --serve            # start the API and the web console
 
-A file or folder runs first, then the interactive console stays open, as
-if it had been typed as /run. Where input isn't a terminal (a script, CI),
-with --json, or with --once, the CLI runs the file and exits.
+A file or folder runs, prints its result and exits, as the brief's command
+expects; add -i to stay in the interactive console afterwards, as if it had
+been typed as /run. With no file or folder, the console opens.
 
 If the API is running, invoices go through it, so each run also appears in
 the web console; otherwise the graph runs here. Either way the terminal shows
@@ -118,12 +118,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "-i",
         "--interactive",
         action="store_true",
-        help="Stay in the interactive console even when input isn't a terminal",
+        help="After running the file or folder, stay in the interactive console",
     )
     stay.add_argument(
         "--once",
         action="store_true",
-        help="Run the file or folder and exit (the default for scripts and --json)",
+        help="Run the file or folder and exit (the default; kept for scripts)",
     )
     parser.add_argument(
         "--no-serve",
@@ -148,16 +148,13 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
 def _interactive(args: argparse.Namespace) -> bool:
     """Whether to open the console, before or after running a file.
 
-    A person at a terminal gets it. A script, CI or anything reading --json
-    gets one run and an exit, so nothing waits on a prompt nobody sees.
-    `--serve` alone keeps serving without a prompt off a terminal."""
+    A file or folder runs and exits, like the brief's command, unless -i asks
+    to stay. With no target, a person gets the console; `--serve` alone keeps
+    serving without a prompt off a terminal."""
     if args.interactive:
         return True
-    if args.once or args.json or args.watch:
+    if args.once or args.json or args.watch or args.invoice_path or args.dir:
         return False
-    at_terminal = sys.stdin.isatty() and sys.stdout.isatty()
-    if args.invoice_path or args.dir:
-        return at_terminal
     return not args.serve or sys.stdin.isatty()
 
 
