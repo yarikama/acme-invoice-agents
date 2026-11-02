@@ -1,4 +1,22 @@
-# Acme Invoice Agents
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+    <img src="docs/images/logo.svg" alt="Acme Invoice Agents logo: an invoice whose corner is a signal light" width="88">
+  </picture>
+</p>
+
+<h1 align="center">Acme Invoice Agents</h1>
+
+<p align="center">
+  <a href="https://github.com/yarikama/acme-invoice-agents/actions/workflows/ci.yml"><img src="https://github.com/yarikama/acme-invoice-agents/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12">
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+  <a href="https://microsoft.github.io/pyright/"><img src="https://img.shields.io/badge/types-pyright-2C6BED" alt="Checked with Pyright"></a>
+  <img src="https://img.shields.io/badge/coverage-97%25-2EA043" alt="Coverage 97%">
+  <a href="https://github.com/astral-sh/uv"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json" alt="uv"></a>
+  <img src="https://img.shields.io/badge/LangGraph-agents-1C3C3C" alt="LangGraph">
+  <img src="https://img.shields.io/badge/Grok-xAI-000000" alt="Grok by xAI">
+</p>
 
 AI agents that process Acme's invoices end to end: read the invoice, check it, decide, and pay or reject. Grok does the reading and the judgment; plain code checks every number and has the final say on money.
 
