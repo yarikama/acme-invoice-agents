@@ -20,6 +20,8 @@ export function Toolbar({ onStarted }: Props) {
   const [sample, setSample] = useState("");
   // Which parser reads scans in the runs started here; the API's default first.
   const [parser, setParser] = useState<Parser>("pymupdf");
+  // The parsers this install can run; docling is an optional extra.
+  const [installed, setInstalled] = useState<Parser[]>(PARSERS.map((p) => p.value));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Starting over forgets every run, so it asks once more, in the page.
@@ -28,7 +30,10 @@ export function Toolbar({ onStarted }: Props) {
 
   useEffect(() => {
     api.health().then(
-      (h) => h.parser && setParser(h.parser),
+      (h) => {
+        if (h.parser) setParser(h.parser);
+        if (h.parsers) setInstalled(h.parsers);
+      },
       () => {},
     );
     api.samples().then(
@@ -104,7 +109,7 @@ export function Toolbar({ onStarted }: Props) {
             value={parser}
             onChange={(e) => setParser(e.target.value as Parser)}
           >
-            {PARSERS.map((p) => (
+            {PARSERS.filter((p) => installed.includes(p.value)).map((p) => (
               <option key={p.value} value={p.value} title={p.hint}>
                 {p.label}
               </option>

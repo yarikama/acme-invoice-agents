@@ -42,12 +42,10 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "defusedxml" },
-    { name = "docling" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "langchain-community" },
     { name = "langchain-core" },
-    { name = "langchain-docling" },
     { name = "langchain-openai" },
     { name = "langchain-xai" },
     { name = "langgraph" },
@@ -60,11 +58,17 @@ dependencies = [
     { name = "python-multipart" },
     { name = "redis" },
     { name = "rich" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+docling = [
+    { name = "docling" },
+    { name = "langchain-docling" },
     { name = "torch", version = "2.15.0", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "torchvision", version = "0.29.2", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'linux'" },
     { name = "torchvision", version = "0.29.2+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
-    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.dev-dependencies]
@@ -82,12 +86,12 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.22.1" },
     { name = "defusedxml", specifier = ">=0.7" },
-    { name = "docling", specifier = "==2.140.0" },
+    { name = "docling", marker = "extra == 'docling'", specifier = "==2.140.0" },
     { name = "fastapi", specifier = ">=0.162.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "langchain-community", specifier = ">=0.4" },
     { name = "langchain-core", specifier = ">=1.5" },
-    { name = "langchain-docling", specifier = "==3.0.0" },
+    { name = "langchain-docling", marker = "extra == 'docling'", specifier = "==3.0.0" },
     { name = "langchain-openai", specifier = ">=1.1" },
     { name = "langchain-xai", specifier = ">=1.3" },
     { name = "langgraph", specifier = ">=1.2" },
@@ -100,12 +104,13 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "redis", specifier = ">=5" },
     { name = "rich", specifier = ">=13.9" },
-    { name = "torch", marker = "sys_platform != 'linux'" },
-    { name = "torch", marker = "sys_platform == 'linux'", index = "https://download.pytorch.org/whl/cpu" },
-    { name = "torchvision", marker = "sys_platform != 'linux'" },
-    { name = "torchvision", marker = "sys_platform == 'linux'", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", marker = "sys_platform == 'linux' and extra == 'docling'", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torch", marker = "sys_platform != 'linux' and extra == 'docling'" },
+    { name = "torchvision", marker = "sys_platform == 'linux' and extra == 'docling'", index = "https://download.pytorch.org/whl/cpu" },
+    { name = "torchvision", marker = "sys_platform != 'linux' and extra == 'docling'" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.54.0" },
 ]
+provides-extras = ["docling"]
 
 [package.metadata.requires-dev]
 dev = [

@@ -308,10 +308,16 @@ def report(results: list[Result]) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     parser.add_argument(
-        "--parsers", nargs="+", choices=ocr.PARSERS, default=list(ocr.PARSERS)
+        "--parsers",
+        nargs="+",
+        choices=ocr.PARSERS,
+        default=ocr.available(),
+        help="Default: every parser installed (docling is an optional extra)",
     )
     parser.add_argument("--out", type=Path, default=Path("eval-results"))
     args = parser.parse_args(argv)
+    if missing := [p for p in args.parsers if p not in ocr.available()]:
+        raise SystemExit(f"{', '.join(missing)}: {ocr.NO_DOCLING}")
     run(args.parsers, args.out)
 
 

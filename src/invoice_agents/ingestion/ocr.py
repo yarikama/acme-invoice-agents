@@ -7,11 +7,12 @@ Tesseract, which must be on the machine (`brew install tesseract`,
 - `pymupdf` (default): PyMuPDF renders each page and Tesseract reads it whole,
   one line at a time, so a table row stays one line. Under a second a page,
   nothing to download.
-- `docling`: Docling's layout model finds the page's blocks and tables first
-  and returns Markdown, with tables as tables. Better on multi-column layouts;
-  on the sample scans (slightly skewed tables) its table model drops cells
-  that the whole-page read keeps. Seconds a page on CPU; the layout model
-  downloads once from Hugging Face. Goes through langchain-docling.
+- `docling` (optional: `uv sync --extra docling`, about 1 GB with PyTorch):
+  Docling's layout model finds the page's blocks and tables first and returns
+  Markdown, with tables as tables. Better on multi-column layouts; on the
+  sample scans (slightly skewed tables) its table model drops cells that the
+  whole-page read keeps. Seconds a page on CPU; the layout model downloads
+  once from Hugging Face. Goes through langchain-docling.
 
 A third parser, `grok`, has Grok read the page image itself (see
 agents.LLMVisionReader): no Tesseract, best on photos and poor scans, but it
@@ -23,6 +24,7 @@ cloud OCR API) can be added beside these without touching the callers.
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import subprocess
 import threading
@@ -43,6 +45,23 @@ NO_TESSERACT = (
     " Tesseract. Install it with `brew install tesseract` (macOS) or"
     " `apt-get install tesseract-ocr` (Debian, Ubuntu)."
 )
+
+
+NO_DOCLING = (
+    "The docling parser is optional and not installed: run"
+    " `uv sync --extra docling` (about 1 GB, with PyTorch), or pick the"
+    " pymupdf or grok parser."
+)
+
+
+def docling_installed() -> bool:
+    return importlib.util.find_spec("docling") is not None
+
+
+def available() -> list[str]:
+    """The parsers this install can run; grok also needs a model, checked
+    when a run uses it."""
+    return [p for p in PARSERS if p != "docling" or docling_installed()]
 
 
 def _need_tesseract() -> None:
@@ -80,18 +99,25 @@ def _docling_loader() -> tuple[Any, Any]:
     """LangChain's Docling loader, and one converter for every file, reading
     characters with Tesseract."""
     _need_tesseract()
-    from docling.datamodel.base_models import InputFormat
-    from docling.datamodel.pipeline_options import (
+    if not docling_installed():
+        raise OcrUnavailableError(NO_DOCLING)
+    # The optional extra; absent from a plain `uv sync`.
+    from docling.datamodel.base_models import (  # pyright: ignore[reportMissingImports]
+        InputFormat,
+    )
+    from docling.datamodel.pipeline_options import (  # pyright: ignore[reportMissingImports]
         OcrMode,
         PdfPipelineOptions,
         TesseractCliOcrOptions,
     )
-    from docling.document_converter import (
+    from docling.document_converter import (  # pyright: ignore[reportMissingImports]
         DocumentConverter,
         ImageFormatOption,
         PdfFormatOption,
     )
-    from langchain_docling import DoclingLoader
+    from langchain_docling import (  # pyright: ignore[reportMissingImports]
+        DoclingLoader,
+    )
 
     # Read the whole page at once: Tesseract on each table cell alone loses
     # short cells such as item names.
