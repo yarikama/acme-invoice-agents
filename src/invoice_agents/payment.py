@@ -70,6 +70,10 @@ class MockBank:
             self._store(key, result)
         return result
 
+    def paid(self, invoice: Invoice) -> bool:
+        """Whether this invoice's payment went through."""
+        return self._find(payment_key(invoice)) is not None
+
     def _find(self, key: str) -> PaymentResult | None:
         if self.db_path is None:
             return self._memory.get(key)

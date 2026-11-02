@@ -104,11 +104,15 @@ class Ledger(SeenInvoices):
             ).fetchone()
             if row is None:
                 return
-            conn.execute(
+            # A payment is never undone by a later failure: duplicate checks
+            # must keep seeing it.
+            changed = conn.execute(
                 "UPDATE ledger SET outcome = ?, reason = ?, settled_at = ?"
-                " WHERE run_id = ?",
+                " WHERE run_id = ? AND outcome IS NOT 'paid'",
                 (outcome, reason, settled_at, run_id),
-            )
+            ).rowcount
+            if not changed:
+                return
         source, number, vendor, total, currency = row
         self._log(
             {

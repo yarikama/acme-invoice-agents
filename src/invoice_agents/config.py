@@ -101,6 +101,10 @@ class Settings(BaseSettings):
         "BANK_DETAILS_CHANGED",
         "LOOKALIKE_VENDOR",
         "POSSIBLE_DUPLICATE",
+        # How an impostor explains a name that doesn't match.
+        "VENDOR_RENAMED",
+        # A value the model reported that the document doesn't contain.
+        "NOT_IN_DOCUMENT",
     ]
     # The default parser for scanned PDFs and photos; a run can pick another.
     # pymupdf (whole page, fast) and docling (layout, Markdown tables) use
@@ -137,11 +141,20 @@ class Settings(BaseSettings):
             self.replay_for_lack_of_key = True
         return self
 
-    @field_validator("triage_model", "record_to", mode="before")
+    @field_validator(
+        "triage_model",
+        "record_to",
+        "decisions_log",
+        "log_json",
+        "critic_model",
+        "critic_reasoning",
+        mode="before",
+    )
     @classmethod
     def _blank_is_unset(cls, value: object) -> object:
         """`TRIAGE_MODEL=` in a .env means no triage, not a model named "";
-        `RECORD_TO=` means don't record, not record to the current folder."""
+        `RECORD_TO=` or `DECISIONS_LOG=` means none, not the current folder
+        (which would fail only after a payment, when the log is written)."""
         if isinstance(value, str) and not value.strip():
             return None
         return value

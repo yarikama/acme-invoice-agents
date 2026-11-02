@@ -67,6 +67,7 @@ from invoice_agents.usage import (
 from invoice_agents.validation import (
     Policy,
     SeenInvoices,
+    paid_already,
     renamed_from,
     ungrounded,
     validate,
@@ -557,6 +558,14 @@ def build_graph(
     async def pay(state: InvoiceState, config: RunnableConfig) -> InvoiceState:
         _emit("pay", "start")
         invoice = _invoice(state)
+        # Validation saw the ledger as it was then; while this run waited (for
+        # a VP, say), another version of the invoice may have been paid.
+        if reason := paid_already(invoice, deps.seen, _run_id(config)):
+            deps.seen.settle(_run_id(config), "rejected", reason)
+            return {
+                "rejection_reason": reason,
+                "trace": _event("pay", f"Not paid. {reason}"),
+            }
         result = deps.bank.pay(invoice)
         paid = result.status == "success"
         deps.seen.settle(

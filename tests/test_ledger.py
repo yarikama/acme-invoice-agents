@@ -52,14 +52,19 @@ def test_only_standing_invoices_count_as_duplicates(tmp_path: Path, inventory):
     # In progress or waiting for a VP: received.
     [dup] = validate(INV_1001, inventory, ledger).findings
     assert dup.code == "DUPLICATE" and dup.detail == "INV-1001 was already received."
-    ledger.settle("r1", "paid")
-    codes = {f.code: f.detail for f in validate(INV_1001, inventory, ledger).findings}
-    assert codes["DUPLICATE"] == "INV-1001 was already paid."
     # A rejected invoice may be sent again once fixed.
     ledger.settle("r1", "rejected", "Wrong total.")
     assert "DUPLICATE" not in {
         f.code for f in validate(INV_1001, inventory, ledger).findings
     }
+    ledger.add(INV_1001, run_id="r2")
+    ledger.settle("r2", "paid")
+    codes = {f.code: f.detail for f in validate(INV_1001, inventory, ledger).findings}
+    assert codes["DUPLICATE"] == "INV-1001 was already paid."
+    # A failure after paying (a checkpoint write, say) never undoes the payment.
+    ledger.settle("r2", "failed", "Checkpoint write failed.")
+    codes = {f.code: f.detail for f in validate(INV_1001, inventory, ledger).findings}
+    assert codes["DUPLICATE"] == "INV-1001 was already paid."
 
 
 async def test_a_restart_does_not_forget_a_paid_invoice(tmp_path: Path, inventory):
@@ -95,3 +100,27 @@ def test_a_bad_row_is_skipped_not_fatal(tmp_path: Path):
             ('{"line_items": [{"unit_price": null}]}',),
         )
     assert [e.run_id for e in ledger.entries] == ["good"]
+
+
+async def test_a_run_stopped_after_paying_is_restored_as_paid(tmp_path: Path):
+    """The process died between the bank's payment and the ledger's record:
+    on restart the bank's key says it was paid, so it stays a duplicate."""
+    from types import SimpleNamespace
+
+    from invoice_agents.api.runs import RunManager
+    from invoice_agents.payment import MockBank
+
+    class Stopped:
+        async def aget_state(self, _config):
+            return SimpleNamespace(tasks=[], values={})
+
+    db = tmp_path / "inventory.db"
+    ledger, bank = Ledger(db), MockBank(db)
+    ledger.add(INV_1001, run_id="paid-run")
+    bank.pay(INV_1001)
+    ledger.add(
+        INV_1001.model_copy(update={"invoice_number": "INV-2002"}), run_id="lost"
+    )
+    await RunManager(Stopped(), ledger, bank).restore()  # pyright: ignore[reportArgumentType]
+    outcome = {e.run_id: e.outcome for e in ledger.entries}
+    assert outcome == {"paid-run": "paid", "lost": "failed"}

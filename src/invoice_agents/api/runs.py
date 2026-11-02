@@ -229,9 +229,14 @@ class RunManager:
             snapshot = await self.graph.aget_state(run.config)
             paused = [i.value for t in snapshot.tasks for i in t.interrupts]
             if not paused:
-                self.ledger.settle(
-                    run.id, "failed", "Interrupted when the API stopped."
-                )
+                # Stopped between paying and recording it: the bank's key says
+                # it was paid, and duplicate checks must keep seeing that.
+                if self.bank is not None and self.bank.paid(entry.invoice):
+                    self.ledger.settle(run.id, "paid", None)
+                else:
+                    self.ledger.settle(
+                        run.id, "failed", "Interrupted when the API stopped."
+                    )
                 continue
             state = cast(InvoiceState, snapshot.values)
             run.path = Path(state["path"])
