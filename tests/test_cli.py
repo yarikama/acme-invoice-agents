@@ -243,3 +243,18 @@ def test_log_json_writes_each_step_with_its_run(
     assert steps[-1]["stage"] == "pay" and result["status"] == "paid"
     assert len({s["run_id"] for s in steps}) == 1 and steps[0]["run_id"]
     assert {"at", "level", "logger", "message"} <= set(steps[0])
+
+
+def test_the_banner_says_when_there_is_no_key(
+    capsys: pytest.CaptureFixture[str],
+    offline: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    keyless = offline.model_copy(
+        update={"llm_provider": "replay", "replay_for_lack_of_key": True}
+    )
+    monkeypatch.setattr(cli, "get_settings", lambda: keyless)
+    path = f"--invoice_path={INVOICES / 'invoice_1015.csv'}"
+    assert cli.main([path, "--json"]) == 0
+    err = " ".join(capsys.readouterr().err.split())  # undo the line wrapping
+    assert "No API key found, so this replays a recorded live run" in err

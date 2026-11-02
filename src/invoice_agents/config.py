@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import SecretStr, field_validator
+from pydantic import SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # The repository: defaults resolve against it, not the working directory, so
@@ -25,7 +25,11 @@ class Settings(BaseSettings):
     # key or network, so a fresh checkout runs every sample as recorded.
     # "offline" runs rule-based agents with no network; text and PDF
     # invoices then need an LLM to extract and are skipped.
-    llm_provider: Literal["xai", "openrouter", "offline", "replay"] = "replay"
+    # auto (the default): live Grok when a key is set, xAI first (the brief
+    # names xAI's API), then OpenRouter; with no key, replay, and say so.
+    llm_provider: Literal["auto", "xai", "openrouter", "offline", "replay"] = "auto"
+    # Set when "auto" found no key and fell back to replay.
+    replay_for_lack_of_key: bool = False
     replay_path: Path = ROOT / "data/replay/recording.json"
     # Set on a live provider to record the agents' answers for replay.
     record_to: Path | None = None
@@ -104,6 +108,25 @@ class Settings(BaseSettings):
     # and (to approve) sees at most this much chance that something is off.
     triage_min_confidence: float = 0.9
     triage_max_suspicion: float = 0.2
+
+    @model_validator(mode="after")
+    def _pick_provider(self) -> Settings:
+        """Resolve "auto" to the provider the keys allow, so everything after
+        this sees a concrete one."""
+        if self.llm_provider != "auto":
+            return self
+
+        def has(key: SecretStr | None) -> bool:
+            return key is not None and bool(key.get_secret_value().strip())
+
+        if has(self.xai_api_key):
+            self.llm_provider = "xai"
+        elif has(self.openrouter_api_key):
+            self.llm_provider = "openrouter"
+        else:
+            self.llm_provider = "replay"
+            self.replay_for_lack_of_key = True
+        return self
 
     @field_validator("triage_model", mode="before")
     @classmethod

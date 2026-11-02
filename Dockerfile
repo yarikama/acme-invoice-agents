@@ -1,5 +1,6 @@
 # One image for the API (which also serves the built web console) and the CLI.
-# Defaults to the replay provider: every sample runs as recorded, no API key.
+# Live Grok when .env has a key (LLM_PROVIDER=auto); with none, it replays a
+# recorded live run of the samples and says so.
 
 # --- The web console, built once -------------------------------------------
 FROM node:22-alpine AS web
@@ -31,7 +32,7 @@ COPY --from=web /web/dist web/dist
 
 # Runtime state lives on a volume: the inventory and ledger database,
 # checkpoints, uploads and the decision log.
-ENV LLM_PROVIDER=replay \
+ENV LLM_PROVIDER=auto \
     DB_PATH=/state/inventory.db \
     CHECKPOINT_PATH=/state/checkpoints.db \
     UPLOADS_DIR=/state/uploads \

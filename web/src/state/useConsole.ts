@@ -14,6 +14,8 @@ export function useConsole() {
   const [state, dispatch] = useReducer(runsReducer, initialRuns);
   const [stream, setStream] = useState<StreamState>("connecting");
   const [provider, setProvider] = useState<string | null>(null);
+  // No API key was set, so the agents' answers come from a recording.
+  const [noKey, setNoKey] = useState(false);
   // The API takes VP decisions only with a token.
   const [vpAuth, setVpAuth] = useState(false);
   // False until the first run list arrives, so the page doesn't claim to be empty.
@@ -25,6 +27,7 @@ export function useConsole() {
     api.health().then(
       (h) => {
         setProvider(h.llm_provider);
+        setNoKey(Boolean(h.no_key));
         setVpAuth(Boolean(h.vp_auth));
       },
       () => setProvider(null),
@@ -46,5 +49,5 @@ export function useConsole() {
     return () => source.close();
   }, [snapshot]);
 
-  return { state, stream, provider, vpAuth, snapshot, loaded };
+  return { state, stream, provider, noKey, vpAuth, snapshot, loaded };
 }

@@ -10,7 +10,7 @@ import { clearLayout, DEFAULT_LAYOUT, loadLayout, saveLayout } from "./state/lay
 import { useConsole } from "./state/useConsole";
 
 export default function App() {
-  const { state, stream, provider, vpAuth, snapshot, loaded } = useConsole();
+  const { state, stream, provider, noKey, vpAuth, snapshot, loaded } = useConsole();
   const [filter, setFilter] = useState<Filter>("all");
   const [picked, setPicked] = useState<string | null>(null);
   const [layout, setLayout] = useState<Layout>(loadLayout);
@@ -56,6 +56,13 @@ export default function App() {
                     ? `${waiting} waiting for a VP decision.`
                     : "Nothing waiting for a decision."}
             </p>
+            {noKey && (
+              <p className="m-0 mt-2 text-sm text-ink-2">
+                <span className="tag mr-2">replay</span>
+                No API key found, so the agents answer from a recorded live run. Set XAI_API_KEY (or OPENROUTER_API_KEY)
+                in .env and restart to run them live.
+              </p>
+            )}
           </div>
           <Toolbar onStarted={onStarted} />
         </div>
