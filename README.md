@@ -14,7 +14,7 @@ Run all samples, see where every invoice went and what it saved, then approve on
 
 ![Running every sample: the overview and impact panels, the routing chart, then a VP approving a euro invoice](docs/demo/web-console.gif)
 
-[Full video (27 s)](docs/demo/web-console.mp4)
+▶ [Watch on YouTube](https://youtu.be/2TQYbxGx7Gw) · [video file (27 s)](docs/demo/web-console.mp4)
 
 ### The terminal, live on Grok
 
@@ -22,7 +22,7 @@ A fraudulent invoice: Grok reads it, the checks flag a zero-stock item and press
 
 ![A fraudulent text invoice run live: extraction, validation, the approver's tool calls, the critic and the rejection](docs/demo/cli-live.gif)
 
-[Full video (47 s)](docs/demo/cli-live.mp4)
+▶ [Watch on YouTube](https://youtu.be/O3M04gAeVWo) · [video file (47 s)](docs/demo/cli-live.mp4)
 
 ## Run it
 
