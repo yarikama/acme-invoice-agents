@@ -1,5 +1,6 @@
 """Recording a run's agent answers and replaying them with no model."""
 
+import asyncio
 import json
 import uuid
 from pathlib import Path
@@ -8,7 +9,7 @@ from typing import Any
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
-from invoice_agents import replay, usage
+from invoice_agents import evaluation, replay, usage
 from invoice_agents.agents import Review, RuleApprover, RuleCritic
 from invoice_agents.api.app import load_pricing
 from invoice_agents.config import Settings
@@ -245,3 +246,77 @@ async def test_a_draft_is_only_replayed_for_the_findings_it_was_written_for(
     again = await approver.draft(INV_1001, duplicate, [], tools)
     assert again.draft.rationale.startswith(FALLBACK)
     assert again.draft.decision == "reject"
+
+
+class SlowApprover:
+    """Two tool calls, 0.05 s apart, then a decision 0.05 s later."""
+
+    async def draft(self, invoice, report, critique, tools) -> Review:
+        await asyncio.sleep(0.05)
+        first = tools.run("check_inventory", {"item": "WidgetA"})
+        await asyncio.sleep(0.05)
+        second = tools.run("check_inventory", {"item": "WidgetB"})
+        await asyncio.sleep(0.05)
+        return Review(
+            ApprovalDraft(decision="approve", rationale="Fine."), [first, second]
+        )
+
+
+async def test_replay_takes_the_time_the_live_run_did(
+    inventory: Inventory, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recording = Recording(tmp_path / "recording.json")
+    tools = ReviewTools(inventory, SeenInvoices(), INV_1001)
+    report = ValidationReport()
+    await RecordingApprover(SlowApprover(), recording).draft(
+        INV_1001, report, [], tools
+    )
+    [entry] = recording.entries.values()
+    first, second = entry["step_at"]
+    assert 0.04 <= first < second <= entry["seconds"]
+
+    waits: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        waits.append(seconds)
+
+    monkeypatch.setattr(replay.asyncio, "sleep", sleep)
+    seen: list[str] = []
+    live = ReviewTools(
+        inventory, SeenInvoices(), INV_1001, on_step=lambda s: seen.append(s.name)
+    )
+    await ReplayApprover(recording, pace=1.0).draft(INV_1001, report, [], live)
+    # Each tool call waits for its own moment, then the rest of the call.
+    assert waits == pytest.approx([first, second - first, entry["seconds"] - second])
+    assert seen == ["check_inventory", "check_inventory"]
+
+    waits.clear()
+    await ReplayApprover(recording, pace=0.0).draft(INV_1001, report, [], tools)
+    assert waits == []  # the eval's pace: at once
+
+
+# Every case the eval scores must replay from the recording, not fall back to
+# the rule-based agents: a reviewer without a key sees the real agents. Scans
+# need the OCR extra and are left out. When this fails, the agents' inputs
+# changed; re-record with RECORD_TO=data/replay/recording.json on a live run.
+RECORDED = [c for c in evaluation.cases_in("all") if c.folder != "scanned"]
+
+
+@pytest.mark.parametrize("case", RECORDED, ids=lambda c: c.name)
+async def test_the_recording_covers_every_eval_case(
+    case: evaluation.Case, tmp_path: Path
+) -> None:
+    settings = Settings(
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+        llm_provider="replay",
+        replay_pace=0.0,
+    )
+    inventory = Inventory(tmp_path / "inventory.db")
+    inventory.seed()
+    deps = Deps(agents=build_agents(settings), inventory=inventory, settings=settings)
+    graph = build_graph(deps, checkpointer=InMemorySaver(serde=checkpoint_serde()))
+    for name in case.files:
+        config: Any = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        path = settings.samples_dir.parent / case.folder / name
+        state = await graph.ainvoke({"path": str(path)}, config)
+        assert not any(replay.FALLBACK in t["message"] for t in state["trace"]), name

@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Set when "auto" found no key and fell back to replay.
     replay_for_lack_of_key: bool = False
     replay_path: Path = ROOT / "data/replay/recording.json"
+    # How long a replayed answer takes, as a share of the live call it
+    # recorded: 1 is the live pace (tool calls stream in as they did), 0 is
+    # at once. The eval always replays at once.
+    replay_pace: float = 1.0
     # Set on a live provider to record the agents' answers for replay.
     record_to: Path | None = None
     xai_api_key: SecretStr | None = None

@@ -530,7 +530,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    settings = get_settings()
+    # Scoring replays answers at once, not at the pace they were recorded.
+    settings = get_settings().model_copy(update={"replay_pace": 0.0})
     if args.triage:
         settings = settings.model_copy(update={"triage_model": args.triage})
     if args.critic:

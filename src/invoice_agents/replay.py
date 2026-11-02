@@ -20,13 +20,20 @@ Anything not in the recording falls back to the rule-based agents, and says
 so in its rationale; free text that was never recorded is skipped, as in
 offline mode.
 
+Each answer also keeps how long the live call took (and, for the approver,
+when each tool call came back), so replay can take the same time: tool calls
+then appear one by one, as they did live. REPLAY_PACE scales it (1 is the
+live pace, 0 answers at once, which the eval uses).
+
 Record with `RECORD_TO=data/replay/recording.json` on a live provider.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -160,11 +167,16 @@ class RecordingExtractor:
         self.inner, self.recording = inner, recording
 
     async def extract(self, text: str, feedback: list[str]) -> Extraction:
+        start = time.perf_counter()
         with _spent() as tokens:
             out = await self.inner.extract(text, feedback)
         self.recording.put(
             _key("extract", text, *feedback),
-            {"extraction": out.model_dump(mode="json"), "tokens": tokens},
+            {
+                "extraction": out.model_dump(mode="json"),
+                "tokens": tokens,
+                "seconds": round(time.perf_counter() - start, 2),
+            },
         )
         return out
 
@@ -180,14 +192,30 @@ class RecordingApprover:
         critique: list[str],
         tools: ReviewTools,
     ) -> Review:
-        with _spent() as tokens:
-            out = await self.inner.draft(invoice, report, critique, tools)
+        start = time.perf_counter()
+        step_at: list[float] = []
+        watching = tools.on_step
+
+        def timed(step: ToolCall) -> None:
+            # When each tool call (or send-back) came back, for replay.
+            step_at.append(round(time.perf_counter() - start, 2))
+            if watching is not None:
+                watching(step)
+
+        tools.on_step = timed
+        try:
+            with _spent() as tokens:
+                out = await self.inner.draft(invoice, report, critique, tools)
+        finally:
+            tools.on_step = watching
         self.recording.put(
             draft_key(invoice, report, critique),
             {
                 "draft": out.draft.model_dump(mode="json"),
                 "steps": [s.model_dump(mode="json") for s in out.steps],
                 "tokens": tokens,
+                "seconds": round(time.perf_counter() - start, 2),
+                "step_at": step_at,
             },
         )
         return out
@@ -204,11 +232,16 @@ class RecordingCritic:
         draft: ApprovalDraft,
         checked: list[ToolCall],
     ) -> Critique:
+        start = time.perf_counter()
         with _spent() as tokens:
             out = await self.inner.review(invoice, report, draft, checked)
         self.recording.put(
             critique_key(invoice, report, draft),
-            {"critique": out.model_dump(mode="json"), "tokens": tokens},
+            {
+                "critique": out.model_dump(mode="json"),
+                "tokens": tokens,
+                "seconds": round(time.perf_counter() - start, 2),
+            },
         )
         return out
 
@@ -216,9 +249,16 @@ class RecordingCritic:
 # --- Replay --------------------------------------------------------------
 
 
+async def _take(seconds: float | None, pace: float) -> None:
+    """Wait as long as the live call took, scaled by the pace."""
+    if seconds and pace > 0:
+        await asyncio.sleep(seconds * pace)
+
+
 class ReplayExtractor:
-    def __init__(self, recording: Recording) -> None:
+    def __init__(self, recording: Recording, pace: float = 0.0) -> None:
         self.recording = recording
+        self.pace = pace
 
     async def extract(self, text: str, feedback: list[str]) -> Extraction:
         hit = self.recording.get(_key("extract", text, *feedback))
@@ -228,14 +268,16 @@ class ReplayExtractor:
                 " the sample invoices. Set LLM_PROVIDER and an API key to read"
                 " new free-text files."
             )
+        await _take(hit.get("seconds"), self.pace)
         _replayed(hit["tokens"])
         return Extraction.model_validate(hit["extraction"])
 
 
 class ReplayApprover:
-    def __init__(self, recording: Recording) -> None:
+    def __init__(self, recording: Recording, pace: float = 0.0) -> None:
         self.recording = recording
         self.fallback = RuleApprover()
+        self.pace = pace
 
     async def draft(
         self,
@@ -253,21 +295,29 @@ class ReplayApprover:
             return Review(draft, review.steps)
         _replayed(hit["tokens"])
         steps: list[ToolCall] = []
-        for raw in hit["steps"]:
+        step_at: list[float] = hit.get("step_at") or []
+        waited = 0.0
+        for i, raw in enumerate(hit["steps"]):
             step = ToolCall.model_validate(raw)
+            # Each call comes back when it did live, so they stream in.
+            if i < len(step_at):
+                await _take(step_at[i] - waited, self.pace)
+                waited = step_at[i]
             # The model's choice of call is replayed; code answers it again.
             steps.append(
                 tools.note(step)
                 if step.name == GUARDRAIL
                 else tools.run(step.name, step.args)
             )
+        await _take(max((hit.get("seconds") or 0) - waited, 0), self.pace)
         return Review(ApprovalDraft.model_validate(hit["draft"]), steps)
 
 
 class ReplayCritic:
-    def __init__(self, recording: Recording) -> None:
+    def __init__(self, recording: Recording, pace: float = 0.0) -> None:
         self.recording = recording
         self.fallback = RuleCritic()
+        self.pace = pace
 
     async def review(
         self,
@@ -279,5 +329,6 @@ class ReplayCritic:
         hit = self.recording.get(critique_key(invoice, report, draft))
         if hit is None:
             return await self.fallback.review(invoice, report, draft, checked)
+        await _take(hit.get("seconds"), self.pace)
         _replayed(hit["tokens"])
         return Critique.model_validate(hit["critique"])
