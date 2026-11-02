@@ -232,3 +232,20 @@ async def test_the_right_outcome_for_the_wrong_reason_is_a_miss(
     missed = await evaluation.run_case(wrong, offline, {})
     assert missed.correct is False
     assert missed.detail.startswith("Missing the expected finding(s): STOCK_EXCEEDED.")
+
+
+def test_a_replay_eval_with_skips_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """In replay a skip means the recording no longer covers a case: accuracy
+    leaves it out, so the eval says so and fails instead of reporting 100%."""
+    settings = Settings(
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+        llm_provider="replay",
+        replay_path=tmp_path / "empty.json",
+        replay_pace=0.0,
+        samples_dir=INVOICES,
+    )
+    monkeypatch.setattr(evaluation, "get_settings", lambda: settings)
+    assert evaluation.main(["--out", str(tmp_path)]) == 1
+    assert "skipped in replay" in capsys.readouterr().out
