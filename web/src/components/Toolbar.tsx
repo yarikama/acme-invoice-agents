@@ -2,6 +2,7 @@ import { ArrowCounterClockwiseIcon, PlayIcon, StackIcon, UploadSimpleIcon } from
 import { useEffect, useRef, useState } from "react";
 
 import { api, type Parser } from "../api/client";
+import { storedToken } from "../lib/vpToken";
 import type { RunOverview, Sample } from "../api/types";
 
 interface Props {
@@ -31,8 +32,12 @@ export function Toolbar({ onStarted }: Props) {
   useEffect(() => {
     api.health().then(
       (h) => {
-        if (h.parser) setParser(h.parser);
-        if (h.parsers) setInstalled(h.parsers);
+        const usable = h.parsers ?? PARSERS.map((p) => p.value);
+        setInstalled(usable);
+        // The default only if this install can run it; else the first that can.
+        const fallback = usable[0];
+        if (h.parser && usable.includes(h.parser)) setParser(h.parser);
+        else if (fallback) setParser(fallback);
       },
       () => {},
     );
@@ -63,7 +68,7 @@ export function Toolbar({ onStarted }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await api.reset();
+      await api.reset(storedToken() || undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

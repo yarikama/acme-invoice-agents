@@ -224,7 +224,7 @@ export function Dashboard({
     decision: (d) => (
       <Widget id="decision" title="VP decision" icon={SECTION_ICON.decision} signal={waiting} draggable={d}>
         {waiting && selected && s ? (
-          <DecisionPanel runId={selected.id} summary={s} needsToken={vpAuth} />
+          <DecisionPanel key={selected.id} runId={selected.id} summary={s} needsToken={vpAuth} />
         ) : (
           <Muted>{selected ? "Nothing to decide: this invoice isn't waiting for a VP." : "Nothing selected."}</Muted>
         )}

@@ -297,3 +297,18 @@ describe("reset", () => {
     expect(play([{ ...before.runs.r1!.events[0]! }], after).order).toEqual([]);
   });
 });
+
+describe("an API restart", () => {
+  it("starts the console over from the new process's log", () => {
+    const at = (s: number, boot: string, runId: string): RunEvent =>
+      ({ ...ev({ type: "started" }, runId), seq: s, boot }) as RunEvent;
+    let state: RunsState = initialRuns;
+    for (let s = 0; s <= 40; s++) state = runsReducer(state, { type: "event", event: at(s, "old", `r${s}`) });
+    expect(state.lastSeq).toBe(40);
+    // The new process's log starts again at 0: nothing is dropped as stale.
+    state = runsReducer(state, { type: "event", event: at(0, "new", "fresh") });
+    expect(state.order).toEqual(["fresh"]);
+    expect(state.lastSeq).toBe(0);
+    expect(state.boot).toBe("new");
+  });
+});

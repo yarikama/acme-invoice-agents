@@ -37,6 +37,7 @@ export const api = {
       no_key?: boolean;
       parser?: Parser;
       parsers?: Parser[];
+      boot?: string;
     }>("/api/health"),
   samples: () => request<Sample[]>("/api/samples"),
   runs: () => request<RunOverview[]>("/api/runs"),
@@ -49,7 +50,11 @@ export const api = {
     return request<RunOverview>("/api/runs/upload", { method: "POST", body: form });
   },
   /** Forget every run and received invoice, so the samples can run again. */
-  reset: () => request<void>("/api/reset", { method: "POST" }),
+  reset: (token?: string) =>
+    request<void>("/api/reset", {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
   /** The assistant's conversation after message `after`. */
   chat: (after = -1) => request<ChatState>(`/api/chat?after=${after}`),
   /** Ask the assistant; returns the messages the request added. */

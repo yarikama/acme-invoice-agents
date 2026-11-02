@@ -489,3 +489,31 @@ async def test_each_way_to_start_a_run_passes_the_parser(client, monkeypatch):
     assert bad.status_code == 422
     health = (await client.get("/api/health")).json()
     assert health["parser"] == "pymupdf"
+
+
+async def test_a_reconnect_from_before_a_restart_gets_this_process_s_whole_log(client):
+    from invoice_agents.api.app import stream_all_events
+
+    resp = await client.post("/api/runs", json={"sample": "invoice_1004.json"})
+    await settle(resp.json()["id"])
+    m = manager()
+
+    async def first(last_event_id):
+        stream = stream_all_events(m, last_event_id=last_event_id)
+        try:
+            return await anext(stream)
+        finally:
+            await stream.aclose()  # pyright: ignore[reportAttributeAccessIssue]
+
+    boot = m.boot
+    # A console that saw seq 50 of another process starts over at 0...
+    assert (await first("0ldb00t-50")).id == f"{boot}-0"
+    # ...one from this process resumes after what it saw.
+    assert (await first(f"{boot}-0")).id == f"{boot}-1"
+    assert (await first(None)).id == f"{boot}-0"
+    assert all(e["boot"] == boot for e in m.log)
+
+
+async def test_the_chat_says_how_many_messages_it_holds(client):
+    body = (await client.get("/api/chat")).json()
+    assert body["count"] == 0 and body["messages"] == []

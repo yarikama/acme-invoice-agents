@@ -1,5 +1,7 @@
 import { CheckCircleIcon, HourglassMediumIcon, type Icon, ProhibitIcon } from "@phosphor-icons/react";
 import { type ReactNode, useRef, useState } from "react";
+import { needsSecondClick } from "../../lib/confirm";
+import { storedToken, storeToken } from "../../lib/vpToken";
 
 import { api, ApiError } from "../../api/client";
 import type { Decision, Summary } from "../../api/types";
@@ -38,28 +40,6 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-const TOKEN_KEY = "acme.vpToken";
-// Paying at least this much (in the invoice's currency) takes a second click.
-const CONFIRM_ABOVE = 10_000;
-
-/** A VP token, kept for this tab only, so closing it signs the VP out. */
-function storedToken(): string {
-  try {
-    return sessionStorage.getItem(TOKEN_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function storeToken(token: string): void {
-  try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Private windows may refuse storage; the token then lasts for this card.
-  }
-}
-
 /** The VP's approve/reject form for a run paused at human_review. */
 export function DecisionPanel({
   runId,
@@ -83,7 +63,7 @@ export function DecisionPanel({
   const noteInput = useRef<HTMLInputElement>(null);
   const inv = summary.invoice;
   const reasons = summary.findings.filter((f) => f.severity !== "info");
-  const big = (inv?.total ?? 0) >= CONFIRM_ABOVE;
+  const big = needsSecondClick(inv?.total ?? null, inv?.currency ?? null);
 
   const decide = async (approved: boolean) => {
     if (approved && big && !confirming) {
