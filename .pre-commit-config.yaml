@@ -9,6 +9,8 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-added-large-files
+        # Demo GIFs for the README are meant to be a few MB.
+        exclude: ^docs/demo/
       - id: detect-private-key
 
   # Run the tools pinned in uv.lock, so hooks and CI use the same versions.
