@@ -62,14 +62,27 @@ flowchart LR
 
 ### Scanned invoices: a parser you can switch
 
-Scans and photos have no text layer, so they are read with OCR before the extraction agent sees them. Two parsers are installed, both reading characters with [Tesseract](https://github.com/tesseract-ocr/tesseract); `OCR_BACKEND` picks one:
+Scans and photos have no text layer, so a parser turns them into text before the extraction agent reads it. Three are installed; each run can pick one, and `OCR_BACKEND` sets the default:
 
-| `OCR_BACKEND` | How it reads | The two sample scans, live on Grok | OCR time |
-|---|---|---|---|
-| `pymupdf` (default) | [PyMuPDF](https://pymupdf.readthedocs.io/) renders each page; Tesseract reads it whole, line by line, so a table row stays one line | 2/2 correct (paid), $0.022 each | about 0.5 s a page |
-| `docling` | [Docling](https://github.com/docling-project/docling)'s layout model finds blocks and tables first and returns Markdown | 0/2: its table model dropped item cells on these slightly skewed scans, so both were rejected (safely, nothing paid) | about 3–6 s a page |
+| Parser | How it reads | The two sample scans, live on Grok | Time to read a scan | Extra cost |
+|---|---|---|---|---|
+| `pymupdf` (default) | [PyMuPDF](https://pymupdf.readthedocs.io/) renders each page; [Tesseract](https://github.com/tesseract-ocr/tesseract) reads it whole, line by line, so a table row stays one line | 2/2 correct (paid) | about 0.5 s | none |
+| `docling` | [Docling](https://github.com/docling-project/docling)'s layout model finds blocks and tables first, then Tesseract; returns Markdown | 0/2: its table model dropped item cells on these slightly skewed scans, so both were rejected (safely, nothing paid) | 3–6 s | none |
+| `grok` | Grok (`grok-4.3`) reads the page image and transcribes it exactly as printed, without correcting anything | 2/2 correct (paid) | 13–18 s | about $0.005 a scan |
 
-PyMuPDF is the default because it reads these scans correctly. Docling is the better choice for multi-column documents and real tables, where layout matters more than speed. A parser is one function from a file to text (`ingestion/ocr.py`), so another engine, such as a cloud OCR API, fits beside them. PyMuPDF is AGPL-licensed, which matters for a closed-source product; Docling is MIT.
+Where to pick it:
+
+| From | How |
+|---|---|
+| The CLI | `python main.py --invoice_path=data/scanned/invoice_1011_scan.png --parser grok` |
+| The terminal console | `/parser grok` for the session; `/status` shows it |
+| The web console | The **scan parser** menu beside the sample picker; it applies to Run, Run all samples and Upload |
+| The assistant, either console | "read the 1011 scan with Grok vision" plans `/run data/scanned/invoice_1011_scan.pdf (parser: grok)` for that run only |
+| The API | `"parser": "grok"` in `POST /api/runs` or `/api/runs/batch`; a `parser` form field on `/api/runs/upload` |
+
+PyMuPDF is the default because it is fast, free, offline, and reads these scans correctly. Docling suits multi-column documents and real tables. Grok vision suits phone photos, faxes and skewed or noisy scans, where Tesseract struggles, at the price of a model call. Grok only transcribes; the extraction agent and every check still run on its text, so a misread can't skip validation. Its readings are recorded with the rest, so replay shows them without a key.
+
+A parser is one function from a file to text (`ingestion/ocr.py`), so another engine, such as a cloud invoice OCR, fits beside these. PyMuPDF is AGPL-licensed, which matters for a closed-source product; Docling and Tesseract are MIT and Apache 2.0.
 
 ### Five loops catch mistakes before a person sees them
 
@@ -111,13 +124,13 @@ The held-out set was written after the adversarial fixes and committed before it
 | Assistant | Plan-then-run with code allowlists; Redis-backed shared history | Plain words in both consoles without letting text move money | Needs a live model; Redis to share |
 | Replay | Record each agent's answers and timing, keyed by its inputs | Reviewers without a key see the real agents, at the real pace | A recording to refresh when inputs change; a test fails when it no longer covers every eval case |
 | VP identity | A bearer token per VP; the run records whose | Separation of duties needs the approver to be someone, provably | Shared secrets, not SSO |
-| OCR | PyMuPDF by default, Docling by setting; both on Tesseract | Local, CPU, no cloud; text PDFs keep the fast path | Tesseract to install; Docling brings PyTorch |
+| Scan parser | PyMuPDF by default; Docling or Grok vision per run | Local, free and fast by default; a model only when a scan needs it | Tesseract to install; Docling brings PyTorch |
 
 ## API
 
 | Method | Path | |
 |---|---|---|
-| `POST` | `/api/runs`, `/api/runs/upload`, `/api/runs/batch` | Run a sample, an uploaded file, or every sample in order |
+| `POST` | `/api/runs`, `/api/runs/upload`, `/api/runs/batch` | Run a sample, an uploaded file, or every sample in order; an optional `parser` picks what reads scans |
 | `GET` | `/api/runs`, `/api/runs/{id}` | Run list; one run's state and events |
 | `GET` | `/api/runs/{id}/events`, `/api/events` | Server-sent events for one run or all |
 | `POST` | `/api/runs/{id}/decision` | The VP's answer; a rejection needs a reason; `Authorization: Bearer <token>` when `VP_TOKENS` is set |

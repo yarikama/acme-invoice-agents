@@ -26,6 +26,7 @@ import subprocess
 import sys
 import webbrowser
 from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,7 @@ from invoice_agents.cli import (
 )
 from invoice_agents.config import ROOT, get_settings
 from invoice_agents.inbox import Inbox, watch
+from invoice_agents.ingestion.ocr import PARSERS
 from invoice_agents.inventory import Inventory
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import chat_model
@@ -78,6 +80,11 @@ from invoice_agents.terminal import OUTCOME_STYLE, OUTCOME_WORD, SIGNAL, money
 
 LOGS = Path(".acme-logs")
 VP_MODES = ("ask", "approve", "reject", "wait")
+PARSER_HELP = {
+    "pymupdf": "Tesseract on the whole page, fast",
+    "docling": "Docling's layout model, then Tesseract",
+    "grok": "Grok reads the page image",
+}
 HISTORY = LOGS / "history"
 
 
@@ -115,6 +122,11 @@ COMMANDS = [
     Command("reject", "/reject <run> <reason>", "Reject a run waiting for the VP."),
     Command(
         "vp", "/vp [ask|approve|reject|wait]", "How to answer when a run needs the VP."
+    ),
+    Command(
+        "parser",
+        "/parser [pymupdf|docling|grok]",
+        "What reads scanned invoices: Tesseract, Docling's layout model, or Grok.",
     ),
     Command("serve", "/serve", "Start the API and the web console."),
     Command("open", "/open", "Open the web console in the browser."),
@@ -167,7 +179,9 @@ def complete(text: str, line: str) -> list[str]:
     first = not words or (len(words) == 1 and not line.endswith(" "))
     command = words[0].lstrip("/") if words else ""
     if not first and command not in PATH_ARGS:
-        choices = {"vp": VP_MODES, "help": tuple(BY_NAME)}.get(command, ())
+        choices = {"vp": VP_MODES, "parser": PARSERS, "help": tuple(BY_NAME)}.get(
+            command, ()
+        )
         return [c for c in choices if c.startswith(text)]
     commands = (
         [f"/{n} " for n in BY_NAME if n.startswith(text[1:])]
@@ -364,6 +378,7 @@ class Shell:
             "approve": lambda a: self.decide(a, approved=True),
             "reject": lambda a: self.decide(a, approved=False),
             "vp": self.vp,
+            "parser": self.parser,
             "serve": self.serve,
             "open": self.open,
             "status": self.status,
@@ -574,6 +589,35 @@ class Shell:
         self.vp_mode = args[0]
         console.print(f"  When a run needs the VP: [bold]{self.vp_mode}[/]")
 
+    def parser(self, args: list[str]) -> None:
+        if args and args[0] not in PARSERS:
+            self._usage("parser")
+            return
+        if args:
+            self.args.parser = args[0]
+            if self.conn is not None:
+                self.conn.runner.parser = args[0]
+        console.print(
+            f"  Scanned invoices are read by [bold]{self._parser()}[/]"
+            f" ({PARSER_HELP[self._parser()]})."
+        )
+
+    @contextmanager
+    def _parser_for(self, choice: str | None) -> Iterator[None]:
+        """A step's own parser for the length of the step, then the session's."""
+        if choice is None or self.conn is None:
+            yield
+            return
+        runner = self.conn.runner
+        before, runner.parser = runner.parser, choice
+        try:
+            yield
+        finally:
+            runner.parser = before
+
+    def _parser(self) -> str:
+        return getattr(self.args, "parser", None) or get_settings().ocr_backend
+
     def serve(self, _args: list[str]) -> None:
         self._serve(quiet=False)
         self._connect()
@@ -602,6 +646,7 @@ class Shell:
         table.add_row("Critic", s.critic_model or s.review_model)
         table.add_row("Triage", s.triage_model or "off")
         table.add_row("VP answers", self.vp_mode)
+        table.add_row("Scan parser", self._parser())
         table.add_row("API", self.args.api if self.conn.api_up else "not running")
         table.add_row(
             "Web console", self.args.web if self.conn.web_up else "not running"
@@ -721,6 +766,8 @@ class Shell:
             console.print(Text(f"    ✕ Not run: {reason}", style="#a6a69f"))
         for step in steps:
             command = shlex.join([f"/{step.command}", *step.args])
+            if step.parser:
+                command += f" (parser: {step.parser})"
             console.print(Text.assemble("    → ", (command, f"bold {SIGNAL}")))
         if steps:
             console.print()
@@ -729,7 +776,8 @@ class Shell:
             if step.command == "eval" and not self._confirm_eval():
                 console.print("  Not running the eval.")
                 continue
-            self.handlers[step.command](step.args)
+            with self._parser_for(step.parser):
+                self.handlers[step.command](step.args)
         if outcome := memory.outcomes(self.history[before:]):
             # What came of it, for "why was that one rejected?" next time,
             # here or in the web console.
@@ -771,7 +819,9 @@ class Shell:
     def _status_line(self) -> str:
         s = get_settings()
         api = "API up" if self.conn and self.conn.api_up else "local"
-        return f"{s.llm_provider} · {api} · VP: {self.vp_mode}"
+        return (
+            f"{s.llm_provider} · {api} · VP: {self.vp_mode} · parser: {self._parser()}"
+        )
 
     # --- helpers --------------------------------------------------------------
 

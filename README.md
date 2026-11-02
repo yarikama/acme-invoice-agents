@@ -83,7 +83,7 @@ flowchart LR
   V -.-> D
 ```
 
-1. **Ingest.** JSON, CSV and XML are read by code. Text and PDF invoices go to Grok, which fills in a typed form (vendor, amount, items, due date) and fixes typos like "2O26". If something is missing, it is asked again with what was wrong. Scanned PDFs and photos are read with OCR first, with a parser you choose: `OCR_BACKEND=pymupdf` (default: fast, whole-page text) or `OCR_BACKEND=docling` (layout-aware Markdown).
+1. **Ingest.** JSON, CSV and XML are read by code. Text and PDF invoices go to Grok, which fills in a typed form (vendor, amount, items, due date) and fixes typos like "2O26". If something is missing, it is asked again with what was wrong. Scanned PDFs and photos are read first by a parser you pick for each run: **PyMuPDF** (default; Tesseract on the whole page, fast and free), **Docling** (a layout model finds the tables first) or **Grok vision** (Grok reads the page image; best on poor scans). Pick it with `--parser`, `/parser` in the console, the **scan parser** menu in the web console, or in plain words ("read the 1011 scan with Grok").
 2. **Validate.** Code, no AI: it checks the math, stock in the SQLite inventory, unknown items, duplicates, prices, the $10,000 threshold and known fraud signs. Each problem is an error (blocks payment) or a warning (needs judgment).
 3. **Approve.** A Grok agent decides approve, reject or escalate. It calls tools to look up what it needs (stock, vendor history, exchange rates). A critic reviews the decision and can send it back. Code then applies the policy: an error means reject, and big or risky invoices go to a VP.
 4. **Pay or reject.** Approved invoices go to the mock payment API; rejections are logged with the reason.

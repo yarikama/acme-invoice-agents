@@ -72,10 +72,11 @@ class Api:
         self.base = base.rstrip("/")
         self.client = client
 
-    async def start(self, path: Path) -> str:
+    async def start(self, path: Path, parser: str | None = None) -> str:
         r = await self.client.post(
             f"{self.base}/api/runs/upload",
             files={"file": (path.name, await asyncio.to_thread(path.read_bytes))},
+            data={"parser": parser} if parser else None,
             timeout=30,
         )
         r.raise_for_status()

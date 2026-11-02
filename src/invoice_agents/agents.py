@@ -7,6 +7,7 @@ no network, so tests are deterministic and the CLI works without a key.
 from __future__ import annotations
 
 import asyncio
+import base64
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -242,6 +243,53 @@ class LLMExtractor:
                 + "\n".join(f"- {item}" for item in feedback)
             )
         return await _structured(self.llm, Extraction, prompt)
+
+
+VISION_PROMPT = """\
+Transcribe this scanned invoice page into plain text, exactly as printed.
+One printed line per line; keep each table row on one line, cells separated
+by spaces. Copy every name, number and date exactly as it appears, even if it
+looks wrong: don't correct, add, explain or summarize anything."""
+
+
+class Reader(Protocol):
+    """Reads a scanned page's text. Sync: ingestion runs in a worker thread."""
+
+    model: str
+
+    def read(self, path: Path) -> str: ...
+
+
+class LLMVisionReader:
+    """Grok reads the page image itself, in place of OCR. It only transcribes;
+    the extraction agent still turns the text into an invoice, so a scan goes
+    through the same checks as any other file."""
+
+    def __init__(self, llm: BaseChatModel, model: str) -> None:
+        self.llm, self.model = llm, model
+
+    def read(self, path: Path) -> str:
+        from invoice_agents.ingestion.ocr import page_images
+
+        pages = []
+        for png in page_images(path, dpi=200):
+            image = base64.b64encode(png).decode()
+            reply = self.llm.invoke(
+                [
+                    HumanMessage(
+                        content=[
+                            {"type": "text", "text": VISION_PROMPT},
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": f"data:image/png;base64,{image}"},
+                            },
+                        ]
+                    )
+                ]
+            )
+            record(reply)
+            pages.append(reply.text.strip())
+        return "\n\n".join(pages)
 
 
 class LLMApprover:

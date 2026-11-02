@@ -52,7 +52,7 @@ from invoice_agents.graph import (
 )
 from invoice_agents.inbox import Inbox, watch
 from invoice_agents.ingestion import UnsupportedFormatError
-from invoice_agents.ingestion.ocr import OcrUnavailableError
+from invoice_agents.ingestion.ocr import PARSERS, OcrUnavailableError
 from invoice_agents.ledger import Ledger
 from invoice_agents.llm import load_pricing
 from invoice_agents.payment import MockBank
@@ -89,6 +89,14 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="How to answer when an invoice needs a human VP: ask here, approve,"
         " reject, or wait for a VP in the web console (default: ask; wait with"
         " --watch)",
+    )
+    parser.add_argument(
+        "--parser",
+        choices=PARSERS,
+        default=None,
+        help="What reads a scanned PDF or photo: pymupdf (Tesseract on the whole"
+        " page, fast), docling (layout model, Markdown tables) or grok (Grok"
+        " reads the image; needs a key). Default: OCR_BACKEND, else pymupdf",
     )
     parser.add_argument(
         "--json", action="store_true", help="Print results as JSON to stdout"
@@ -231,6 +239,9 @@ def _print_finished(view: RunView) -> None:
 
 
 class Runner(Protocol):
+    # The parser for scans, or None for the configured default.
+    parser: str | None
+
     async def process(self, path: Path, vp_mode: str) -> dict[str, Any]: ...
 
 
@@ -238,6 +249,7 @@ class LocalRunner:
     """Runs the graph in this process."""
 
     def __init__(self, settings: Settings) -> None:
+        self.parser: str | None = None
         # Prices for each step's cost, as the API shows them.
         deps = stored_deps(settings, load_pricing(settings))
         self.ledger = deps.seen
@@ -263,6 +275,8 @@ class LocalRunner:
     async def _process(self, run_id: str, path: Path, vp_mode: str) -> dict[str, Any]:
         config: Any = {"configurable": {"thread_id": run_id}}
         payload: Any = {"path": str(path)}
+        if self.parser:
+            payload["parser"] = self.parser
         view = RunView(path.name)
         while True:
             paused = None
@@ -292,9 +306,10 @@ class RemoteRunner:
 
     def __init__(self, api: remote.Api) -> None:
         self.api = api
+        self.parser: str | None = None
 
     async def process(self, path: Path, vp_mode: str) -> dict[str, Any]:
-        run_id = await self.api.start(path)
+        run_id = await self.api.start(path, self.parser)
         view = RunView(path.name)
         live = Live(view, console=console, refresh_per_second=12, transient=False)
         live.start()
@@ -391,13 +406,14 @@ async def connect(
             f"Runs go through the API at {args.api},"
             " so each one also appears in the console."
         )
-        return Connection(
-            RemoteRunner(remote.Api(args.api, client)), api_up, web_up, mode
-        )
-    mode = f"Running here with the {settings.llm_provider} provider."
-    if settings.replay_for_lack_of_key:
-        mode += NO_KEY
-    return Connection(local or LocalRunner(settings), api_up, web_up, mode)
+        runner: Runner = RemoteRunner(remote.Api(args.api, client))
+    else:
+        mode = f"Running here with the {settings.llm_provider} provider."
+        if settings.replay_for_lack_of_key:
+            mode += NO_KEY
+        runner = local or LocalRunner(settings)
+    runner.parser = getattr(args, "parser", None)
+    return Connection(runner, api_up, web_up, mode)
 
 
 def invoice_files(target: Path) -> list[Path]:

@@ -25,15 +25,22 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+/** What reads a scanned PDF or photo. */
+export type Parser = "pymupdf" | "docling" | "grok";
+
 export const api = {
-  health: () => request<{ status: string; llm_provider: string; vp_auth: boolean; no_key?: boolean }>("/api/health"),
+  health: () =>
+    request<{ status: string; llm_provider: string; vp_auth: boolean; no_key?: boolean; parser?: Parser }>(
+      "/api/health",
+    ),
   samples: () => request<Sample[]>("/api/samples"),
   runs: () => request<RunOverview[]>("/api/runs"),
-  startSample: (sample: string) => request<RunOverview>("/api/runs", json({ sample })),
-  startBatch: () => request<RunOverview[]>("/api/runs/batch", { method: "POST" }),
-  upload: (file: File) => {
+  startSample: (sample: string, parser?: Parser) => request<RunOverview>("/api/runs", json({ sample, parser })),
+  startBatch: (parser?: Parser) => request<RunOverview[]>("/api/runs/batch", json({ parser })),
+  upload: (file: File, parser?: Parser) => {
     const form = new FormData();
     form.append("file", file);
+    if (parser) form.append("parser", parser);
     return request<RunOverview>("/api/runs/upload", { method: "POST", body: form });
   },
   /** Forget every run and received invoice, so the samples can run again. */
