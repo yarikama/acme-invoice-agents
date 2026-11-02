@@ -155,7 +155,7 @@ def validate(
     findings += _renamed(invoice, document)
     master = inventory.vendors()
     seen = seen if seen is not None else SeenInvoices()
-    findings += _duplicates(invoice, seen)
+    findings += _duplicates(invoice, seen) or _resubmitted(invoice, seen)
     findings += _split(invoice, seen, policy)
     findings += _lookalike_vendor(invoice, seen, master) or _new_vendor(
         invoice, seen, master
@@ -689,6 +689,50 @@ def _threshold(inv: Invoice, policy: Policy) -> list[Finding]:
             )
         ]
     return []
+
+
+def _resubmitted(inv: Invoice, seen: SeenInvoices) -> list[Finding]:
+    """The same vendor, total and date as an invoice still standing, under
+    another number: sent again with a new number, or the same invoice with its
+    number misread (OCR read a scanned INV-1011 as INV-10114). Code can't tell
+    which, so a person decides; nothing pays it on its own."""
+    if inv.total is None or not inv.vendor:
+        return []
+    vendor = _vendor_key(inv.vendor)
+    number = _number_key(inv.invoice_number or "")
+    issued = parse_date(inv.invoice_date)
+
+    def same_day(other: Invoice) -> bool:
+        when = parse_date(other.invoice_date)
+        # A missing date can't rule a match out.
+        return issued is None or when is None or issued == when
+
+    earlier = [
+        e.invoice
+        for e in seen.entries
+        if e.outcome in STANDING
+        and e.invoice.vendor
+        and _vendor_key(e.invoice.vendor) == vendor
+        and e.invoice.total is not None
+        and abs(e.invoice.total - inv.total) < 0.005
+        and e.invoice.currency == inv.currency
+        and _number_key(e.invoice.invoice_number or "") != number
+        and same_day(e.invoice)
+    ]
+    if not earlier:
+        return []
+    first = earlier[0]
+    return [
+        _f(
+            "POSSIBLE_DUPLICATE",
+            Severity.WARNING,
+            "Same vendor, date and total as an earlier invoice",
+            f"{first.invoice_number or 'An unnumbered invoice'} from {first.vendor}"
+            f" for {inv.currency} {inv.total:,.2f} was already received. This may"
+            " be the same invoice sent again under a new number, or its number"
+            " misread.",
+        )
+    ]
 
 
 def _duplicates(inv: Invoice, seen: SeenInvoices) -> list[Finding]:

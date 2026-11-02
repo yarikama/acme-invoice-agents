@@ -1,5 +1,6 @@
 import pytest
 
+from invoice_agents.config import Settings
 from invoice_agents.ingestion import load_document
 from invoice_agents.models import Invoice, LineItem, Severity
 from invoice_agents.validation import Policy, SeenInvoices, ungrounded, validate
@@ -425,3 +426,54 @@ def test_nan_and_infinity_are_not_numbers_an_invoice_can_hold():
         LineItem(item="W", quantity=1, unit_price=float("nan"))
     with pytest.raises(pydantic.ValidationError):
         make([("WidgetA", 1, 250)], float("inf"))
+
+
+def inv_1011() -> Invoice:
+    """INV-1011 as Grok reads the sample's text and PDF."""
+    return make(
+        [("WidgetA", 6, 250.0), ("WidgetB", 3, 500.0)],
+        3000.0,
+        invoice_number="INV-1011",
+        vendor="Summit Manufacturing Co.",
+        invoice_date="2026-01-20",
+        due_date="2026-02-20",
+    )
+
+
+def test_same_invoice_under_a_misread_number_goes_to_a_vp(inventory):
+    """A scan of INV-1011 that OCR reads as INV-10114, after the PDF was paid:
+    the number check can't match it, so vendor, date and total do."""
+    seen = SeenInvoices()
+    paid = inv_1011()
+    seen.add(paid, run_id="r1")
+    seen.settle("r1", "paid")
+    misread = paid.model_copy(update={"invoice_number": "INV-10114"})
+    report = validate(misread, inventory, seen)
+    assert "POSSIBLE_DUPLICATE" in codes(report, Severity.WARNING)
+    assert "DUPLICATE" not in codes(report)
+    # A person decides: the policy never pays it on its own.
+    settings = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
+    assert "POSSIBLE_DUPLICATE" in settings.vp_required_findings
+
+
+def test_possible_duplicate_needs_the_same_vendor_day_and_total(inventory):
+    seen = SeenInvoices()
+    first = inv_1011()
+    seen.add(first, run_id="r1")
+    renumbered = {"invoice_number": "INV-9999"}
+    for change in (
+        {"invoice_date": "2026-03-20"},  # the same amount next month: a new bill
+        {"total": 2999.0},
+        {"vendor": "Another Vendor LLC"},
+    ):
+        other = first.model_copy(update={**renumbered, **change})
+        assert "POSSIBLE_DUPLICATE" not in codes(validate(other, inventory, seen)), (
+            change
+        )
+    # The same number is a plain duplicate, not both.
+    again = validate(first, inventory, seen)
+    assert "DUPLICATE" in codes(again) and "POSSIBLE_DUPLICATE" not in codes(again)
+    # A rejected invoice may come back fixed under a new number.
+    seen.settle("r1", "rejected")
+    other = first.model_copy(update=renumbered)
+    assert "POSSIBLE_DUPLICATE" not in codes(validate(other, inventory, seen))

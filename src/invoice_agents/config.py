@@ -100,6 +100,7 @@ class Settings(BaseSettings):
         "INSTRUCTIONS_IN_DOCUMENT",
         "BANK_DETAILS_CHANGED",
         "LOOKALIKE_VENDOR",
+        "POSSIBLE_DUPLICATE",
     ]
     # The default parser for scanned PDFs and photos; a run can pick another.
     # pymupdf (whole page, fast) and docling (layout, Markdown tables) use
